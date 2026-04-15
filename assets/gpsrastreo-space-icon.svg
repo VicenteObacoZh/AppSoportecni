@@ -1,0 +1,165 @@
+﻿<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="outerGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(512 418) rotate(90) scale(438 438)">
+      <stop offset="0" stop-color="#7FB8FF" stop-opacity="0.55"/>
+      <stop offset="0.45" stop-color="#2F5FA8" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="cardBg" x1="182" y1="152" x2="803" y2="758" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#08152F"/>
+      <stop offset="0.58" stop-color="#0C2A5D"/>
+      <stop offset="1" stop-color="#133F85"/>
+    </linearGradient>
+    <radialGradient id="nebula" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(694 286) rotate(147.735) scale(265.847 205.791)">
+      <stop offset="0" stop-color="#BFD8FF" stop-opacity="0.92"/>
+      <stop offset="0.33" stop-color="#84AAFF" stop-opacity="0.52"/>
+      <stop offset="1" stop-color="#84AAFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="earthOcean" x1="292" y1="528" x2="704" y2="792" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2C9BFF"/>
+      <stop offset="0.52" stop-color="#1271D8"/>
+      <stop offset="1" stop-color="#063D8B"/>
+    </linearGradient>
+    <linearGradient id="earthLand" x1="335" y1="560" x2="683" y2="749" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#B9E271"/>
+      <stop offset="1" stop-color="#5A8E28"/>
+    </linearGradient>
+    <linearGradient id="orbitGlow" x1="192" y1="648" x2="788" y2="648" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6ED3FF"/>
+      <stop offset="0.5" stop-color="#BDF5FF"/>
+      <stop offset="1" stop-color="#6ED3FF"/>
+    </linearGradient>
+    <linearGradient id="pinRed" x1="529" y1="370" x2="698" y2="673" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FF5E4F"/>
+      <stop offset="0.45" stop-color="#FF1E14"/>
+      <stop offset="1" stop-color="#AF0904"/>
+    </linearGradient>
+    <linearGradient id="pinShadow" x1="665" y1="442" x2="729" y2="632" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#851009"/>
+      <stop offset="1" stop-color="#470000"/>
+    </linearGradient>
+    <radialGradient id="pinHole" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(615 458) rotate(135) scale(74 74)">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#D8E0EC"/>
+    </radialGradient>
+    <linearGradient id="satMetal" x1="213" y1="226" x2="377" y2="343" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#EAF2FF"/>
+      <stop offset="0.28" stop-color="#86A8D8"/>
+      <stop offset="0.54" stop-color="#F4FAFF"/>
+      <stop offset="0.79" stop-color="#5879AD"/>
+      <stop offset="1" stop-color="#D2E2FF"/>
+    </linearGradient>
+    <linearGradient id="panelBlue" x1="109" y1="291" x2="399" y2="213" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3D86F5"/>
+      <stop offset="1" stop-color="#1A4BB6"/>
+    </linearGradient>
+    <filter id="cardShadow" x="112" y="116" width="800" height="715" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="26" stdDeviation="30" flood-color="#020A16" flood-opacity="0.48"/>
+    </filter>
+    <filter id="pinDrop" x="488" y="338" width="277" height="387" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="12" dy="16" stdDeviation="10" flood-color="#2D0101" flood-opacity="0.45"/>
+    </filter>
+    <filter id="textGlow" x="176" y="785" width="674" height="157" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="18"/>
+    </filter>
+    <clipPath id="cardClip">
+      <rect x="182" y="154" width="660" height="660" rx="92"/>
+    </clipPath>
+  </defs>
+
+  <rect width="1024" height="1024" fill="#02060E"/>
+  <circle cx="512" cy="420" r="420" fill="url(#outerGlow)"/>
+
+  <g filter="url(#cardShadow)">
+    <rect x="182" y="154" width="660" height="660" rx="92" fill="url(#cardBg)"/>
+    <rect x="182.75" y="154.75" width="658.5" height="658.5" rx="91.25" stroke="#8CA7D2" stroke-opacity="0.35" stroke-width="1.5"/>
+  </g>
+
+  <g clip-path="url(#cardClip)">
+    <rect x="182" y="154" width="660" height="660" rx="92" fill="url(#cardBg)"/>
+    <ellipse cx="694" cy="286" rx="212" ry="154" fill="url(#nebula)"/>
+
+    <g opacity="0.95" fill="#DDEBFF">
+      <circle cx="255" cy="238" r="2.5"/>
+      <circle cx="291" cy="272" r="2"/>
+      <circle cx="344" cy="229" r="2.7"/>
+      <circle cx="391" cy="284" r="1.8"/>
+      <circle cx="470" cy="233" r="2.2"/>
+      <circle cx="522" cy="265" r="1.6"/>
+      <circle cx="600" cy="215" r="2.1"/>
+      <circle cx="644" cy="244" r="2.8"/>
+      <circle cx="705" cy="198" r="2.4"/>
+      <circle cx="744" cy="236" r="1.9"/>
+      <circle cx="791" cy="194" r="2.1"/>
+      <circle cx="754" cy="308" r="1.9"/>
+      <circle cx="694" cy="331" r="2.6"/>
+      <circle cx="620" cy="295" r="1.8"/>
+      <circle cx="560" cy="336" r="2.2"/>
+      <circle cx="463" cy="304" r="1.9"/>
+      <circle cx="378" cy="337" r="2.2"/>
+      <circle cx="310" cy="316" r="2.5"/>
+      <circle cx="229" cy="351" r="2.1"/>
+      <circle cx="817" cy="261" r="2.4"/>
+      <circle cx="781" cy="365" r="2.8"/>
+      <circle cx="684" cy="379" r="1.8"/>
+      <circle cx="592" cy="366" r="2.1"/>
+    </g>
+
+    <g transform="translate(126 135) rotate(-18 183 118)">
+      <rect x="-6" y="109" width="134" height="66" rx="4" fill="#D9E6FF"/>
+      <rect x="0" y="114" width="122" height="56" rx="2" fill="url(#panelBlue)"/>
+      <path d="M0 132H122M0 150H122M30 114V170M60 114V170M90 114V170" stroke="#EAF2FF" stroke-width="3" opacity="0.8"/>
+      <rect x="252" y="42" width="134" height="66" rx="4" fill="#D9E6FF"/>
+      <rect x="258" y="47" width="122" height="56" rx="2" fill="url(#panelBlue)"/>
+      <path d="M258 65H380M258 83H380M288 47V103M318 47V103M348 47V103" stroke="#EAF2FF" stroke-width="3" opacity="0.8"/>
+      <rect x="104" y="78" width="163" height="82" rx="36" fill="#0D1730"/>
+      <rect x="125" y="89" width="121" height="60" rx="26" fill="url(#satMetal)" stroke="#E8F1FF" stroke-opacity="0.5" stroke-width="2"/>
+      <circle cx="252" cy="122" r="43" fill="url(#satMetal)" stroke="#DCE9FF" stroke-width="2"/>
+      <circle cx="252" cy="122" r="29" fill="#152748"/>
+      <path d="M225 138C239 130 262 130 276 138" stroke="#EFF6FF" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="252" cy="122" r="8" fill="#F3F8FF"/>
+    </g>
+
+    <path d="M427 366C463 352 501 329 531 296" stroke="#A8F0FF" stroke-width="14" stroke-linecap="round" opacity="0.96"/>
+    <path d="M441 396C492 378 534 342 566 308" stroke="#96EAFF" stroke-width="14" stroke-linecap="round" opacity="0.92"/>
+    <path d="M458 429C521 408 570 360 605 319" stroke="#86E4FF" stroke-width="14" stroke-linecap="round" opacity="0.88"/>
+
+    <g>
+      <ellipse cx="508" cy="712" rx="294" ry="146" fill="url(#earthOcean)"/>
+      <path d="M259 698C310 654 352 633 407 622C430 617 454 624 474 639C501 661 535 664 568 650C616 629 644 636 698 666C731 685 760 711 792 743C772 774 714 809 629 825C548 840 438 833 345 802C306 789 273 763 259 698Z" fill="url(#earthLand)" opacity="0.98"/>
+      <path d="M520 634C554 617 598 620 648 642C686 658 720 678 754 712C733 742 687 768 634 777C600 782 572 772 548 752C528 735 497 727 454 729C399 731 343 719 294 690C319 662 365 644 431 640C466 638 493 642 520 634Z" fill="#D1E979" opacity="0.85"/>
+      <path d="M282 736C388 706 492 696 599 698C651 699 704 703 762 715" stroke="#9EE6FF" stroke-opacity="0.65" stroke-width="3"/>
+      <path d="M342 604C332 654 330 713 343 780" stroke="#9EE6FF" stroke-opacity="0.65" stroke-width="3"/>
+      <path d="M434 583C426 645 426 718 440 795" stroke="#9EE6FF" stroke-opacity="0.65" stroke-width="3"/>
+      <path d="M530 585C522 651 523 721 536 792" stroke="#9EE6FF" stroke-opacity="0.65" stroke-width="3"/>
+      <path d="M629 604C626 653 633 710 648 771" stroke="#9EE6FF" stroke-opacity="0.65" stroke-width="3"/>
+      <path d="M312 662C403 630 518 622 639 640C692 648 734 661 772 678" stroke="#9EE6FF" stroke-opacity="0.65" stroke-width="3"/>
+      <path d="M295 777C372 741 470 730 578 737C639 741 700 752 750 771" stroke="#9EE6FF" stroke-opacity="0.55" stroke-width="3"/>
+    </g>
+
+    <ellipse cx="499" cy="668" rx="312" ry="123" fill="none" stroke="url(#orbitGlow)" stroke-width="11" opacity="0.98"/>
+    <ellipse cx="499" cy="668" rx="320" ry="131" fill="none" stroke="#85E8FF" stroke-opacity="0.3" stroke-width="24"/>
+    <circle cx="274" cy="608" r="12" fill="#F8FFFF"/>
+
+    <g opacity="0.95">
+      <circle cx="792" cy="549" r="26" fill="#FFF5D9"/>
+      <circle cx="792" cy="549" r="48" fill="#FFCC55" fill-opacity="0.28"/>
+      <circle cx="792" cy="549" r="74" fill="#FFB533" fill-opacity="0.12"/>
+    </g>
+
+    <g filter="url(#pinDrop)">
+      <path d="M669 690L544 690L659 506C671 487 677 464 677 441C677 377 625 325 561 325C497 325 445 377 445 441C445 464 451 487 463 506L578 690H553L561 702L669 690Z" fill="url(#pinShadow)" opacity="0.85"/>
+      <path d="M562 354C492 354 435 411 435 481C435 506 442 529 456 550L562 710L668 550C682 529 689 506 689 481C689 411 632 354 562 354Z" fill="url(#pinRed)"/>
+      <path d="M562 354C492 354 435 411 435 481C435 506 442 529 456 550L562 710L562 354Z" fill="#FF2B22"/>
+      <circle cx="562" cy="458" r="62" fill="url(#pinHole)"/>
+      <circle cx="562" cy="458" r="65" stroke="#9B0A04" stroke-width="6" stroke-opacity="0.55"/>
+      <path d="M501 393C521 371 553 358 582 358" stroke="#FFB1AA" stroke-width="8" stroke-linecap="round" opacity="0.78"/>
+      <path d="M497 410C512 394 533 386 551 385" stroke="#FFD1CC" stroke-width="6" stroke-linecap="round" opacity="0.72"/>
+    </g>
+  </g>
+
+  <g filter="url(#textGlow)" opacity="0.92">
+    <text x="512" y="885" text-anchor="middle" fill="#FFFFFF" fill-opacity="0.75" font-family="Segoe UI, Arial, sans-serif" font-size="92" font-weight="700">GpsRastreo</text>
+  </g>
+  <text x="512" y="885" text-anchor="middle" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="92" font-weight="700">GpsRastreo</text>
+</svg>

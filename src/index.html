@@ -1,0 +1,242 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GpsRastreo | Centro de Monitoreo</title>
+  <meta name="description" content="Interfaz inicial de GpsRastreo para monitoreo satelital, alertas y control operativo." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <header class="hero">
+      <nav class="topbar">
+        <div class="brand">
+          <img src="../assets/icono.png" alt="GpsRastreo" class="brand__icon" />
+          <div>
+            <p class="eyebrow">Sistema de Rastreo Satelital</p>
+            <h1>GpsRastreo</h1>
+          </div>
+        </div>
+        <div class="topbar__actions">
+          <a class="pill pill--ghost" href="https://rastreo.soportecni.com" target="_blank" rel="noreferrer">Abrir plataforma real</a>
+          <a class="pill pill--ghost" href="./login.html">Login demo</a>
+          <a class="pill pill--ghost" href="./dashboard.html">Dashboard demo</a>
+          <button class="pill pill--primary" id="checkApiButton" type="button">Probar API</button>
+        </div>
+      </nav>
+
+      <section class="hero__content">
+        <div class="hero__copy">
+          <span class="hero__tag">Cobertura internacional y monitoreo en tiempo real</span>
+          <h2>Controla flotas, activos y alertas desde una sola cabina operativa.</h2>
+          <p>
+            Esta primera base de GpsRastreo toma como referencia la plataforma viva en
+            <strong>rastreo.soportecni.com</strong> para construir una experiencia moderna, clara y lista para crecer.
+          </p>
+          <div class="hero__cta">
+            <a class="pill pill--primary" href="./login.html">Entrar a GpsRastreo</a>
+            <a class="pill pill--ghost" href="./dashboard.html">Ver dashboard</a>
+            <a class="pill pill--primary" href="#modulos">Ver modulos</a>
+            <a class="pill pill--ghost" href="#arquitectura">Revisar arquitectura</a>
+          </div>
+          <dl class="hero__stats">
+            <div>
+              <dt>Base API</dt>
+              <dd>https://rastreo.soportecni.com</dd>
+            </div>
+            <div>
+              <dt>Estado esperado</dt>
+              <dd>Operativo</dd>
+            </div>
+            <div>
+              <dt>Enfoque</dt>
+              <dd>Monitoreo, soporte y trazabilidad</dd>
+            </div>
+          </dl>
+        </div>
+
+        <aside class="mission-card">
+          <div class="mission-card__glow"></div>
+          <img src="../assets/icono.png" alt="Icono GpsRastreo" class="mission-card__image" />
+          <div class="mission-card__body">
+            <p class="eyebrow">Cabina central</p>
+            <h3>Vision inicial del producto</h3>
+            <ul>
+              <li>Monitoreo de unidades en vivo</li>
+              <li>Alertas por eventos criticos</li>
+              <li>Historial de recorridos y reportes</li>
+              <li>Panel rapido para operadores y administradores</li>
+            </ul>
+          </div>
+        </aside>
+      </section>
+    </header>
+
+    <main>
+      <section class="status-grid">
+        <article class="status-card status-card--highlight">
+          <p class="eyebrow">Estado del servicio</p>
+          <h3 id="apiStatus">Pendiente de validacion</h3>
+          <p id="apiMessage">Pulsa "Probar API" para verificar conectividad con la plataforma.</p>
+        </article>
+        <article class="status-card">
+          <p class="eyebrow">Rol principal</p>
+          <h3>Operador de monitoreo</h3>
+          <p>Vista preparada para priorizar ubicacion, incidentes, geocercas y respuesta rapida.</p>
+        </article>
+        <article class="status-card">
+          <p class="eyebrow">Experiencia</p>
+          <h3>Dashboard unificado</h3>
+          <p>Una sola interfaz para seguimiento de flota, historial, alertas y disponibilidad de servicio.</p>
+        </article>
+      </section>
+
+      <section class="journey">
+        <div class="section-heading">
+          <p class="eyebrow">Recorrido del usuario</p>
+          <h2>Una experiencia pensada para operar rapido y sin friccion</h2>
+        </div>
+        <div class="journey__grid">
+          <article class="journey-card">
+            <span class="journey-card__step">Paso 01</span>
+            <h3>Acceso seguro</h3>
+            <p>Ingreso con credenciales, acceso por rol y recordatorio de operador para turnos continuos.</p>
+            <a class="text-link" href="./login.html">Abrir pantalla de login</a>
+          </article>
+          <article class="journey-card">
+            <span class="journey-card__step">Paso 02</span>
+            <h3>Centro de monitoreo</h3>
+            <p>Mapa central, estado de flota, alertas recientes y visibilidad inmediata de incidentes.</p>
+            <a class="text-link" href="./dashboard.html">Abrir dashboard demo</a>
+          </article>
+          <article class="journey-card">
+            <span class="journey-card__step">Paso 03</span>
+            <h3>Accion operativa</h3>
+            <p>Consulta historicos, revisa geocercas, filtra recorridos y escala novedades al equipo de soporte.</p>
+            <a class="text-link" href="#arquitectura">Ver siguiente fase</a>
+          </article>
+        </div>
+      </section>
+
+      <section class="modules" id="modulos">
+        <div class="section-heading">
+          <p class="eyebrow">Modulos base</p>
+          <h2>La primera estructura funcional de GpsRastreo</h2>
+        </div>
+        <div class="modules__grid">
+          <article class="module-card">
+            <span class="module-card__number">01</span>
+            <h3>Panel en vivo</h3>
+            <p>Mapa principal, actividad de unidades, velocidad, ultimo evento y estado de conexion.</p>
+          </article>
+          <article class="module-card">
+            <span class="module-card__number">02</span>
+            <h3>Alertas inteligentes</h3>
+            <p>Exceso de velocidad, desconexion, entrada o salida de geocercas y eventos criticos.</p>
+          </article>
+          <article class="module-card">
+            <span class="module-card__number">03</span>
+            <h3>Historial y rutas</h3>
+            <p>Consulta por fechas, reproduccion de trayecto, tiempos detenidos y evidencia operativa.</p>
+          </article>
+          <article class="module-card">
+            <span class="module-card__number">04</span>
+            <h3>Activos y clientes</h3>
+            <p>Organizacion por empresa, usuario, dispositivo, unidad y estado administrativo.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="dashboard-preview">
+        <div class="section-heading">
+          <p class="eyebrow">Interfaz propuesta</p>
+          <h2>Un dashboard mas claro, mas operativo y listo para escalar</h2>
+        </div>
+
+        <div class="dashboard-layout">
+          <aside class="dashboard-sidebar">
+            <h3>Vista rapida</h3>
+            <ul>
+              <li>Resumen general</li>
+              <li>Mapa de seguimiento</li>
+              <li>Alertas activas</li>
+              <li>Rutas y reportes</li>
+              <li>Clientes y unidades</li>
+              <li>Configuracion</li>
+            </ul>
+          </aside>
+
+          <div class="dashboard-main">
+            <article class="map-panel">
+              <div class="map-panel__top">
+                <div>
+                  <p class="eyebrow">Seguimiento</p>
+                  <h3>Mapa central de operaciones</h3>
+                </div>
+                <span class="signal-pill">GPS Online</span>
+              </div>
+              <div class="map-surface">
+                <div class="map-surface__pulse"></div>
+                <div class="map-surface__orbit orbit-one"></div>
+                <div class="map-surface__orbit orbit-two"></div>
+                <div class="map-surface__marker marker-a"></div>
+                <div class="map-surface__marker marker-b"></div>
+                <div class="map-surface__marker marker-c"></div>
+              </div>
+            </article>
+
+            <div class="dashboard-widgets">
+              <article class="widget">
+                <p class="eyebrow">Alertas hoy</p>
+                <h3>18</h3>
+                <p>Eventos pendientes de atencion prioritaria.</p>
+              </article>
+              <article class="widget">
+                <p class="eyebrow">Unidades online</p>
+                <h3>96%</h3>
+                <p>Conectividad alta en la flota monitoreada.</p>
+              </article>
+              <article class="widget">
+                <p class="eyebrow">Disponibilidad</p>
+                <h3>24/7</h3>
+                <p>Diseño pensado para operacion continua.</p>
+              </article>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="architecture" id="arquitectura">
+        <div class="section-heading">
+          <p class="eyebrow">Arquitectura sugerida</p>
+          <h2>Base de crecimiento para producto, operaciones y soporte</h2>
+        </div>
+        <div class="architecture__grid">
+          <article class="architecture-card">
+            <h3>Frontend</h3>
+            <p>Interfaz web responsiva con dashboard, autenticacion, mapa, alertas y reportes.</p>
+          </article>
+          <article class="architecture-card">
+            <h3>Integracion</h3>
+            <p>Consumo gradual de la plataforma viva en <strong>rastreo.soportecni.com</strong>, empezando por autenticacion y consulta de datos.</p>
+          </article>
+          <article class="architecture-card">
+            <h3>Escalabilidad</h3>
+            <p>Estructura modular para crecer hacia roles, panel administrativo y centro de soporte tecnico.</p>
+          </article>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="./config.js?v=2"></script>
+  <script src="./mock-data.js?v=2"></script>
+  <script src="./api.js?v=2"></script>
+  <script src="./app.js?v=2"></script>
+  <script src="./runtime.js?v=2"></script>
+</body>
+</html>

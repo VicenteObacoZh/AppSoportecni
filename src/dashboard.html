@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GpsRastreo | Dashboard Operativo</title>
+  <meta name="description" content="Dashboard demo para GpsRastreo." />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body class="dashboard-body">
+  <div class="app-dashboard">
+    <aside class="app-sidebar">
+      <div class="app-sidebar__brand">
+        <img src="../assets/icono.png" alt="GpsRastreo" class="brand__icon" />
+        <div>
+          <p class="eyebrow">Cabina de control</p>
+          <h1>GpsRastreo</h1>
+        </div>
+      </div>
+
+      <nav class="app-nav">
+        <a class="app-nav__item app-nav__item--active" href="./dashboard.html">Resumen general</a>
+        <a class="app-nav__item" href="#">Mapa en vivo</a>
+        <a class="app-nav__item" href="#">Alertas</a>
+        <a class="app-nav__item" href="#">Rutas e historicos</a>
+        <a class="app-nav__item" href="#">Clientes</a>
+        <a class="app-nav__item" href="#">Dispositivos</a>
+        <a class="app-nav__item" href="./login.html">Cerrar sesion</a>
+      </nav>
+
+      <article class="sidebar-card">
+        <p class="eyebrow">Turno activo</p>
+        <h3>Operaciones nocturnas</h3>
+        <p>3 alertas altas, 12 medias y monitoreo continuo sobre flota prioritaria.</p>
+      </article>
+    </aside>
+
+    <main class="app-main">
+      <header class="app-main__top">
+        <div>
+          <p class="eyebrow">Resumen operativo</p>
+          <h2>Panel central de monitoreo</h2>
+        </div>
+        <div class="topbar__actions">
+          <button class="pill pill--primary" id="refreshDashboardButton" type="button">Reconectar panel</button>
+          <a class="pill pill--ghost" href="./index.html">Portada</a>
+          <a class="pill pill--ghost" href="https://rastreo.soportecni.com" target="_blank" rel="noreferrer">Plataforma real</a>
+        </div>
+      </header>
+
+      <section class="live-banner">
+        <div>
+          <p class="eyebrow">Integracion</p>
+          <h3 id="liveBannerTitle">Cargando estado de integracion...</h3>
+        </div>
+        <p id="liveBannerText">Preparando datos del panel.</p>
+      </section>
+
+      <section class="session-strip" id="sessionStrip">
+        <div>
+          <p class="eyebrow">Sesion</p>
+          <h3 id="sessionTitle">Sin validar</h3>
+        </div>
+        <p id="sessionText">Aun no se ha comprobado la sesion del portal.</p>
+      </section>
+
+      <section class="kpi-grid" id="kpiGrid"></section>
+
+      <section class="command-grid">
+        <article class="map-panel">
+          <div class="map-panel__top">
+            <div>
+              <p class="eyebrow">Mapa operacional</p>
+              <h3>Seguimiento de unidades priorizadas</h3>
+            </div>
+            <span class="signal-pill">Actualizacion 15s</span>
+          </div>
+          <div class="map-surface map-surface--large map-surface--leaflet">
+            <div id="liveMap" class="live-map"></div>
+            <div class="map-empty-state" id="mapEmptyState">
+              Esperando unidades reales para pintar el mapa.
+            </div>
+          </div>
+        </article>
+
+        <div class="command-side">
+          <article class="widget">
+            <p class="eyebrow">Ultima alerta</p>
+            <h3 id="latestAlertTitle">Cargando...</h3>
+            <p id="latestAlertText">Consultando eventos demo.</p>
+          </article>
+          <article class="widget">
+            <p class="eyebrow">Unidad destacada</p>
+            <h3 id="highlightedUnitTitle">Cargando...</h3>
+            <p id="highlightedUnitText">Preparando estado de la unidad.</p>
+          </article>
+          <article class="widget">
+            <p class="eyebrow">Proxima accion</p>
+            <h3>Escalar soporte</h3>
+            <p>Preparar integracion real de autenticacion y consulta de eventos.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="feed-grid">
+        <article class="table-card">
+          <div class="table-card__top">
+            <div>
+              <p class="eyebrow">Alertas reales</p>
+              <h3>Configuraciones activas del portal</h3>
+            </div>
+          </div>
+          <div class="event-list" id="eventList"></div>
+        </article>
+
+        <article class="table-card">
+          <div class="table-card__top">
+            <div>
+              <p class="eyebrow">Proximas capas</p>
+              <h3>Construccion sugerida</h3>
+            </div>
+          </div>
+          <div class="event-list" id="roadmapList"></div>
+        </article>
+
+        <article class="table-card">
+          <div class="table-card__top">
+            <div>
+              <p class="eyebrow">Dispositivos visibles</p>
+              <h3>Resumen rapido del monitor</h3>
+            </div>
+          </div>
+          <div class="event-list" id="deviceList">
+            <div class="event-row">
+              <strong>Esperando</strong>
+              <span>Cuando la sesion sea valida, aqui apareceran las primeras unidades reales.</span>
+            </div>
+          </div>
+        </article>
+      </section>
+    </main>
+  </div>
+  <script src="./config.js?v=2"></script>
+  <script src="./mock-data.js?v=2"></script>
+  <script src="./api.js?v=2"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="./runtime.js?v=2"></script>
+</body>
+</html>

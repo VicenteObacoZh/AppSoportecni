@@ -1,0 +1,42 @@
+﻿<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="card" x1="52" y1="40" x2="456" y2="472" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#EAF3FA"/>
+      <stop offset="1" stop-color="#DCECF6"/>
+    </linearGradient>
+    <linearGradient id="pin" x1="142" y1="92" x2="372" y2="390" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0E5A8A"/>
+      <stop offset="1" stop-color="#1C9AB7"/>
+    </linearGradient>
+    <linearGradient id="inner" x1="186" y1="152" x2="328" y2="294" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3A8FBE" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#5FC1D2" stop-opacity="0.55"/>
+    </linearGradient>
+    <linearGradient id="orbit" x1="208" y1="198" x2="306" y2="262" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFB347"/>
+      <stop offset="1" stop-color="#FF6B3D"/>
+    </linearGradient>
+    <filter id="shadow" x="70" y="74" width="372" height="356" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#0B3756" flood-opacity="0.22"/>
+    </filter>
+  </defs>
+
+  <rect x="28" y="28" width="456" height="456" rx="96" fill="url(#card)"/>
+
+  <g filter="url(#shadow)">
+    <path d="M256 88C181.441 88 121 148.441 121 223C121 320.893 233.328 401.165 248.88 411.723C253.169 414.636 258.831 414.636 263.12 411.723C278.672 401.165 391 320.893 391 223C391 148.441 330.559 88 256 88Z" fill="url(#pin)"/>
+  </g>
+
+  <circle cx="256" cy="217" r="82" fill="url(#inner)"/>
+  <circle cx="256" cy="217" r="48" fill="#F2FAFD"/>
+  <circle cx="256" cy="217" r="34" fill="#0F4F7F" opacity="0.18"/>
+
+  <ellipse cx="255" cy="218" rx="74" ry="28" transform="rotate(-46 255 218)" fill="none" stroke="#163F73" stroke-width="16" stroke-linecap="round"/>
+  <path d="M222 247C237 230 258 214 288 198" stroke="url(#orbit)" stroke-width="14" stroke-linecap="round"/>
+  <circle cx="319" cy="157" r="14" fill="#FF6B3D"/>
+  <path d="M248 185L272 148" stroke="#F6C44F" stroke-width="10" stroke-linecap="round"/>
+  <path d="M232 292L200 325" stroke="#F6C44F" stroke-width="10" stroke-linecap="round"/>
+  <circle cx="186" cy="339" r="14" fill="#F6C44F"/>
+
+  <path d="M155 377C181 348 214 332 256 332C299 332 331 349 357 377" stroke="#DDF5F8" stroke-width="14" stroke-linecap="round"/>
+</svg>
