@@ -35,14 +35,23 @@
   }
 
   async function requestJson(path, options) {
-    const response = await fetch(buildUrl(path), {
-      method: 'GET',
-      mode: config.requestMode || 'cors',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      ...options
-    });
+    const requestUrl = buildUrl(path);
+    let response;
+
+    try {
+      response = await fetch(requestUrl, {
+        method: 'GET',
+        mode: config.requestMode || 'cors',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        ...options
+      });
+    } catch (error) {
+      const networkError = new Error(`No se pudo conectar con ${requestUrl}. ${error?.message || 'Revisa backend y red local.'}`);
+      networkError.cause = error;
+      throw networkError;
+    }
 
     const contentType = response.headers.get('content-type') || '';
     const payload = contentType.includes('application/json')
@@ -74,6 +83,18 @@
 
       throw error;
     }
+  }
+
+  async function getLiveRoute(sessionId, deviceId, from, to) {
+    const query = new URLSearchParams({
+      sessionId,
+      deviceId: String(deviceId),
+      from,
+      to
+    });
+
+    const payload = await request(`/live/monitor/route?${query.toString()}`);
+    return payload?.data || null;
   }
 
   window.GpsRastreoApi = {
@@ -155,8 +176,10 @@
             alerts: (alertItems.length > 0
               ? alertItems.slice(0, 6).map((item) => ({
                   time: item.activo ? 'activa' : 'inactiva',
-                  title: `${item.nombre || 'Alerta'} | ${item.tipo || 'Sin tipo'}`,
-                  detail: `${item.dispositivos || 0} dispositivos vinculados`
+                  title: item.nombre || 'Alerta',
+                  detail: `${item.tipo || 'Sin tipo'} | ${item.dispositivos || 0} dispositivos vinculados`,
+                  badge: item.activo ? 'Activa' : 'Inactiva',
+                  tone: item.activo ? 'success' : 'muted'
                 }))
               : [
                   { time: 'live', title: `Usuario autenticado: ${live.userName || 'sin nombre visible'}` },
@@ -195,6 +218,55 @@
 
       const payload = await request(config.endpoints.dashboard || '/dashboard');
       return payload.data || payload;
+    },
+
+    async getAlerts() {
+      if (config.mockMode) {
+        return {
+          summary: {
+            total: 0,
+            active: 0,
+            inactive: 0,
+            types: 0
+          },
+          items: []
+        };
+      }
+
+      const sessionId = getStoredSessionId();
+      if (!sessionId) {
+        throw new Error('SESSION_REQUIRED');
+      }
+
+      const liveAlerts = await getLiveAlerts(sessionId);
+      return liveAlerts || {
+        summary: {
+          total: 0,
+          active: 0,
+          inactive: 0,
+          types: 0
+        },
+        items: []
+      };
+    },
+
+    async getRoute(deviceId, from, to) {
+      if (config.mockMode) {
+        return {
+          summary: {
+            total: 0,
+            moving: 0
+          },
+          points: []
+        };
+      }
+
+      const sessionId = getStoredSessionId();
+      if (!sessionId) {
+        throw new Error('SESSION_REQUIRED');
+      }
+
+      return await getLiveRoute(sessionId, deviceId, from, to);
     },
 
     async getSessionInfo() {

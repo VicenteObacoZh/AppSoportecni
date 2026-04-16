@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GpsRastreo | Rutas e históricos</title>
+  <meta name="description" content="Vista de rutas e historicos para GpsRastreo." />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body class="dashboard-body">
+  <div class="app-dashboard">
+    <aside class="app-sidebar">
+      <div class="app-sidebar__brand">
+        <img src="../assets/icono.png" alt="GpsRastreo" class="brand__icon" />
+        <div>
+          <p class="eyebrow">Cabina de control</p>
+          <h1>GpsRastreo</h1>
+        </div>
+        <button class="nav-toggle" type="button" aria-label="Abrir menu" aria-expanded="false" data-nav-toggle>
+          Menu
+        </button>
+      </div>
+
+      <nav class="app-nav">
+        <a class="app-nav__item" href="./dashboard.html">Resumen general</a>
+        <a class="app-nav__item" href="./map.html">Mapa en vivo</a>
+        <a class="app-nav__item" href="./alerts.html">Alertas</a>
+        <a class="app-nav__item app-nav__item--active" href="./routes.html">Rutas e historicos</a>
+        <a class="app-nav__item" href="#">Clientes</a>
+        <a class="app-nav__item" href="./devices.html">Dispositivos</a>
+        <a class="app-nav__item" href="./login.html">Cerrar sesion</a>
+      </nav>
+
+      <article class="sidebar-card">
+        <p class="eyebrow">Analitica</p>
+        <h3>Recorridos reales</h3>
+        <p>Consulta trazas por dispositivo y rango de tiempo usando la misma sesion autenticada del monitor.</p>
+      </article>
+    </aside>
+
+    <main class="app-main">
+      <header class="app-main__top">
+        <div>
+          <p class="eyebrow">Historico operativo</p>
+          <h2>Rutas e históricos</h2>
+        </div>
+        <div class="topbar__actions">
+          <button class="pill pill--primary" id="loadRouteButton" type="button">Consultar ruta</button>
+          <a class="pill pill--ghost" href="./dashboard.html">Dashboard</a>
+        </div>
+      </header>
+
+      <section class="session-strip">
+        <div>
+          <p class="eyebrow">Sesion</p>
+          <h3 id="routesSessionTitle">Validando sesion...</h3>
+        </div>
+        <p id="routesSessionText">Preparando acceso a las rutas del portal.</p>
+      </section>
+
+      <section class="route-filters">
+        <label class="field">
+          <span>Dispositivo</span>
+          <select id="routeDeviceSelect"></select>
+        </label>
+        <label class="field">
+          <span>Desde</span>
+          <input type="datetime-local" id="routeFrom" />
+        </label>
+        <label class="field">
+          <span>Hasta</span>
+          <input type="datetime-local" id="routeTo" />
+        </label>
+      </section>
+
+      <section class="devices-summary" id="routeSummary"></section>
+
+      <section class="command-grid command-grid--map">
+        <article class="map-panel">
+          <div class="map-panel__top">
+            <div>
+              <p class="eyebrow">Trazado historico</p>
+              <h3>Ruta del dispositivo seleccionado</h3>
+            </div>
+            <span class="signal-pill" id="routeSignalPill">Rango listo</span>
+          </div>
+          <div class="map-surface map-surface--large map-surface--leaflet map-surface--page">
+            <div id="routeMap" class="live-map"></div>
+            <div class="map-empty-state" id="routeMapEmptyState">
+              Selecciona una unidad y pulsa "Consultar ruta".
+            </div>
+          </div>
+        </article>
+
+        <div class="command-side">
+          <article class="table-card map-side-card">
+            <div class="table-card__top">
+              <div>
+                <p class="eyebrow">Bitacora</p>
+                <h3>Puntos recientes</h3>
+              </div>
+            </div>
+            <div class="event-list" id="routePointsList"></div>
+          </article>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="./config.js?v=3"></script>
+  <script src="./mock-data.js?v=3"></script>
+  <script src="./api.js?v=3"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="./shell.js?v=1"></script>
+  <script src="./routes.js?v=1"></script>
+</body>
+</html>

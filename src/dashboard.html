@@ -20,15 +20,18 @@
           <p class="eyebrow">Cabina de control</p>
           <h1>GpsRastreo</h1>
         </div>
+        <button class="nav-toggle" type="button" aria-label="Abrir menu" aria-expanded="false" data-nav-toggle>
+          Menu
+        </button>
       </div>
 
       <nav class="app-nav">
         <a class="app-nav__item app-nav__item--active" href="./dashboard.html">Resumen general</a>
-        <a class="app-nav__item" href="#">Mapa en vivo</a>
-        <a class="app-nav__item" href="#">Alertas</a>
-        <a class="app-nav__item" href="#">Rutas e historicos</a>
+        <a class="app-nav__item" href="./map.html">Mapa en vivo</a>
+        <a class="app-nav__item" href="./alerts.html">Alertas</a>
+        <a class="app-nav__item" href="./routes.html">Rutas e historicos</a>
         <a class="app-nav__item" href="#">Clientes</a>
-        <a class="app-nav__item" href="#">Dispositivos</a>
+        <a class="app-nav__item" href="./devices.html">Dispositivos</a>
         <a class="app-nav__item" href="./login.html">Cerrar sesion</a>
       </nav>
 
@@ -144,10 +147,11 @@
       </section>
     </main>
   </div>
-  <script src="./config.js?v=2"></script>
-  <script src="./mock-data.js?v=2"></script>
-  <script src="./api.js?v=2"></script>
+  <script src="./config.js?v=3"></script>
+  <script src="./mock-data.js?v=3"></script>
+  <script src="./api.js?v=3"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="./runtime.js?v=2"></script>
+  <script src="./shell.js?v=1"></script>
+  <script src="./runtime.js?v=3"></script>
 </body>
 </html>

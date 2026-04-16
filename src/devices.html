@@ -1,0 +1,62 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GpsRastreo | Dispositivos</title>
+  <meta name="description" content="Vista movil de flotas y unidades para GpsRastreo." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body class="dashboard-body dashboard-body--devices-mobile">
+  <div class="mobile-devices-app">
+    <header class="mobile-devices-topbar">
+      <h1>Flotas y unidades</h1>
+    </header>
+
+    <main class="mobile-devices-main">
+      <div class="mobile-devices-search">
+        <span class="mobile-devices-search__icon">&#128269;</span>
+        <input type="text" id="devicesSearch" placeholder="Buscar" />
+      </div>
+
+      <div class="mobile-devices-filters" role="tablist" aria-label="Filtro de estado">
+        <button type="button" class="mobile-devices-filter mobile-devices-filter--active" data-device-filter="all">Todos</button>
+        <button type="button" class="mobile-devices-filter" data-device-filter="moving">Movimiento</button>
+        <button type="button" class="mobile-devices-filter" data-device-filter="idle">Reposo</button>
+        <button type="button" class="mobile-devices-filter" data-device-filter="stopped">Detenido</button>
+      </div>
+
+      <section class="mobile-devices-list" id="devicesCompanyList">
+        <div class="mobile-map-empty">Cargando flota...</div>
+      </section>
+    </main>
+
+    <nav class="mobile-bottom-nav mobile-bottom-nav--icons-only">
+      <a class="mobile-bottom-nav__item mobile-bottom-nav__item--active" href="./devices.html" aria-label="Dispositivos">
+        <span class="mobile-bottom-nav__icon">&#128663;</span>
+        <span>Dispositivos</span>
+      </a>
+      <a class="mobile-bottom-nav__item" href="./alerts.html" aria-label="Eventos">
+        <span class="mobile-bottom-nav__icon">&#128276;</span>
+        <span>Eventos</span>
+      </a>
+      <a class="mobile-bottom-nav__item" href="./map.html" aria-label="Mapa">
+        <span class="mobile-bottom-nav__icon">&#128506;</span>
+        <span>Mapa</span>
+      </a>
+      <a class="mobile-bottom-nav__item" href="./routes.html" aria-label="Historico">
+        <span class="mobile-bottom-nav__icon">&#128736;</span>
+        <span>Historico</span>
+      </a>
+    </nav>
+  </div>
+
+  <script src="./config.js?v=3"></script>
+  <script src="./mock-data.js?v=3"></script>
+  <script src="./api.js?v=3"></script>
+  <script src="./devices.js?v=2"></script>
+</body>
+</html>

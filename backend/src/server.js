@@ -32,6 +32,6 @@ app.use((err, _req, res, _next) => {
   });
 });
 
-app.listen(config.port, () => {
-  console.log(`${config.appName} escuchando en http://localhost:${config.port}`);
+app.listen(config.port, '0.0.0.0', () => {
+  console.log(`${config.appName} escuchando en http://0.0.0.0:${config.port}`);
 });

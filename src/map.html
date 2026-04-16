@@ -1,0 +1,96 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GpsRastreo | Mapa en vivo</title>
+  <meta name="description" content="Vista movil de mapa en vivo para GpsRastreo." />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body class="dashboard-body dashboard-body--map">
+  <div class="mobile-map-app">
+    <header class="mobile-map-topbar">
+      <div class="mobile-map-topbar__title">
+        <h1>Mapa</h1>
+      </div>
+      <div class="mobile-map-counters">
+        <span class="mobile-map-counter mobile-map-counter--green" id="mapMovingCount">0</span>
+        <span class="mobile-map-counter mobile-map-counter--orange" id="mapLocationCount">0</span>
+        <span class="mobile-map-counter mobile-map-counter--red" id="mapAlertCount">0</span>
+      </div>
+    </header>
+
+    <main class="mobile-map-stage">
+      <div id="pageLiveMap" class="mobile-map-canvas"></div>
+      <div class="map-empty-state map-empty-state--overlay" id="pageMapEmptyState">
+        Esperando unidades reales para pintar el mapa.
+      </div>
+
+      <button class="mobile-map-menu-button" type="button" id="mobileMapMenuButton" aria-label="Abrir panel lateral" aria-expanded="false">
+        &#9776;
+      </button>
+
+      <div class="mobile-map-actions">
+        <button type="button" class="mobile-map-action" id="mapLayerButton" title="Capas">&#128506;</button>
+        <button type="button" class="mobile-map-action" id="mapAlertsButton" title="Alertas">&#128680;</button>
+        <button type="button" class="mobile-map-action" id="refreshMapButton" title="Actualizar">&#8635;</button>
+        <button type="button" class="mobile-map-action mobile-map-action--active" id="mapRoutesButton" title="Historial">&#10136;</button>
+        <button type="button" class="mobile-map-action" id="mapZoomInButton" title="Acercar">+</button>
+        <button type="button" class="mobile-map-action" id="mapZoomOutButton" title="Alejar">&#8722;</button>
+        <button type="button" class="mobile-map-action" id="mapLocateButton" title="Centrar">&#8998;</button>
+      </div>
+
+      <aside class="mobile-map-sheet" id="mobileMapSheet">
+        <div class="mobile-map-sheet__tabs">
+          <button type="button" class="mobile-map-sheet__tab mobile-map-sheet__tab--active" data-sheet-tab="devices">Vehiculos</button>
+          <button type="button" class="mobile-map-sheet__tab" data-sheet-tab="companies">Empresas</button>
+        </div>
+
+        <div class="mobile-map-sheet__search">
+          <span class="mobile-map-sheet__search-icon">&#128269;</span>
+          <input type="text" id="mapSearchInput" placeholder="Buscar" />
+          <button type="button" id="mapSearchClearButton" aria-label="Limpiar busqueda">&#10005;</button>
+        </div>
+
+        <div class="mobile-map-sheet__panel mobile-map-sheet__panel--active" data-sheet-panel="devices">
+          <div class="mobile-map-list" id="mapDeviceList"></div>
+        </div>
+
+        <div class="mobile-map-sheet__panel" data-sheet-panel="companies">
+          <div class="mobile-map-company-list" id="mapCompanyList"></div>
+        </div>
+      </aside>
+    </main>
+
+    <nav class="mobile-bottom-nav mobile-bottom-nav--icons-only">
+      <a class="mobile-bottom-nav__item" href="./devices.html">
+        <span class="mobile-bottom-nav__icon">&#128663;</span>
+        <span>Dispositivos</span>
+      </a>
+      <a class="mobile-bottom-nav__item" href="./alerts.html">
+        <span class="mobile-bottom-nav__icon">&#128276;</span>
+        <span>Eventos</span>
+      </a>
+      <a class="mobile-bottom-nav__item mobile-bottom-nav__item--active" href="./map.html">
+        <span class="mobile-bottom-nav__icon">&#128506;</span>
+        <span>Mapa</span>
+      </a>
+      <a class="mobile-bottom-nav__item" href="./routes.html">
+        <span class="mobile-bottom-nav__icon">&#128736;</span>
+        <span>Historico</span>
+      </a>
+    </nav>
+  </div>
+
+  <script src="./config.js?v=3"></script>
+  <script src="./mock-data.js?v=3"></script>
+  <script src="./api.js?v=3"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="./map.js?v=3"></script>
+</body>
+</html>
+

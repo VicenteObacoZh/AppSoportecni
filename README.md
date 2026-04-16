@@ -15,6 +15,8 @@ Se dejo una primera base visual del producto con enfoque en:
 
 - `src/`: interfaz inicial web en HTML, CSS y JavaScript
 - `assets/`: iconos y recursos visuales
+- `scripts/`: utilidades para empaquetado y automatizacion local
+- `www/`: salida web lista para Capacitor
 - `docs/`: arquitectura y notas del producto
 
 ## Archivos principales
@@ -32,6 +34,7 @@ Se dejo una primera base visual del producto con enfoque en:
 - `docs/arquitectura.md`
 - `docs/integracion-backend.md`
 - `docs/mapa-plataforma-real.md`
+- `docs/capacitor-setup.md`
 
 ## API de referencia
 
@@ -49,3 +52,11 @@ Construir la siguiente fase sobre esta base:
 2. integrar dashboard con datos del backend
 3. reemplazar el mapa visual por mapa real con seguimiento
 4. implementar alertas, clientes y reportes operativos
+
+## Salto a movil
+
+La base ya quedo preparada para empaquetarse con `Capacitor`:
+
+1. instalar dependencias en la raiz del proyecto
+2. generar `www/` con `npm run build:web`
+3. sincronizar con Android/iPhone usando `Capacitor`

@@ -47,6 +47,35 @@ function buildAlertsSummary(payload) {
   };
 }
 
+function buildRouteSummary(payload) {
+  const points = Array.isArray(payload) ? payload : [];
+
+  const normalized = points
+    .map((item) => {
+      const lat = Number(item?.latitude ?? item?.lat ?? item?.Latitude ?? item?.Lat);
+      const lon = Number(item?.longitude ?? item?.lon ?? item?.Longitude ?? item?.Lon);
+      const speedKmh = Number(item?.speedKmh ?? item?.speed ?? item?.SpeedKmh ?? item?.Speed ?? 0);
+
+      return {
+        lat,
+        lon,
+        speedKmh,
+        fixTime: item?.fixTime ?? item?.FixTime ?? item?.deviceTime ?? item?.DeviceTime ?? null,
+        address: item?.address ?? item?.Address ?? null
+      };
+    })
+    .filter((item) => Number.isFinite(item.lat) && Number.isFinite(item.lon));
+
+  return {
+    source: 'monitor-route',
+    points: normalized,
+    summary: {
+      total: normalized.length,
+      moving: normalized.filter((item) => item.speedKmh > 3).length
+    }
+  };
+}
+
 router.get('/monitor/data', async (req, res) => {
   const sessionId = String(req.query.sessionId || '').trim();
   if (!sessionId) {
@@ -148,6 +177,70 @@ router.get('/alerts/list', async (req, res) => {
       ok: true,
       mode: session.mode,
       data: buildAlertsSummary(payload)
+    });
+  } catch (error) {
+    return res.status(502).json({
+      ok: false,
+      message: error.message
+    });
+  }
+});
+
+router.get('/monitor/route', async (req, res) => {
+  const sessionId = String(req.query.sessionId || '').trim();
+  const deviceId = String(req.query.deviceId || '').trim();
+  const from = String(req.query.from || '').trim();
+  const to = String(req.query.to || '').trim();
+
+  if (!sessionId || !deviceId || !from || !to) {
+    return res.status(400).json({
+      ok: false,
+      message: 'sessionId, deviceId, from y to son obligatorios.'
+    });
+  }
+
+  const session = getSession(sessionId);
+  if (!session || !Array.isArray(session.cookies) || session.cookies.length === 0) {
+    return res.status(404).json({
+      ok: false,
+      message: 'Sesion valida no encontrada.'
+    });
+  }
+
+  const query = new URLSearchParams({
+    deviceId,
+    from,
+    to
+  });
+
+  try {
+    const result = await fetchPlatform(`/Monitoreo/Monitor?handler=Route&${query.toString()}`, {
+      headers: {
+        Cookie: session.cookies.join('; ')
+      }
+    });
+
+    let payload;
+    try {
+      payload = JSON.parse(result.text);
+    } catch {
+      const looksLikeLogin =
+        String(result.text || '').includes('Iniciar sesi') ||
+        String(result.text || '').includes('class="login-form"');
+
+      return res.status(401).json({
+        ok: false,
+        code: looksLikeLogin ? 'SESSION_EXPIRED' : 'INVALID_ROUTE_RESPONSE',
+        message: looksLikeLogin
+          ? 'La sesion del portal expiro o ya no es valida para consultar rutas.'
+          : 'El modulo de rutas respondio con un contenido inesperado.'
+      });
+    }
+
+    return res.json({
+      ok: true,
+      mode: session.mode,
+      data: buildRouteSummary(payload)
     });
   } catch (error) {
     return res.status(502).json({

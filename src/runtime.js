@@ -62,8 +62,12 @@
 
     container.innerHTML = items.map((item) => `
       <div class="event-row">
-        <strong>${item[keyLabel]}</strong>
-        <span>${item.title || item.detail}</span>
+        <div class="event-row__top">
+          <strong>${item[keyLabel] || item.title || 'Dato'}</strong>
+          ${item.badge ? `<span class="event-badge event-badge--${item.tone || 'muted'}">${item.badge}</span>` : ''}
+        </div>
+        <span>${item.title && item[keyLabel] ? item.title : (item.detail || '')}</span>
+        ${item.detail && item.title && item[keyLabel] ? `<small>${item.detail}</small>` : ''}
       </div>
     `).join('');
   }
@@ -306,15 +310,31 @@
         }
 
         window.setTimeout(() => {
-          const nextUrl = new URL('./dashboard.html', window.location.href);
+          const nextUrl = new URL('./map.html', window.location.href);
           if (result?.sessionId) {
             nextUrl.searchParams.set('sessionId', result.sessionId);
           }
           window.location.href = nextUrl.toString();
         }, 700);
-      }).catch(() => {
+      }).catch((error) => {
+        const validationMessages = Array.isArray(error?.payload?.validationMessages)
+          ? error.payload.validationMessages.filter(Boolean)
+          : [];
+        const backendMessage = error?.payload?.message || '';
+        const detailedMessage =
+          validationMessages[0] ||
+          backendMessage ||
+          error?.message ||
+          'No fue posible iniciar sesion. Revisa la integracion real.';
+
         if (loginMessage) {
-          loginMessage.textContent = 'No fue posible iniciar sesion. Revisa la integracion real.';
+          loginMessage.textContent = detailedMessage;
+        }
+
+        if (integrationBanner) {
+          integrationBanner.textContent = validationMessages.length > 1
+            ? validationMessages.join(' | ')
+            : detailedMessage;
         }
       });
     });
