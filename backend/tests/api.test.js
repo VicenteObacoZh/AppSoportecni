@@ -169,6 +169,19 @@ test('recent events endpoint returns normalized event cards in mock mode', async
   assert.equal(typeof eventItem.longitude, 'number');
 });
 
+test('geofences endpoint returns normalized shapes in mock mode', async () => {
+  assert.ok(sessionId, 'Expected sessionId from previous login test.');
+
+  const { status, payload } = await requestJson(`/api/live/monitor/geofences?sessionId=${encodeURIComponent(sessionId)}`);
+
+  assert.equal(status, 200);
+  assert.equal(payload.ok, true);
+  assert.equal(payload.mode, 'mock');
+  assert.ok(Array.isArray(payload.data.items));
+  assert.ok(payload.data.items.length > 0);
+  assert.equal(typeof payload.data.summary.total, 'number');
+});
+
 test('route endpoint validates required parameters', async () => {
   assert.ok(sessionId, 'Expected sessionId from previous login test.');
 

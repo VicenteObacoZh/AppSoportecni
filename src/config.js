@@ -95,7 +95,8 @@
       liveMonitorData: '/live/monitor/data',
       liveAlertsList: '/live/alerts/list',
       liveMonitorRoute: '/live/monitor/route',
-      liveEventsRecent: '/live/monitor/events/recent'
+      liveEventsRecent: '/live/monitor/events/recent',
+      liveGeofences: '/live/monitor/geofences'
     }
   };
 })();

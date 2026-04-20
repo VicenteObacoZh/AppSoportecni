@@ -255,6 +255,19 @@
     };
   }
 
+  async function getGeofencesBySession(sessionId) {
+    const query = new URLSearchParams({
+      sessionId
+    });
+
+    const payload = await request(`${config.endpoints.liveGeofences || '/live/monitor/geofences'}?${query.toString()}`);
+    return payload?.data || {
+      available: false,
+      items: [],
+      summary: { total: 0 }
+    };
+  }
+
   window.GpsRastreoApi = {
     async checkPlatform() {
       const payload = await request(config.endpoints.health || '/health', { method: 'GET' });
@@ -437,6 +450,35 @@
           nextError.code = error.code || error.payload?.code || 'SESSION_EXPIRED';
           throw nextError;
         }
+        throw error;
+      }
+    },
+
+    async getGeofences() {
+      const sessionId = getStoredSessionId();
+      if (!sessionId) {
+        throw new Error('SESSION_REQUIRED');
+      }
+
+      try {
+        return await getGeofencesBySession(sessionId);
+      } catch (error) {
+        if (error.status === 404 || error.status === 401) {
+          clearOperationalState();
+          const nextError = new Error('SESSION_EXPIRED');
+          nextError.payload = error.payload;
+          nextError.code = error.code || error.payload?.code || 'SESSION_EXPIRED';
+          throw nextError;
+        }
+
+        if (error.status === 501) {
+          return {
+            available: false,
+            items: [],
+            summary: { total: 0 }
+          };
+        }
+
         throw error;
       }
     },

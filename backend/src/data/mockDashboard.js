@@ -50,6 +50,7 @@ module.exports = {
         lon: -75.51444,
         speedKmh: 74,
         fixTime: '2026-04-19T21:18:00.000Z',
+        address: 'Mamonal, Cartagena',
         iconBase: 'flecha'
       },
       {
@@ -62,6 +63,7 @@ module.exports = {
         lon: -75.50931,
         speedKmh: 0,
         fixTime: '2026-04-19T21:15:00.000Z',
+        address: 'Centro Logistico, Cartagena',
         iconBase: 'camionetadoble'
       },
       {
@@ -74,6 +76,7 @@ module.exports = {
         lon: -75.52012,
         speedKmh: 12,
         fixTime: '2026-04-19T21:17:00.000Z',
+        address: 'Bosque, Cartagena',
         iconBase: 'taxi'
       },
       {
@@ -86,6 +89,7 @@ module.exports = {
         lon: -75.49783,
         speedKmh: 0,
         fixTime: '2026-04-19T21:10:00.000Z',
+        address: 'Zona Industrial, Cartagena',
         iconBase: 'jeep5p'
       }
     ]
@@ -154,5 +158,24 @@ module.exports = {
     { lat: 10.39640, lon: -75.51680, speedKmh: 24, fixTime: '2026-04-19T17:24:00.000Z', address: 'Cartagena' },
     { lat: 10.39820, lon: -75.51420, speedKmh: 15, fixTime: '2026-04-19T17:36:00.000Z', address: 'Cartagena' },
     { lat: 10.40010, lon: -75.51160, speedKmh: 0, fixTime: '2026-04-19T17:48:00.000Z', address: 'Cartagena' }
+  ],
+  geofences: [
+    {
+      geofenceId: 'geo-1',
+      name: 'Patio Mamonal',
+      radiusMeters: 420,
+      centerLat: 10.39972,
+      centerLon: -75.51444
+    },
+    {
+      geofenceId: 'geo-2',
+      name: 'Zona Industrial Segura',
+      points: [
+        { lat: 10.3884, lon: -75.5017 },
+        { lat: 10.3902, lon: -75.4949 },
+        { lat: 10.3849, lon: -75.4926 },
+        { lat: 10.3828, lon: -75.4998 }
+      ]
+    }
   ]
 };

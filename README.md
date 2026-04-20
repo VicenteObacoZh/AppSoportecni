@@ -10,7 +10,8 @@ La base actual ya funciona como app movil incremental de operacion sobre el stac
 - mapa Leaflet con vista general, enfoque por evento y clusters por zoom
 - eventos recientes con navegacion al mapa
 - dispositivos con accesos a mapa e historico
-- historico/rutas con presets moviles y contexto por unidad
+- historico/rutas con presets moviles, playback y contexto por unidad
+- selector de capas en mapa, detalle operativo por unidad y base de geocercas
 - empaquetado con Capacitor sin migrar de stack
 
 ## Estructura
@@ -73,6 +74,21 @@ Las pruebas actuales validan el contrato base de:
 - `GET /api/live/alerts/list`
 - `GET /api/live/monitor/events/recent`
 - `GET /api/live/monitor/route`
+- `GET /api/live/monitor/geofences`
+
+## Playback e historico
+
+- `src/routes.html` consume `GET /api/live/monitor/route`
+- la pantalla dibuja inicio, fin, polilinea y un playback paso a paso
+- el playback permite reproducir, pausar, reiniciar, cambiar velocidad y saltar a un punto desde la timeline
+- cada punto muestra hora, velocidad, posicion y direccion cuando el backend la entrega
+
+## Mapa operativo
+
+- `src/map.html` consume `GET /api/live/monitor/data`
+- el selector de capas cambia entre base map clasico, claro y terreno
+- el mapa mantiene clusters/totales y puede enfocar una unidad o un evento
+- `GET /api/live/monitor/geofences` entrega geocercas mock y deja lista la base del overlay para la integracion real
 
 ## Proximo paso recomendado
 

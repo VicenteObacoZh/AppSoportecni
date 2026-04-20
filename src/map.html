@@ -46,6 +46,33 @@
         <button type="button" class="mobile-map-action" id="mapLocateButton" title="Centrar">&#8998;</button>
       </div>
 
+      <section class="mobile-map-layer-panel" id="mapLayerPanel" hidden>
+        <div class="mobile-map-layer-panel__section">
+          <span class="mobile-map-layer-panel__label">Base map</span>
+          <div class="mobile-map-layer-panel__chips" id="mapLayerChoices">
+            <button type="button" class="mobile-map-layer-chip mobile-map-layer-chip--active" data-map-layer="osm">Clasico</button>
+            <button type="button" class="mobile-map-layer-chip" data-map-layer="light">Claro</button>
+            <button type="button" class="mobile-map-layer-chip" data-map-layer="terrain">Terreno</button>
+          </div>
+        </div>
+
+        <div class="mobile-map-layer-panel__section">
+          <span class="mobile-map-layer-panel__label">Estado</span>
+          <div class="mobile-map-layer-panel__chips">
+            <button type="button" class="mobile-map-layer-chip mobile-map-layer-chip--active" data-map-status="all">Todas</button>
+            <button type="button" class="mobile-map-layer-chip" data-map-status="moving">Movimiento</button>
+            <button type="button" class="mobile-map-layer-chip" data-map-status="idle">Reposo</button>
+            <button type="button" class="mobile-map-layer-chip" data-map-status="stopped">Detenido</button>
+            <button type="button" class="mobile-map-layer-chip" data-map-status="offline">Sin senal</button>
+          </div>
+        </div>
+
+        <div class="mobile-map-layer-panel__section">
+          <button type="button" class="mobile-map-layer-toggle" id="mapGeofencesToggle">Mostrar geocercas</button>
+          <small id="mapGeofencesStatus">Geocercas aun no cargadas.</small>
+        </div>
+      </section>
+
       <aside class="mobile-map-sheet" id="mobileMapSheet">
         <div class="mobile-map-sheet__tabs">
           <button type="button" class="mobile-map-sheet__tab mobile-map-sheet__tab--active" data-sheet-tab="devices">Vehiculos</button>
@@ -114,6 +141,11 @@
             <strong id="mapDeviceUniqueId">-</strong>
           </article>
         </div>
+        <div class="mobile-map-device-panel__footer">
+          <span class="mobile-map-device-panel__status" id="mapDeviceStatus">Sin estado</span>
+          <button class="mobile-map-device-panel__address" type="button" id="mapDeviceAddressButton">Mostrar direccion</button>
+        </div>
+        <p class="mobile-map-device-panel__address-text" id="mapDeviceAddressText" hidden></p>
       </section>
     </main>
 
@@ -142,7 +174,7 @@
   <script src="./api.js?v=3"></script>
   <script src="./app-shell.js?v=1"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="./map.js?v=4"></script>
+  <script src="./map.js?v=5"></script>
 </body>
 </html>
 

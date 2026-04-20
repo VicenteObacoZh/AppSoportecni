@@ -53,6 +53,50 @@
 
       <section class="mobile-routes-summary" id="routeSummary"></section>
 
+      <section class="mobile-routes-playback-card">
+        <div class="mobile-routes-points-card__top">
+          <p class="eyebrow">Playback</p>
+          <h3>Recorrido paso a paso</h3>
+        </div>
+
+        <div class="mobile-routes-playback-controls">
+          <button type="button" class="mobile-routes-control mobile-routes-control--primary" id="routePlayButton">Reproducir</button>
+          <button type="button" class="mobile-routes-control" id="routePauseButton">Pausar</button>
+          <button type="button" class="mobile-routes-control" id="routeRestartButton">Reiniciar</button>
+          <label class="mobile-routes-speed">
+            <span>Velocidad</span>
+            <select id="routeSpeedSelect">
+              <option value="0.5">0.5x</option>
+              <option value="1" selected>1x</option>
+              <option value="2">2x</option>
+              <option value="4">4x</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="mobile-routes-current">
+          <div class="mobile-routes-current__status" id="routePlaybackState">Carga una ruta para iniciar</div>
+          <div class="mobile-routes-current__grid">
+            <article>
+              <span>Hora</span>
+              <strong id="routeCurrentTime">--</strong>
+            </article>
+            <article>
+              <span>Velocidad</span>
+              <strong id="routeCurrentSpeed">0 km/h</strong>
+            </article>
+            <article>
+              <span>Posicion</span>
+              <strong id="routeCurrentPosition">Sin coordenadas</strong>
+            </article>
+            <article>
+              <span>Direccion</span>
+              <strong id="routeCurrentAddress">Direccion no disponible para este punto.</strong>
+            </article>
+          </div>
+        </div>
+      </section>
+
       <section class="mobile-routes-map-card">
         <div class="mobile-routes-map-card__top">
           <div>
@@ -72,7 +116,8 @@
       <section class="mobile-routes-points-card">
         <div class="mobile-routes-points-card__top">
           <p class="eyebrow">Bitacora</p>
-          <h3>Puntos recientes</h3>
+          <h3>Timeline del recorrido</h3>
+          <span class="mobile-routes-timeline-count" id="routeTimelineCount">Sin puntos cargados</span>
         </div>
         <div class="mobile-routes-points" id="routePointsList"></div>
       </section>
@@ -103,6 +148,6 @@
   <script src="./api.js?v=3"></script>
   <script src="./app-shell.js?v=1"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="./routes.js?v=2"></script>
+  <script src="./routes.js?v=3"></script>
 </body>
 </html>

@@ -14,15 +14,82 @@
   const mapElement = document.getElementById('routeMap');
   const mapEmptyState = document.getElementById('routeMapEmptyState');
   const presetButtons = Array.from(document.querySelectorAll('[data-route-preset]'));
+  const playButton = document.getElementById('routePlayButton');
+  const pauseButton = document.getElementById('routePauseButton');
+  const restartButton = document.getElementById('routeRestartButton');
+  const speedSelect = document.getElementById('routeSpeedSelect');
+  const currentState = document.getElementById('routePlaybackState');
+  const currentTime = document.getElementById('routeCurrentTime');
+  const currentSpeed = document.getElementById('routeCurrentSpeed');
+  const currentPosition = document.getElementById('routeCurrentPosition');
+  const currentAddress = document.getElementById('routeCurrentAddress');
+  const timelineCount = document.getElementById('routeTimelineCount');
 
   let routeMap = null;
+  let baseLayer = null;
   let routeMarkers = [];
   let routePolyline = null;
+  let playbackMarker = null;
   let currentDevices = [];
+  let currentRoute = [];
+  let playbackIndex = 0;
+  let playbackTimer = null;
+  let playbackSpeed = Number(speedSelect?.value || 1);
+  let isPlaying = false;
 
   function formatDateTimeLocal(date) {
     const pad = (value) => String(value).padStart(2, '0');
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  }
+
+  function formatDateTime(value) {
+    if (!value) {
+      return '--';
+    }
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return '--';
+    }
+
+    return parsed.toLocaleString();
+  }
+
+  function formatShortTime(value) {
+    if (!value) {
+      return '--:--';
+    }
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return '--:--';
+    }
+
+    return parsed.toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
+
+  function formatSpeed(value) {
+    return `${Math.round(Number(value || 0))} km/h`;
+  }
+
+  function formatPosition(point) {
+    if (!point || !Number.isFinite(Number(point.lat)) || !Number.isFinite(Number(point.lon))) {
+      return 'Sin coordenadas';
+    }
+
+    return `${Number(point.lat).toFixed(5)}, ${Number(point.lon).toFixed(5)}`;
+  }
+
+  function getAddressLabel(value) {
+    return String(value || '').trim() || 'Direccion no disponible para este punto.';
+  }
+
+  function getPlaybackInterval() {
+    const normalizedSpeed = Math.max(Number(playbackSpeed || 1), 0.5);
+    return Math.max(180, Math.round(1100 / normalizedSpeed));
   }
 
   function applyPreset(preset) {
@@ -52,10 +119,11 @@
       return;
     }
 
-    const total = Number(routeData?.summary?.total || 0);
+    const points = Array.isArray(routeData?.points) ? routeData.points : [];
+    const total = Number(routeData?.summary?.total || points.length || 0);
     const moving = Number(routeData?.summary?.moving || 0);
-    const first = routeData?.points?.[0] || null;
-    const last = routeData?.points?.[routeData.points.length - 1] || null;
+    const first = points[0] || null;
+    const last = points[points.length - 1] || null;
 
     summary.innerHTML = `
       <article class="mobile-routes-kpi">
@@ -68,35 +136,60 @@
       </article>
       <article class="mobile-routes-kpi">
         <span>Inicio</span>
-        <strong>${first?.fixTime ? new Date(first.fixTime).toLocaleTimeString() : '--:--'}</strong>
+        <strong>${formatShortTime(first?.fixTime)}</strong>
       </article>
       <article class="mobile-routes-kpi">
         <span>Fin</span>
-        <strong>${last?.fixTime ? new Date(last.fixTime).toLocaleTimeString() : '--:--'}</strong>
+        <strong>${formatShortTime(last?.fixTime)}</strong>
       </article>
     `;
   }
 
-  function renderPoints(points) {
-    if (!pointsList) {
-      return;
+  function renderCurrentPoint(point, index) {
+    const total = currentRoute.length;
+    const pointLabel = total > 0 && index >= 0
+      ? `Punto ${index + 1} de ${total}`
+      : 'Sin playback';
+
+    if (currentState) {
+      currentState.textContent = isPlaying
+        ? `${pointLabel} | Reproduciendo x${playbackSpeed}`
+        : `${pointLabel} | ${total ? 'Listo para reproducir' : 'Carga una ruta para iniciar'}`;
     }
 
-    if (!points.length) {
-      pointsList.innerHTML = '<div class="mobile-map-empty">La ruta no devolvio puntos para ese rango.</div>';
-      return;
+    if (currentTime) {
+      currentTime.textContent = formatDateTime(point?.fixTime);
     }
 
-    pointsList.innerHTML = points.slice(-12).reverse().map((point, index) => `
-      <div class="event-row">
-        <div class="event-row__top">
-          <strong>Punto ${points.length - index}</strong>
-          <span class="event-badge event-badge--${Number(point.speedKmh || 0) > 3 ? 'success' : 'muted'}">${Number(point.speedKmh || 0)} km/h</span>
+    if (currentSpeed) {
+      currentSpeed.textContent = formatSpeed(point?.speedKmh);
+    }
+
+    if (currentPosition) {
+      currentPosition.textContent = formatPosition(point);
+    }
+
+    if (currentAddress) {
+      currentAddress.textContent = getAddressLabel(point?.address);
+    }
+
+    if (timelineCount) {
+      timelineCount.textContent = total ? `${total} puntos sincronizados` : 'Sin puntos cargados';
+    }
+  }
+
+  function buildPlaybackIcon() {
+    return window.L.divIcon({
+      className: 'gps-playback-marker',
+      html: `
+        <div class="gps-playback-marker__shell">
+          <span class="gps-playback-marker__pulse"></span>
+          <span class="gps-playback-marker__dot"></span>
         </div>
-        <span>${point.fixTime ? new Date(point.fixTime).toLocaleString() : 'Sin hora visible'}</span>
-        <small>${point.address || `${point.lat}, ${point.lon}`}</small>
-      </div>
-    `).join('');
+      `,
+      iconSize: [26, 26],
+      iconAnchor: [13, 13]
+    });
   }
 
   function ensureMap() {
@@ -110,10 +203,12 @@
         attributionControl: false
       }).setView([-4.05, -78.92], 6);
 
-      window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      baseLayer = window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '&copy; OpenStreetMap'
-      }).addTo(routeMap);
+      });
+
+      baseLayer.addTo(routeMap);
     }
 
     return routeMap;
@@ -131,6 +226,169 @@
       routePolyline.remove();
       routePolyline = null;
     }
+
+    if (playbackMarker) {
+      playbackMarker.remove();
+      playbackMarker = null;
+    }
+  }
+
+  function ensurePlaybackMarker(latLng) {
+    if (!routeMap) {
+      return null;
+    }
+
+    if (!playbackMarker) {
+      playbackMarker = window.L.marker(latLng, {
+        icon: buildPlaybackIcon(),
+        zIndexOffset: 900
+      }).addTo(routeMap);
+    } else {
+      playbackMarker.setLatLng(latLng);
+    }
+
+    return playbackMarker;
+  }
+
+  function updateTimelineSelection() {
+    if (!pointsList) {
+      return;
+    }
+
+    pointsList.querySelectorAll('[data-route-point-index]').forEach((button) => {
+      const isActive = Number(button.getAttribute('data-route-point-index')) === playbackIndex;
+      button.classList.toggle('mobile-route-point--active', isActive);
+    });
+  }
+
+  function seekToPoint(nextIndex, options = {}) {
+    if (!currentRoute.length || !routeMap) {
+      renderCurrentPoint(null, -1);
+      return;
+    }
+
+    const boundedIndex = Math.max(0, Math.min(nextIndex, currentRoute.length - 1));
+    const point = currentRoute[boundedIndex];
+    const latLng = [Number(point.lat), Number(point.lon)];
+
+    playbackIndex = boundedIndex;
+    ensurePlaybackMarker(latLng);
+    renderCurrentPoint(point, boundedIndex);
+    updateTimelineSelection();
+
+    if (options.follow !== false) {
+      routeMap.panTo(latLng, {
+        animate: true,
+        duration: 0.5
+      });
+    }
+
+    if (playbackMarker) {
+      playbackMarker.bindPopup(`
+        <div class="gps-popup">
+          <strong>${formatShortTime(point.fixTime)}</strong>
+          <span>${formatSpeed(point.speedKmh)}</span>
+          <span>${getAddressLabel(point.address)}</span>
+        </div>
+      `);
+    }
+  }
+
+  function pausePlayback() {
+    isPlaying = false;
+    if (playbackTimer) {
+      window.clearTimeout(playbackTimer);
+      playbackTimer = null;
+    }
+    renderCurrentPoint(currentRoute[playbackIndex] || null, currentRoute.length ? playbackIndex : -1);
+  }
+
+  function scheduleNextPlaybackStep() {
+    if (!isPlaying || !currentRoute.length) {
+      return;
+    }
+
+    playbackTimer = window.setTimeout(() => {
+      if (!isPlaying) {
+        return;
+      }
+
+      if (playbackIndex >= currentRoute.length - 1) {
+        pausePlayback();
+        signalPill.textContent = 'Playback finalizado';
+        return;
+      }
+
+      seekToPoint(playbackIndex + 1, { follow: true });
+      scheduleNextPlaybackStep();
+    }, getPlaybackInterval());
+  }
+
+  function startPlayback() {
+    if (!currentRoute.length) {
+      signalPill.textContent = 'No hay puntos para reproducir';
+      return;
+    }
+
+    if (playbackIndex >= currentRoute.length - 1) {
+      seekToPoint(0, { follow: true });
+    }
+
+    pausePlayback();
+    isPlaying = true;
+    signalPill.textContent = `Playback x${playbackSpeed}`;
+    renderCurrentPoint(currentRoute[playbackIndex], playbackIndex);
+    scheduleNextPlaybackStep();
+  }
+
+  function restartPlayback() {
+    pausePlayback();
+    if (!currentRoute.length) {
+      renderCurrentPoint(null, -1);
+      return;
+    }
+
+    seekToPoint(0, { follow: true });
+    signalPill.textContent = 'Playback reiniciado';
+  }
+
+  function renderPoints(points) {
+    if (!pointsList) {
+      return;
+    }
+
+    if (!points.length) {
+      pointsList.innerHTML = '<div class="mobile-map-empty">La ruta no devolvio puntos para ese rango.</div>';
+      updateTimelineSelection();
+      return;
+    }
+
+    pointsList.innerHTML = points.map((point, index) => `
+      <button class="mobile-route-point" type="button" data-route-point-index="${index}">
+        <div class="mobile-route-point__main">
+          <div class="mobile-route-point__top">
+            <strong>Punto ${index + 1}</strong>
+            <span class="event-badge event-badge--${Number(point.speedKmh || 0) > 3 ? 'success' : 'muted'}">${formatSpeed(point.speedKmh)}</span>
+          </div>
+          <span>${formatDateTime(point.fixTime)}</span>
+          <small>${getAddressLabel(point.address)}</small>
+        </div>
+        <div class="mobile-route-point__meta">
+          <strong>${formatShortTime(point.fixTime)}</strong>
+          <span>${formatPosition(point)}</span>
+        </div>
+      </button>
+    `).join('');
+
+    pointsList.querySelectorAll('[data-route-point-index]').forEach((button) => {
+      button.addEventListener('click', () => {
+        pausePlayback();
+        seekToPoint(Number(button.getAttribute('data-route-point-index') || 0), { follow: true });
+        signalPill.textContent = 'Punto enfocado';
+      });
+    });
+
+    updateTimelineSelection();
   }
 
   function renderRoute(points) {
@@ -147,6 +405,7 @@
 
     if (!points.length) {
       map.setView([-4.05, -78.92], 6);
+      renderCurrentPoint(null, -1);
       return;
     }
 
@@ -164,7 +423,13 @@
       fillColor: '#57c95f',
       fillOpacity: 1
     }).addTo(map);
-    startMarker.bindPopup('Inicio');
+    startMarker.bindPopup(`
+      <div class="gps-popup">
+        <strong>Inicio</strong>
+        <span>${formatDateTime(points[0]?.fixTime)}</span>
+        <span>${getAddressLabel(points[0]?.address)}</span>
+      </div>
+    `);
     routeMarkers.push(startMarker);
 
     const endMarker = window.L.circleMarker(latLngs[latLngs.length - 1], {
@@ -174,10 +439,17 @@
       fillColor: '#ff6b64',
       fillOpacity: 1
     }).addTo(map);
-    endMarker.bindPopup('Fin');
+    endMarker.bindPopup(`
+      <div class="gps-popup">
+        <strong>Fin</strong>
+        <span>${formatDateTime(points[points.length - 1]?.fixTime)}</span>
+        <span>${getAddressLabel(points[points.length - 1]?.address)}</span>
+      </div>
+    `);
     routeMarkers.push(endMarker);
 
     map.fitBounds(routePolyline.getBounds(), { padding: [24, 24] });
+    seekToPoint(0, { follow: false });
   }
 
   function populateDevices(devices) {
@@ -232,7 +504,7 @@
       }
 
       sessionTitle.textContent = session.mode === 'live' ? 'Sesion real detectada' : 'Sesion mock detectada';
-      sessionText.textContent = `SessionId activa: ${session.id}. Lista para consultar historicos.`;
+      sessionText.textContent = `SessionId activa: ${session.id}. Lista para consultar historicos y playback.`;
 
       const dashboard = await apiClient.getDashboard();
       const devices = Array.isArray(dashboard.devices) ? dashboard.devices : [];
@@ -246,6 +518,8 @@
         window.setTimeout(() => {
           loadRoute();
         }, 100);
+      } else {
+        renderCurrentPoint(null, -1);
       }
       return devices.length > 0;
     } catch (_error) {
@@ -254,6 +528,7 @@
       renderSummary({ summary: { total: 0, moving: 0 }, points: [] });
       renderPoints([]);
       renderRoute([]);
+      renderCurrentPoint(null, -1);
       return false;
     }
   }
@@ -262,6 +537,8 @@
     if (!apiClient || !deviceSelect?.value || !fromInput?.value || !toInput?.value) {
       return;
     }
+
+    pausePlayback();
 
     try {
       signalPill.textContent = 'Consultando...';
@@ -278,15 +555,23 @@
         routeContext.to
       );
 
+      currentRoute = Array.isArray(routeData?.points) ? routeData.points : [];
+      playbackIndex = 0;
+
       renderSummary(routeData || { summary: { total: 0, moving: 0 }, points: [] });
-      renderPoints(routeData?.points || []);
-      renderRoute(routeData?.points || []);
-      signalPill.textContent = routeData?.points?.length ? 'Ruta cargada' : 'Sin puntos';
-    } catch (_error) {
-      signalPill.textContent = 'Consulta fallida';
+      renderPoints(currentRoute);
+      renderRoute(currentRoute);
+      signalPill.textContent = currentRoute.length ? 'Ruta cargada' : 'Sin puntos';
+    } catch (error) {
+      currentRoute = [];
+      playbackIndex = 0;
+      signalPill.textContent = error?.code === 'SESSION_EXPIRED'
+        ? 'Sesion expirada durante la consulta'
+        : 'Consulta fallida';
       renderSummary({ summary: { total: 0, moving: 0 }, points: [] });
       renderPoints([]);
       renderRoute([]);
+      renderCurrentPoint(null, -1);
     }
   }
 
@@ -296,6 +581,22 @@
     button.addEventListener('click', () => {
       applyPreset(button.dataset.routePreset || '4h');
     });
+  });
+
+  playButton?.addEventListener('click', startPlayback);
+  pauseButton?.addEventListener('click', () => {
+    pausePlayback();
+    signalPill.textContent = currentRoute.length ? 'Playback en pausa' : 'Sin puntos';
+  });
+  restartButton?.addEventListener('click', restartPlayback);
+
+  speedSelect?.addEventListener('change', () => {
+    playbackSpeed = Number(speedSelect.value || 1);
+    if (isPlaying) {
+      startPlayback();
+    } else {
+      renderCurrentPoint(currentRoute[playbackIndex] || null, currentRoute.length ? playbackIndex : -1);
+    }
   });
 
   initializeView();

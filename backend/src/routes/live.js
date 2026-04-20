@@ -22,7 +22,18 @@ function respondSessionNotFound(res) {
 }
 
 function buildMonitorSummary(payload) {
-  const devices = Array.isArray(payload?.devices) ? payload.devices : [];
+  const rawDevices = Array.isArray(payload?.devices) ? payload.devices : [];
+  const devices = rawDevices.map((item) => ({
+    ...item,
+    vehicleName: item?.vehicleName ?? item?.VehicleName ?? item?.name ?? item?.Name ?? 'Unidad',
+    groupName: item?.groupName ?? item?.GroupName ?? item?.empresa ?? item?.Empresa ?? 'Sin empresa',
+    uniqueId: item?.uniqueId ?? item?.UniqueId ?? item?.imei ?? item?.Imei ?? item?.IMEI ?? '-',
+    lat: Number(item?.lat ?? item?.latitude ?? item?.Lat ?? item?.Latitude),
+    lon: Number(item?.lon ?? item?.longitude ?? item?.Lon ?? item?.Longitude),
+    speedKmh: Number(item?.speedKmh ?? item?.speed ?? item?.SpeedKmh ?? item?.Speed ?? 0),
+    fixTime: item?.fixTime ?? item?.FixTime ?? item?.deviceTime ?? item?.DeviceTime ?? null,
+    address: item?.address ?? item?.Address ?? item?.direccion ?? item?.Direccion ?? null
+  }));
   const moving = devices.filter((item) => Number(item.speedKmh || 0) > 3);
   const withLocation = devices.filter((item) => Number.isFinite(Number(item.lat)) && Number.isFinite(Number(item.lon)));
   const companies = [...new Set(devices.map((item) => item.groupName).filter(Boolean))];
@@ -68,17 +79,19 @@ function buildRouteSummary(payload) {
   const points = Array.isArray(payload) ? payload : [];
 
   const normalized = points
-    .map((item) => {
+    .map((item, index) => {
       const lat = Number(item?.latitude ?? item?.lat ?? item?.Latitude ?? item?.Lat);
       const lon = Number(item?.longitude ?? item?.lon ?? item?.Longitude ?? item?.Lon);
       const speedKmh = Number(item?.speedKmh ?? item?.speed ?? item?.SpeedKmh ?? item?.Speed ?? 0);
 
       return {
+        pointId: String(item?.pointId ?? item?.PointId ?? item?.id ?? item?.Id ?? `route-point-${index + 1}`),
         lat,
         lon,
         speedKmh,
         fixTime: item?.fixTime ?? item?.FixTime ?? item?.deviceTime ?? item?.DeviceTime ?? null,
-        address: item?.address ?? item?.Address ?? null
+        address: item?.address ?? item?.Address ?? item?.direccion ?? item?.Direccion ?? null,
+        course: Number(item?.course ?? item?.Course ?? 0)
       };
     })
     .filter((item) => Number.isFinite(item.lat) && Number.isFinite(item.lon));
@@ -88,7 +101,57 @@ function buildRouteSummary(payload) {
     points: normalized,
     summary: {
       total: normalized.length,
-      moving: normalized.filter((item) => item.speedKmh > 3).length
+      moving: normalized.filter((item) => item.speedKmh > 3).length,
+      firstFixTime: normalized[0]?.fixTime || null,
+      lastFixTime: normalized[normalized.length - 1]?.fixTime || null
+    }
+  };
+}
+
+function normalizeGeofences(payload) {
+  const rawItems =
+    (Array.isArray(payload) ? payload : null) ||
+    (Array.isArray(payload?.items) ? payload.items : null) ||
+    (Array.isArray(payload?.data) ? payload.data : null) ||
+    (Array.isArray(payload?.rows) ? payload.rows : null) ||
+    [];
+
+  const items = rawItems
+    .map((item, index) => {
+      const polygon = Array.isArray(item?.points)
+        ? item.points.map((point) => ({
+            lat: Number(point?.lat ?? point?.latitude ?? point?.Lat ?? point?.Latitude),
+            lon: Number(point?.lon ?? point?.longitude ?? point?.Lon ?? point?.Longitude)
+          })).filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lon))
+        : [];
+
+      const centerLat = Number(item?.centerLat ?? item?.lat ?? item?.latitude ?? item?.Lat ?? item?.Latitude);
+      const centerLon = Number(item?.centerLon ?? item?.lon ?? item?.longitude ?? item?.Lon ?? item?.Longitude);
+      const radiusMeters = Number(item?.radiusMeters ?? item?.radius ?? item?.RadiusMeters ?? item?.Radius ?? 0);
+
+      return {
+        geofenceId: String(item?.geofenceId ?? item?.GeofenceId ?? item?.id ?? item?.Id ?? `geofence-${index + 1}`),
+        name: item?.name ?? item?.Name ?? 'Geocerca',
+        type: polygon.length >= 3 ? 'polygon' : 'circle',
+        centerLat,
+        centerLon,
+        radiusMeters,
+        points: polygon
+      };
+    })
+    .filter((item) => {
+      if (item.type === 'polygon') {
+        return item.points.length >= 3;
+      }
+
+      return Number.isFinite(item.centerLat) && Number.isFinite(item.centerLon) && item.radiusMeters > 0;
+    });
+
+  return {
+    available: items.length > 0,
+    items,
+    summary: {
+      total: items.length
     }
   };
 }
@@ -172,6 +235,10 @@ function buildMockRouteSummary() {
 
 function buildMockEventsSummary(limit) {
   return normalizeRecentEvents(mockData.recentEvents, limit);
+}
+
+function buildMockGeofencesSummary() {
+  return normalizeGeofences(mockData.geofences || []);
 }
 
 function hasLiveCookies(session) {
@@ -434,6 +501,33 @@ router.get('/monitor/events/recent', async (req, res) => {
       message: error.message
     });
   }
+});
+
+router.get('/monitor/geofences', async (req, res) => {
+  const sessionId = String(req.query.sessionId || '').trim();
+
+  if (!sessionId) {
+    return respondMissingSessionId(res);
+  }
+
+  const session = getSession(sessionId);
+  if (!session) {
+    return respondSessionNotFound(res);
+  }
+
+  if (session.mode === 'mock') {
+    return res.json({
+      ok: true,
+      mode: 'mock',
+      data: buildMockGeofencesSummary()
+    });
+  }
+
+  return res.status(501).json({
+    ok: false,
+    code: 'GEOFENCES_NOT_IMPLEMENTED',
+    message: 'La carga real de geocercas aun no esta conectada al portal.'
+  });
 });
 
 module.exports = router;
