@@ -2,8 +2,33 @@
   const config = window.GpsRastreoConfig || {};
   const mock = window.GpsRastreoMock || {};
 
-  function buildUrl(path) {
-    const base = (config.backendBaseUrl || '').replace(/\/$/, '');
+  function normalizeBaseUrl(value) {
+    return String(value || '').trim().replace(/\/$/, '');
+  }
+
+  function getBackendBaseUrls() {
+    const candidates = [];
+    const configuredCandidates = Array.isArray(config.backendBaseUrlCandidates)
+      ? config.backendBaseUrlCandidates
+      : [];
+
+    configuredCandidates.forEach((item) => {
+      const normalized = normalizeBaseUrl(item);
+      if (normalized) {
+        candidates.push(normalized);
+      }
+    });
+
+    const primary = normalizeBaseUrl(config.backendBaseUrl);
+    if (primary) {
+      candidates.unshift(primary);
+    }
+
+    return [...new Set(candidates)];
+  }
+
+  function buildUrl(path, baseUrl) {
+    const base = normalizeBaseUrl(baseUrl || config.backendBaseUrl);
     const cleanPath = (path || '').startsWith('/') ? path : `/${path || ''}`;
     return `${base}${cleanPath}`;
   }
@@ -35,37 +60,50 @@
   }
 
   async function requestJson(path, options) {
-    const requestUrl = buildUrl(path);
-    let response;
+    const backendBaseUrls = getBackendBaseUrls();
+    let lastNetworkError = null;
 
-    try {
-      response = await fetch(requestUrl, {
-        method: 'GET',
-        mode: config.requestMode || 'cors',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        ...options
-      });
-    } catch (error) {
-      const networkError = new Error(`No se pudo conectar con ${requestUrl}. ${error?.message || 'Revisa backend y red local.'}`);
-      networkError.cause = error;
+    for (const baseUrl of backendBaseUrls) {
+      const requestUrl = buildUrl(path, baseUrl);
+      let response;
+
+      try {
+        response = await fetch(requestUrl, {
+          method: 'GET',
+          mode: config.requestMode || 'cors',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          ...options
+        });
+      } catch (error) {
+        lastNetworkError = { error, requestUrl };
+        continue;
+      }
+
+      const contentType = response.headers.get('content-type') || '';
+      const payload = contentType.includes('application/json')
+        ? await response.json()
+        : await response.text();
+
+      if (!response.ok) {
+        const error = new Error(`HTTP ${response.status}`);
+        error.status = response.status;
+        error.payload = payload;
+        throw error;
+      }
+
+      config.backendBaseUrl = baseUrl;
+      return payload;
+    }
+
+    if (lastNetworkError) {
+      const networkError = new Error(`No se pudo conectar con ${lastNetworkError.requestUrl}. ${lastNetworkError.error?.message || 'Revisa backend y red local.'}`);
+      networkError.cause = lastNetworkError.error;
       throw networkError;
     }
 
-    const contentType = response.headers.get('content-type') || '';
-    const payload = contentType.includes('application/json')
-      ? await response.json()
-      : await response.text();
-
-    if (!response.ok) {
-      const error = new Error(`HTTP ${response.status}`);
-      error.status = response.status;
-      error.payload = payload;
-      throw error;
-    }
-
-    return payload;
+    throw new Error('No hay backendBaseUrl configurado para la aplicacion.');
   }
 
   async function request(path, options) {

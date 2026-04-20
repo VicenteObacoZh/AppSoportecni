@@ -4,6 +4,9 @@ const config: CapacitorConfig = {
   appId: 'com.soportecni.gpsrastreo',
   appName: 'GpsRastreo',
   webDir: 'www',
+  server: {
+    androidScheme: 'http'
+  },
   bundledWebRuntime: false
 };
 
