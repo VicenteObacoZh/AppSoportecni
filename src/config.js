@@ -89,8 +89,12 @@
     endpoints: {
       health: '/health',
       login: '/auth/login',
+      authSession: '/auth/session',
+      authLatestSession: '/auth/latest-session',
       dashboard: '/dashboard',
       liveMonitorData: '/live/monitor/data',
+      liveAlertsList: '/live/alerts/list',
+      liveMonitorRoute: '/live/monitor/route',
       liveEventsRecent: '/live/monitor/events/recent'
     }
   };

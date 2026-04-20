@@ -27,6 +27,14 @@
   const eventTime = document.getElementById('mapEventTime');
   const eventAddressButton = document.getElementById('mapEventAddressButton');
   const eventAddressText = document.getElementById('mapEventAddressText');
+  const devicePanel = document.getElementById('mapDevicePanel');
+  const deviceTitle = document.getElementById('mapDeviceTitle');
+  const deviceCompany = document.getElementById('mapDeviceCompany');
+  const deviceSpeed = document.getElementById('mapDeviceSpeed');
+  const deviceTime = document.getElementById('mapDeviceTime');
+  const deviceUniqueId = document.getElementById('mapDeviceUniqueId');
+  const deviceHistoryButton = document.getElementById('mapDeviceHistoryButton');
+  const appShell = window.GpsRastreoShell;
 
   let liveMap = null;
   let renderMarkers = [];
@@ -37,6 +45,7 @@
   let activeCompany = '';
   let currentAlertSummary = null;
   let selectedEvent = null;
+  let selectedDevice = null;
 
   function escapeHtml(value) {
     return String(value ?? '')
@@ -172,6 +181,36 @@
     }
   }
 
+  function showDevicePanel(device) {
+    selectedDevice = device || null;
+    if (!devicePanel) {
+      return;
+    }
+
+    const hasDevice = Boolean(device);
+    devicePanel.hidden = !hasDevice;
+
+    if (!hasDevice) {
+      return;
+    }
+
+    if (deviceTitle) {
+      deviceTitle.textContent = device.vehicleName || device.name || 'Unidad';
+    }
+    if (deviceCompany) {
+      deviceCompany.textContent = device.groupName || 'Sin empresa';
+    }
+    if (deviceSpeed) {
+      deviceSpeed.textContent = formatSpeed(device.speedKmh);
+    }
+    if (deviceTime) {
+      deviceTime.textContent = formatDateTime(device.fixTime);
+    }
+    if (deviceUniqueId) {
+      deviceUniqueId.textContent = device.uniqueId || '-';
+    }
+  }
+
   function buildDeviceIcon(device) {
     const markerUrl = getMarkerUrl(device);
     const fallbackUrl = `../assets/markers/flecha_${getStatusColor(device)}.png`;
@@ -304,6 +343,11 @@
         const lat = Number(button.getAttribute('data-device-lat'));
         const lon = Number(button.getAttribute('data-device-lon'));
         if (Number.isFinite(lat) && Number.isFinite(lon) && liveMap) {
+          const selected = currentDevices.find((item) => Number(item.lat) === lat && Number(item.lon) === lon);
+          if (selected) {
+            apiClient?.storeSelectedDevice?.(selected);
+            showDevicePanel(selected);
+          }
           liveMap.setView([lat, lon], 16);
           setSheetOpen(false);
         }
@@ -445,6 +489,11 @@
       </div>
     `);
 
+    marker.on('click', () => {
+      apiClient?.storeSelectedDevice?.(device);
+      showDevicePanel(device);
+    });
+
     renderMarkers.push(marker);
   }
 
@@ -553,6 +602,9 @@
     }
 
     if (!hasEvent) {
+      if (eventAddressText) {
+        eventAddressText.hidden = true;
+      }
       return;
     }
 
@@ -572,12 +624,36 @@
   }
 
   function resolveSelectedEvent() {
-    const fromStorage = apiClient?.getSelectedEvent?.();
     const currentUrl = new URL(window.location.href);
     const eventId = currentUrl.searchParams.get('eventId');
+    const from = currentUrl.searchParams.get('from');
 
-    if (fromStorage && (!eventId || String(fromStorage.eventId) === String(eventId))) {
+    if (!eventId || from !== 'events') {
+      apiClient?.clearSelectedEvent?.();
+      return null;
+    }
+
+    const fromStorage = apiClient?.getSelectedEvent?.();
+
+    if (fromStorage && String(fromStorage.eventId) === String(eventId)) {
       return fromStorage;
+    }
+
+    return null;
+  }
+
+  function resolveSelectedDevice() {
+    const currentUrl = new URL(window.location.href);
+    const deviceId = currentUrl.searchParams.get('deviceId');
+    const from = currentUrl.searchParams.get('from');
+    const fromStorage = apiClient?.getSelectedDevice?.();
+
+    if (deviceId && fromStorage && String(fromStorage.deviceId) === String(deviceId)) {
+      return fromStorage;
+    }
+
+    if (from === 'devices' || from === 'map') {
+      return deviceId ? { deviceId } : fromStorage;
     }
 
     return null;
@@ -603,7 +679,9 @@
     }
 
     try {
-      const session = await apiClient.getSessionInfo();
+      const session = await appShell?.requireSession?.({
+        redirectOnMissing: true
+      });
       if (!session) {
         currentDevices = [];
         currentCompanies = [];
@@ -613,6 +691,7 @@
         renderCompanyList();
         renderMap([]);
         applyEventFocusState();
+        showDevicePanel(null);
         return;
       }
 
@@ -627,8 +706,19 @@
       applyEventFocusState();
 
       if (selectedEvent) {
+        showDevicePanel(null);
         focusSelectedEvent();
+      } else if (selectedDevice?.deviceId) {
+        const device = currentDevices.find((item) => String(item.deviceId) === String(selectedDevice.deviceId));
+        if (device) {
+          apiClient?.storeSelectedDevice?.(device);
+          showDevicePanel(device);
+          if (liveMap && Number.isFinite(Number(device.lat)) && Number.isFinite(Number(device.lon))) {
+            liveMap.setView([Number(device.lat), Number(device.lon)], 16);
+          }
+        }
       } else if (currentDevices.length > 0 && liveMap && renderMarkers.length === 0) {
+        showDevicePanel(null);
         const bounds = window.L.latLngBounds(currentDevices
           .filter((item) => Number.isFinite(Number(item.lat)) && Number.isFinite(Number(item.lon)))
           .map((item) => [Number(item.lat), Number(item.lon)]));
@@ -645,10 +735,12 @@
       renderCompanyList();
       renderMap([]);
       applyEventFocusState();
+      showDevicePanel(null);
     }
   }
 
   selectedEvent = resolveSelectedEvent();
+  selectedDevice = resolveSelectedDevice();
 
   menuButton?.addEventListener('click', () => {
     const isOpen = sheet?.classList.contains('mobile-map-sheet--open');
@@ -692,6 +784,11 @@
       return;
     }
 
+    if (selectedDevice && liveMap && Number.isFinite(Number(selectedDevice.lat)) && Number.isFinite(Number(selectedDevice.lon))) {
+      liveMap.setView([Number(selectedDevice.lat), Number(selectedDevice.lon)], 16);
+      return;
+    }
+
     const withLocation = currentDevices.filter((item) => Number.isFinite(Number(item?.lat)) && Number.isFinite(Number(item?.lon)));
     if (!withLocation.length || !liveMap) {
       return;
@@ -718,6 +815,22 @@
       return;
     }
     eventAddressText.hidden = !eventAddressText.hidden;
+  });
+
+  deviceHistoryButton?.addEventListener('click', () => {
+    if (!selectedDevice?.deviceId) {
+      return;
+    }
+
+    const now = new Date();
+    const before = new Date(now.getTime() - (4 * 60 * 60 * 1000));
+    apiClient?.storeRouteContext?.({
+      deviceId: selectedDevice.deviceId,
+      from: before.toISOString(),
+      to: now.toISOString()
+    });
+    apiClient?.storeSelectedDevice?.(selectedDevice);
+    appShell?.navigate?.('./routes.html', { deviceId: selectedDevice.deviceId, from: 'map' });
   });
 
   sheet?.addEventListener('wheel', (event) => {

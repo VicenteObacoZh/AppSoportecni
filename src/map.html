@@ -87,6 +87,34 @@
         </div>
         <p class="mobile-map-event-panel__address-text" id="mapEventAddressText" hidden></p>
       </section>
+
+      <section class="mobile-map-device-panel" id="mapDevicePanel" hidden>
+        <div class="mobile-map-device-panel__top">
+          <div>
+            <p class="eyebrow">Unidad</p>
+            <h3 id="mapDeviceTitle">Sin unidad</h3>
+          </div>
+          <button class="mobile-map-device-panel__action" type="button" id="mapDeviceHistoryButton">Historico</button>
+        </div>
+        <div class="mobile-map-device-panel__meta">
+          <article>
+            <span>Empresa</span>
+            <strong id="mapDeviceCompany">-</strong>
+          </article>
+          <article>
+            <span>Velocidad</span>
+            <strong id="mapDeviceSpeed">0 kph</strong>
+          </article>
+          <article>
+            <span>Ultima posicion</span>
+            <strong id="mapDeviceTime">--</strong>
+          </article>
+          <article>
+            <span>IMEI</span>
+            <strong id="mapDeviceUniqueId">-</strong>
+          </article>
+        </div>
+      </section>
     </main>
 
     <nav class="mobile-bottom-nav mobile-bottom-nav--icons-only">
@@ -112,8 +140,9 @@
   <script src="./config.js?v=3"></script>
   <script src="./mock-data.js?v=3"></script>
   <script src="./api.js?v=3"></script>
+  <script src="./app-shell.js?v=1"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="./map.js?v=3"></script>
+  <script src="./map.js?v=4"></script>
 </body>
 </html>
 

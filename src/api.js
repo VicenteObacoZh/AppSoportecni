@@ -79,7 +79,7 @@
   function storeSelectedEvent(eventItem) {
     try {
       if (eventItem) {
-        window.sessionStorage.setItem('gpsrastreo.selectedEvent', JSON.stringify(eventItem));
+        window.localStorage.setItem('gpsrastreo.selectedEvent', JSON.stringify(eventItem));
       }
     } catch {
       // no-op
@@ -88,7 +88,7 @@
 
   function getSelectedEvent() {
     try {
-      const raw = window.sessionStorage.getItem('gpsrastreo.selectedEvent');
+      const raw = window.localStorage.getItem('gpsrastreo.selectedEvent');
       return raw ? JSON.parse(raw) : null;
     } catch {
       return null;
@@ -97,7 +97,61 @@
 
   function clearSelectedEvent() {
     try {
-      window.sessionStorage.removeItem('gpsrastreo.selectedEvent');
+      window.localStorage.removeItem('gpsrastreo.selectedEvent');
+    } catch {
+      // no-op
+    }
+  }
+
+  function storeSelectedDevice(device) {
+    try {
+      if (device) {
+        window.localStorage.setItem('gpsrastreo.selectedDevice', JSON.stringify(device));
+      }
+    } catch {
+      // no-op
+    }
+  }
+
+  function getSelectedDevice() {
+    try {
+      const raw = window.localStorage.getItem('gpsrastreo.selectedDevice');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function clearSelectedDevice() {
+    try {
+      window.localStorage.removeItem('gpsrastreo.selectedDevice');
+    } catch {
+      // no-op
+    }
+  }
+
+  function storeRouteContext(routeContext) {
+    try {
+      if (routeContext) {
+        window.localStorage.setItem('gpsrastreo.routeContext', JSON.stringify(routeContext));
+      }
+    } catch {
+      // no-op
+    }
+  }
+
+  function getRouteContext() {
+    try {
+      const raw = window.localStorage.getItem('gpsrastreo.routeContext');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function clearRouteContext() {
+    try {
+      window.localStorage.removeItem('gpsrastreo.routeContext');
     } catch {
       // no-op
     }
@@ -134,6 +188,7 @@
         const error = new Error(`HTTP ${response.status}`);
         error.status = response.status;
         error.payload = payload;
+        error.code = payload?.code || '';
         throw error;
       }
 
@@ -156,7 +211,7 @@
 
   async function getLiveAlerts(sessionId) {
     try {
-      const payload = await request(`/live/alerts/list?sessionId=${encodeURIComponent(sessionId)}`);
+      const payload = await request(`${config.endpoints.liveAlertsList || '/live/alerts/list'}?sessionId=${encodeURIComponent(sessionId)}`);
       return payload?.data || null;
     } catch (error) {
       if (error.status === 404 || error.status === 401) {
@@ -175,7 +230,7 @@
       to
     });
 
-    const payload = await request(`/live/monitor/route?${query.toString()}`);
+    const payload = await request(`${config.endpoints.liveMonitorRoute || '/live/monitor/route'}?${query.toString()}`);
     return payload?.data || null;
   }
 
@@ -342,12 +397,12 @@
     async getSessionInfo() {
       const sessionId = getStoredSessionId();
       if (!sessionId) {
-        try {
-          const latest = await request('/auth/latest-session');
-          if (latest?.id) {
-            syncRuntimeMode(latest);
-            storeSessionId(latest.id);
-            return latest;
+      try {
+        const latest = await request(config.endpoints.authLatestSession || '/auth/latest-session');
+        if (latest?.id) {
+          syncRuntimeMode(latest);
+          storeSessionId(latest.id);
+          return latest;
           }
         } catch {
           return null;
@@ -357,11 +412,11 @@
       }
 
       try {
-        const payload = await request(`/auth/session/${encodeURIComponent(sessionId)}`);
+        const payload = await request(`${config.endpoints.authSession || '/auth/session'}/${encodeURIComponent(sessionId)}`);
         syncRuntimeMode(payload);
         return payload;
       } catch (error) {
-        if (error.status === 404) {
+        if (error.status === 404 || error.status === 401) {
           clearStoredSessionId();
           return null;
         }
@@ -374,6 +429,12 @@
     clearStoredSessionId,
     storeSelectedEvent,
     getSelectedEvent,
-    clearSelectedEvent
+    clearSelectedEvent,
+    storeSelectedDevice,
+    getSelectedDevice,
+    clearSelectedDevice,
+    storeRouteContext,
+    getRouteContext,
+    clearRouteContext
   };
 })();

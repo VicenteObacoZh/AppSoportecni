@@ -22,6 +22,7 @@
   const apiStatus = document.getElementById('apiStatus');
   const apiMessage = document.getElementById('apiMessage');
   const refreshDashboardButton = document.getElementById('refreshDashboardButton');
+  const appShell = window.GpsRastreoShell;
   let liveMap = null;
   let liveMapMarkers = [];
 
@@ -288,6 +289,17 @@
   }
 
   if (loginForm && apiClient) {
+    const loginReasonMessage = appShell?.readLoginMessageFromUrl?.();
+    if (loginReasonMessage && loginMessage) {
+      loginMessage.textContent = loginReasonMessage;
+    }
+
+    apiClient.getSessionInfo().then((session) => {
+      if (session && window.location.pathname.endsWith('/login.html')) {
+        window.location.href = new URL('./map.html', window.location.href).toString();
+      }
+    }).catch(() => {});
+
     loginForm.addEventListener('submit', (event) => {
       event.preventDefault();
 

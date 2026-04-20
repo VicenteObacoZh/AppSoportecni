@@ -3,119 +3,106 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GpsRastreo | Rutas e históricos</title>
-  <meta name="description" content="Vista de rutas e historicos para GpsRastreo." />
+  <title>GpsRastreo | Rutas</title>
+  <meta name="description" content="Vista movil de rutas e historicos para GpsRastreo." />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="./styles.css" />
 </head>
-<body class="dashboard-body">
-  <div class="app-dashboard">
-    <aside class="app-sidebar">
-      <div class="app-sidebar__brand">
-        <img src="../assets/icono.png" alt="GpsRastreo" class="brand__icon" />
-        <div>
-          <p class="eyebrow">Cabina de control</p>
-          <h1>GpsRastreo</h1>
-        </div>
-        <button class="nav-toggle" type="button" aria-label="Abrir menu" aria-expanded="false" data-nav-toggle>
-          Menu
-        </button>
+<body class="dashboard-body dashboard-body--routes-mobile">
+  <div class="mobile-routes-app">
+    <header class="mobile-routes-topbar">
+      <div>
+        <p class="eyebrow">Historico operativo</p>
+        <h1>Rutas</h1>
       </div>
+      <button class="mobile-routes-action" id="loadRouteButton" type="button">Consultar</button>
+    </header>
 
-      <nav class="app-nav">
-        <a class="app-nav__item" href="./dashboard.html">Resumen general</a>
-        <a class="app-nav__item" href="./map.html">Mapa en vivo</a>
-        <a class="app-nav__item" href="./alerts.html">Alertas</a>
-        <a class="app-nav__item app-nav__item--active" href="./routes.html">Rutas e historicos</a>
-        <a class="app-nav__item" href="#">Clientes</a>
-        <a class="app-nav__item" href="./devices.html">Dispositivos</a>
-        <a class="app-nav__item" href="./login.html">Cerrar sesion</a>
-      </nav>
-
-      <article class="sidebar-card">
-        <p class="eyebrow">Analitica</p>
-        <h3>Recorridos reales</h3>
-        <p>Consulta trazas por dispositivo y rango de tiempo usando la misma sesion autenticada del monitor.</p>
-      </article>
-    </aside>
-
-    <main class="app-main">
-      <header class="app-main__top">
-        <div>
-          <p class="eyebrow">Historico operativo</p>
-          <h2>Rutas e históricos</h2>
-        </div>
-        <div class="topbar__actions">
-          <button class="pill pill--primary" id="loadRouteButton" type="button">Consultar ruta</button>
-          <a class="pill pill--ghost" href="./dashboard.html">Dashboard</a>
-        </div>
-      </header>
-
-      <section class="session-strip">
-        <div>
-          <p class="eyebrow">Sesion</p>
-          <h3 id="routesSessionTitle">Validando sesion...</h3>
-        </div>
-        <p id="routesSessionText">Preparando acceso a las rutas del portal.</p>
+    <main class="mobile-routes-main">
+      <section class="mobile-routes-session">
+        <strong id="routesSessionTitle">Validando sesion...</strong>
+        <span id="routesSessionText">Preparando acceso a las rutas del portal.</span>
       </section>
 
-      <section class="route-filters">
+      <section class="mobile-routes-filters">
         <label class="field">
           <span>Dispositivo</span>
           <select id="routeDeviceSelect"></select>
         </label>
+
+        <div class="mobile-routes-presets">
+          <button type="button" class="mobile-routes-preset" data-route-preset="1h">Ultima 1h</button>
+          <button type="button" class="mobile-routes-preset" data-route-preset="4h">Ultimas 4h</button>
+          <button type="button" class="mobile-routes-preset" data-route-preset="today">Hoy</button>
+          <button type="button" class="mobile-routes-preset" data-route-preset="yesterday">Ayer</button>
+        </div>
+
         <label class="field">
           <span>Desde</span>
           <input type="datetime-local" id="routeFrom" />
         </label>
+
         <label class="field">
           <span>Hasta</span>
           <input type="datetime-local" id="routeTo" />
         </label>
       </section>
 
-      <section class="devices-summary" id="routeSummary"></section>
+      <section class="mobile-routes-summary" id="routeSummary"></section>
 
-      <section class="command-grid command-grid--map">
-        <article class="map-panel">
-          <div class="map-panel__top">
-            <div>
-              <p class="eyebrow">Trazado historico</p>
-              <h3>Ruta del dispositivo seleccionado</h3>
-            </div>
-            <span class="signal-pill" id="routeSignalPill">Rango listo</span>
+      <section class="mobile-routes-map-card">
+        <div class="mobile-routes-map-card__top">
+          <div>
+            <p class="eyebrow">Trazado historico</p>
+            <h3>Ruta del dispositivo seleccionado</h3>
           </div>
-          <div class="map-surface map-surface--large map-surface--leaflet map-surface--page">
-            <div id="routeMap" class="live-map"></div>
-            <div class="map-empty-state" id="routeMapEmptyState">
-              Selecciona una unidad y pulsa "Consultar ruta".
-            </div>
+          <span class="signal-pill" id="routeSignalPill">Rango listo</span>
+        </div>
+        <div class="mobile-routes-map-wrap">
+          <div id="routeMap" class="mobile-routes-map"></div>
+          <div class="map-empty-state map-empty-state--overlay" id="routeMapEmptyState">
+            Selecciona una unidad y pulsa "Consultar".
           </div>
-        </article>
-
-        <div class="command-side">
-          <article class="table-card map-side-card">
-            <div class="table-card__top">
-              <div>
-                <p class="eyebrow">Bitacora</p>
-                <h3>Puntos recientes</h3>
-              </div>
-            </div>
-            <div class="event-list" id="routePointsList"></div>
-          </article>
         </div>
       </section>
+
+      <section class="mobile-routes-points-card">
+        <div class="mobile-routes-points-card__top">
+          <p class="eyebrow">Bitacora</p>
+          <h3>Puntos recientes</h3>
+        </div>
+        <div class="mobile-routes-points" id="routePointsList"></div>
+      </section>
     </main>
+
+    <nav class="mobile-bottom-nav mobile-bottom-nav--icons-only">
+      <a class="mobile-bottom-nav__item" href="./devices.html" aria-label="Dispositivos">
+        <span class="mobile-bottom-nav__icon">&#128663;</span>
+        <span>Dispositivos</span>
+      </a>
+      <a class="mobile-bottom-nav__item" href="./alerts.html" aria-label="Eventos">
+        <span class="mobile-bottom-nav__icon">&#128276;</span>
+        <span>Eventos</span>
+      </a>
+      <a class="mobile-bottom-nav__item" href="./map.html" aria-label="Mapa">
+        <span class="mobile-bottom-nav__icon">&#128506;</span>
+        <span>Mapa</span>
+      </a>
+      <a class="mobile-bottom-nav__item mobile-bottom-nav__item--active" href="./routes.html" aria-label="Historico">
+        <span class="mobile-bottom-nav__icon">&#128736;</span>
+        <span>Historico</span>
+      </a>
+    </nav>
   </div>
 
   <script src="./config.js?v=3"></script>
   <script src="./mock-data.js?v=3"></script>
   <script src="./api.js?v=3"></script>
+  <script src="./app-shell.js?v=1"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="./shell.js?v=1"></script>
-  <script src="./routes.js?v=1"></script>
+  <script src="./routes.js?v=2"></script>
 </body>
 </html>

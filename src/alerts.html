@@ -33,6 +33,13 @@
         <input type="text" id="alertsSearch" placeholder="Buscar vehiculo o evento" />
       </label>
 
+      <label class="mobile-events-type-filter">
+        <span>Tipo</span>
+        <select id="alertsTypeFilter">
+          <option value="all">Todos</option>
+        </select>
+      </label>
+
       <section class="mobile-events-list" id="alertsEventsList">
         <div class="mobile-map-empty">Cargando eventos recientes...</div>
       </section>
@@ -61,6 +68,7 @@
   <script src="./config.js?v=4"></script>
   <script src="./mock-data.js?v=4"></script>
   <script src="./api.js?v=4"></script>
+  <script src="./app-shell.js?v=1"></script>
   <script src="./alerts.js?v=4"></script>
 </body>
 </html>

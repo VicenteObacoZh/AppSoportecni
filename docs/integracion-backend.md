@@ -26,13 +26,35 @@ La fuente de verdad para `mock` vs `live` es el backend de `backend/`.
 4. `GET /api/auth/session/:id`
 5. `GET /api/live/monitor/data?sessionId=...`
 6. `GET /api/live/alerts/list?sessionId=...`
-7. `GET /api/live/monitor/route?...`
+7. `GET /api/live/monitor/events/recent?sessionId=...`
+8. `GET /api/live/monitor/route?...`
+
+## Pantallas y endpoints
+
+- `src/login.html`
+  - `POST /api/auth/login`
+  - `GET /api/auth/latest-session`
+- `src/map.html`
+  - `GET /api/auth/session/:id`
+  - `GET /api/live/monitor/data`
+  - `GET /api/live/alerts/list`
+- `src/alerts.html`
+  - `GET /api/auth/session/:id`
+  - `GET /api/live/monitor/events/recent`
+- `src/devices.html`
+  - `GET /api/auth/session/:id`
+  - `GET /api/live/monitor/data`
+- `src/routes.html`
+  - `GET /api/auth/session/:id`
+  - `GET /api/live/monitor/data`
+  - `GET /api/live/monitor/route`
 
 ## Riesgos actuales
 
 - la plataforma `https://rastreo.soportecni.com` responde en vivo
 - desde navegador puede existir restriccion de CORS
 - el login real probablemente requiere token antifalsificacion y flujo de sesion de servidor
+- los handlers reales de eventos y rutas pueden variar el payload y requerir mas normalizacion en backend
 
 ## Camino seguro
 
@@ -43,7 +65,7 @@ La integracion real deberia pasar por una de estas rutas:
 
 ## Proxima fase tecnica
 
-1. endurecer manejo de sesion expirada y re-login
-2. ampliar handlers del portal real sin romper contratos actuales
-3. agregar pruebas de humo para health, login y monitor
-4. documentar estrategia Android (`http://localhost` + `adb reverse`)
+1. validar en vivo los payloads reales de `Events` y `Route`
+2. reforzar re-login guiado cuando el portal invalida cookies
+3. seguir ampliando pruebas smoke del backend y recorridos manuales de Android
+4. mantener frontend consumiendo solo el proxy actual

@@ -1,5 +1,6 @@
 (function () {
   const apiClient = window.GpsRastreoApi;
+  const appShell = window.GpsRastreoShell;
 
   const sessionTitle = document.getElementById('routesSessionTitle');
   const sessionText = document.getElementById('routesSessionText');
@@ -12,6 +13,7 @@
   const signalPill = document.getElementById('routeSignalPill');
   const mapElement = document.getElementById('routeMap');
   const mapEmptyState = document.getElementById('routeMapEmptyState');
+  const presetButtons = Array.from(document.querySelectorAll('[data-route-preset]'));
 
   let routeMap = null;
   let routeMarkers = [];
@@ -23,11 +25,26 @@
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
   }
 
-  function setDefaultRange() {
+  function applyPreset(preset) {
     const now = new Date();
-    const before = new Date(now.getTime() - (4 * 60 * 60 * 1000));
-    fromInput.value = formatDateTimeLocal(before);
-    toInput.value = formatDateTimeLocal(now);
+    let from = new Date(now.getTime() - (4 * 60 * 60 * 1000));
+    let to = now;
+
+    if (preset === '1h') {
+      from = new Date(now.getTime() - (60 * 60 * 1000));
+    } else if (preset === 'today') {
+      from = new Date(now);
+      from.setHours(0, 0, 0, 0);
+    } else if (preset === 'yesterday') {
+      from = new Date(now);
+      from.setDate(from.getDate() - 1);
+      from.setHours(0, 0, 0, 0);
+      to = new Date(from);
+      to.setHours(23, 59, 0, 0);
+    }
+
+    fromInput.value = formatDateTimeLocal(from);
+    toInput.value = formatDateTimeLocal(to);
   }
 
   function renderSummary(routeData) {
@@ -41,25 +58,21 @@
     const last = routeData?.points?.[routeData.points.length - 1] || null;
 
     summary.innerHTML = `
-      <article class="widget">
-        <p class="eyebrow">Puntos</p>
-        <h3>${total}</h3>
-        <p>Muestras devueltas por el handler Route.</p>
+      <article class="mobile-routes-kpi">
+        <span>Puntos</span>
+        <strong>${total}</strong>
       </article>
-      <article class="widget">
-        <p class="eyebrow">En movimiento</p>
-        <h3>${moving}</h3>
-        <p>Puntos con velocidad mayor a 3 km/h.</p>
+      <article class="mobile-routes-kpi">
+        <span>Movimiento</span>
+        <strong>${moving}</strong>
       </article>
-      <article class="widget">
-        <p class="eyebrow">Inicio</p>
-        <h3>${first?.fixTime ? new Date(first.fixTime).toLocaleTimeString() : '--:--'}</h3>
-        <p>Primer punto del rango consultado.</p>
+      <article class="mobile-routes-kpi">
+        <span>Inicio</span>
+        <strong>${first?.fixTime ? new Date(first.fixTime).toLocaleTimeString() : '--:--'}</strong>
       </article>
-      <article class="widget">
-        <p class="eyebrow">Fin</p>
-        <h3>${last?.fixTime ? new Date(last.fixTime).toLocaleTimeString() : '--:--'}</h3>
-        <p>Ultimo punto del rango consultado.</p>
+      <article class="mobile-routes-kpi">
+        <span>Fin</span>
+        <strong>${last?.fixTime ? new Date(last.fixTime).toLocaleTimeString() : '--:--'}</strong>
       </article>
     `;
   }
@@ -70,25 +83,18 @@
     }
 
     if (!points.length) {
-      pointsList.innerHTML = `
-        <div class="event-row">
-          <strong>Sin puntos</strong>
-          <span>La ruta consultada no devolvio posiciones dentro del rango.</span>
-        </div>
-      `;
+      pointsList.innerHTML = '<div class="mobile-map-empty">La ruta no devolvio puntos para ese rango.</div>';
       return;
     }
 
-    pointsList.innerHTML = points.slice(-10).reverse().map((point, index) => `
+    pointsList.innerHTML = points.slice(-12).reverse().map((point, index) => `
       <div class="event-row">
         <div class="event-row__top">
           <strong>Punto ${points.length - index}</strong>
-          <span class="event-badge event-badge--${Number(point.speedKmh || 0) > 3 ? 'success' : 'muted'}">
-            ${Number(point.speedKmh || 0)} km/h
-          </span>
+          <span class="event-badge event-badge--${Number(point.speedKmh || 0) > 3 ? 'success' : 'muted'}">${Number(point.speedKmh || 0)} km/h</span>
         </div>
         <span>${point.fixTime ? new Date(point.fixTime).toLocaleString() : 'Sin hora visible'}</span>
-        <small>${point.lat}, ${point.lon}</small>
+        <small>${point.address || `${point.lat}, ${point.lon}`}</small>
       </div>
     `).join('');
   }
@@ -101,8 +107,8 @@
     if (!routeMap) {
       routeMap = window.L.map(mapElement, {
         zoomControl: true,
-        attributionControl: true
-      }).setView([-4.05, -78.92], 12);
+        attributionControl: false
+      }).setView([-4.05, -78.92], 6);
 
       window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
@@ -140,26 +146,36 @@
     }
 
     if (!points.length) {
-      map.setView([-4.05, -78.92], 12);
+      map.setView([-4.05, -78.92], 6);
       return;
     }
 
     const latLngs = points.map((point) => [Number(point.lat), Number(point.lon)]);
     routePolyline = window.L.polyline(latLngs, {
-      color: '#4ec5ff',
+      color: '#1ea1ff',
       weight: 4,
       opacity: 0.85
     }).addTo(map);
 
-    const startMarker = window.L.marker(latLngs[0]).addTo(map);
-    startMarker.bindPopup('Inicio de la ruta');
+    const startMarker = window.L.circleMarker(latLngs[0], {
+      radius: 8,
+      color: '#2f9d42',
+      weight: 3,
+      fillColor: '#57c95f',
+      fillOpacity: 1
+    }).addTo(map);
+    startMarker.bindPopup('Inicio');
     routeMarkers.push(startMarker);
 
-    if (latLngs.length > 1) {
-      const endMarker = window.L.marker(latLngs[latLngs.length - 1]).addTo(map);
-      endMarker.bindPopup('Fin de la ruta');
-      routeMarkers.push(endMarker);
-    }
+    const endMarker = window.L.circleMarker(latLngs[latLngs.length - 1], {
+      radius: 8,
+      color: '#d83d3d',
+      weight: 3,
+      fillColor: '#ff6b64',
+      fillOpacity: 1
+    }).addTo(map);
+    endMarker.bindPopup('Fin');
+    routeMarkers.push(endMarker);
 
     map.fitBounds(routePolyline.getBounds(), { padding: [24, 24] });
   }
@@ -177,32 +193,60 @@
     `).join('');
   }
 
+  function restoreRouteContext() {
+    const url = new URL(window.location.href);
+    const deviceId = url.searchParams.get('deviceId');
+    const stored = apiClient?.getRouteContext?.();
+
+    if (stored?.from && stored?.to) {
+      fromInput.value = formatDateTimeLocal(new Date(stored.from));
+      toInput.value = formatDateTimeLocal(new Date(stored.to));
+    } else {
+      applyPreset('4h');
+    }
+
+    if (deviceId && deviceSelect) {
+      deviceSelect.value = deviceId;
+    } else if (stored?.deviceId && deviceSelect) {
+      deviceSelect.value = String(stored.deviceId);
+    }
+  }
+
   async function initializeView() {
     if (!apiClient) {
       return false;
     }
 
     try {
-      const session = await apiClient.getSessionInfo();
+      const session = await appShell?.requireSession?.({
+        redirectOnMissing: true,
+        sessionTitleEl: sessionTitle,
+        sessionTextEl: sessionText
+      });
+
       if (!session) {
-        sessionTitle.textContent = 'Sin sesion activa';
-        sessionText.textContent = 'Inicia sesion desde login.html para consultar rutas reales.';
         renderSummary({ summary: { total: 0, moving: 0 }, points: [] });
         renderPoints([]);
         renderRoute([]);
         return false;
       }
 
-      sessionTitle.textContent = 'Sesion real detectada';
-      sessionText.textContent = `SessionId activa: ${session.id}. Lista para consultar recorridos historicos.`;
+      sessionTitle.textContent = session.mode === 'live' ? 'Sesion real detectada' : 'Sesion mock detectada';
+      sessionText.textContent = `SessionId activa: ${session.id}. Lista para consultar historicos.`;
 
       const dashboard = await apiClient.getDashboard();
       const devices = Array.isArray(dashboard.devices) ? dashboard.devices : [];
       populateDevices(devices);
-      setDefaultRange();
+      restoreRouteContext();
       renderSummary({ summary: { total: 0, moving: 0 }, points: [] });
       renderPoints([]);
       renderRoute([]);
+      const currentUrl = new URL(window.location.href);
+      if (currentUrl.searchParams.get('deviceId')) {
+        window.setTimeout(() => {
+          loadRoute();
+        }, 100);
+      }
       return devices.length > 0;
     } catch (_error) {
       sessionTitle.textContent = 'No fue posible cargar la vista';
@@ -221,10 +265,17 @@
 
     try {
       signalPill.textContent = 'Consultando...';
+      const routeContext = {
+        deviceId: deviceSelect.value,
+        from: new Date(fromInput.value).toISOString(),
+        to: new Date(toInput.value).toISOString()
+      };
+      apiClient?.storeRouteContext?.(routeContext);
+
       const routeData = await apiClient.getRoute(
-        deviceSelect.value,
-        new Date(fromInput.value).toISOString(),
-        new Date(toInput.value).toISOString()
+        routeContext.deviceId,
+        routeContext.from,
+        routeContext.to
       );
 
       renderSummary(routeData || { summary: { total: 0, moving: 0 }, points: [] });
@@ -239,9 +290,13 @@
     }
   }
 
-  if (loadButton) {
-    loadButton.addEventListener('click', loadRoute);
-  }
+  loadButton?.addEventListener('click', loadRoute);
+
+  presetButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      applyPreset(button.dataset.routePreset || '4h');
+    });
+  });
 
   initializeView();
 })();

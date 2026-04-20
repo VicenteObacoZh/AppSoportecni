@@ -5,8 +5,10 @@
   const sessionText = document.getElementById('alertsSessionText');
   const refreshButton = document.getElementById('refreshAlertsButton');
   const searchInput = document.getElementById('alertsSearch');
+  const typeFilter = document.getElementById('alertsTypeFilter');
   const summary = document.getElementById('alertsSummary');
   const eventsList = document.getElementById('alertsEventsList');
+  const appShell = window.GpsRastreoShell;
 
   let currentEvents = [];
 
@@ -74,6 +76,24 @@
     `;
   }
 
+  function renderTypeOptions(events) {
+    if (!typeFilter) {
+      return;
+    }
+
+    const currentValue = typeFilter.value || 'all';
+    const types = [...new Set(events.map((item) => String(item.eventType || '').trim()).filter(Boolean))];
+
+    typeFilter.innerHTML = [
+      '<option value="all">Todos</option>',
+      ...types.map((item) => `<option value="${escapeHtml(item)}">${escapeHtml(item)}</option>`)
+    ].join('');
+
+    typeFilter.value = types.includes(currentValue) || currentValue === 'all'
+      ? currentValue
+      : 'all';
+  }
+
   function renderEvents(events) {
     if (!eventsList) {
       return;
@@ -120,11 +140,7 @@
 
   function applyFilter() {
     const query = String(searchInput?.value || '').trim().toLowerCase();
-    if (!query) {
-      renderEvents(currentEvents);
-      return;
-    }
-
+    const selectedType = String(typeFilter?.value || 'all').trim();
     const filtered = currentEvents.filter((eventItem) => {
       const haystack = [
         eventItem.vehicleName,
@@ -132,7 +148,9 @@
         eventItem.address
       ].filter(Boolean).join(' ').toLowerCase();
 
-      return haystack.includes(query);
+      const matchesQuery = !query || haystack.includes(query);
+      const matchesType = selectedType === 'all' || String(eventItem.eventType || '').trim() === selectedType;
+      return matchesQuery && matchesType;
     });
 
     renderEvents(filtered);
@@ -144,12 +162,16 @@
     }
 
     try {
-      const session = await apiClient.getSessionInfo();
+      const session = await appShell?.requireSession?.({
+        redirectOnMissing: true,
+        sessionTitleEl: sessionTitle,
+        sessionTextEl: sessionText
+      });
+
       if (!session) {
-        sessionTitle.textContent = 'Sin sesion activa';
-        sessionText.textContent = 'Inicia sesion desde login.html para consultar eventos recientes.';
         currentEvents = [];
         renderSummary([]);
+        renderTypeOptions([]);
         renderEvents([]);
         return;
       }
@@ -160,17 +182,20 @@
       const payload = await apiClient.getRecentEvents(40);
       currentEvents = Array.isArray(payload.items) ? payload.items : [];
       renderSummary(currentEvents);
+      renderTypeOptions(currentEvents);
       applyFilter();
     } catch (_error) {
       sessionTitle.textContent = 'No fue posible cargar eventos';
       sessionText.textContent = 'Revisa la sesion, el backend o la conectividad con el portal.';
       currentEvents = [];
       renderSummary([]);
+      renderTypeOptions([]);
       renderEvents([]);
     }
   }
 
   searchInput?.addEventListener('input', applyFilter);
+  typeFilter?.addEventListener('change', applyFilter);
   refreshButton?.addEventListener('click', loadEvents);
 
   loadEvents();

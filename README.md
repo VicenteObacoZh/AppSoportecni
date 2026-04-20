@@ -4,12 +4,14 @@ GpsRastreo es la nueva identidad visual y funcional del proyecto de rastreo sate
 
 ## Estado actual
 
-Se dejo una primera base visual del producto con enfoque en:
+La base actual ya funciona como app movil incremental de operacion sobre el stack existente:
 
-- monitoreo satelital
-- panel operativo moderno
-- modulos principales del sistema
-- branding inicial con iconografia espacial y GPS
+- login y sessionId contra backend proxy
+- mapa Leaflet con vista general, enfoque por evento y clusters por zoom
+- eventos recientes con navegacion al mapa
+- dispositivos con accesos a mapa e historico
+- historico/rutas con presets moviles y contexto por unidad
+- empaquetado con Capacitor sin migrar de stack
 
 ## Estructura
 
@@ -68,9 +70,9 @@ Las pruebas actuales validan el contrato base de:
 
 Construir la siguiente fase sobre esta base:
 
-1. estabilizar login + sessionId + monitor + alertas + rutas con backend proxy
-2. endurecer expiracion de sesion y reautenticacion
-3. seguir refinando mapa real y vistas moviles sobre el mismo contrato
+1. validar payloads reales del portal para eventos y rutas sobre cuentas productivas
+2. endurecer mas los estados de sesion expirada con reintento y relogin guiado
+3. seguir afinando paneles operativos de mapa y detalle por unidad
 4. ampliar cobertura funcional sin migrar el stack actual
 
 ## Salto a movil
