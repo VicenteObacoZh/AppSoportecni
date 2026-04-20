@@ -71,9 +71,29 @@ function getLatestSession() {
   return latestSessionId ? getSession(latestSessionId) : null;
 }
 
+function updateSession(id, patch = {}) {
+  const current = getSession(id);
+  if (!current) {
+    return null;
+  }
+
+  const next = {
+    ...current,
+    ...patch
+  };
+
+  sessions.set(id, next);
+  if (!latestSessionId) {
+    latestSessionId = id;
+  }
+
+  return next;
+}
+
 module.exports = {
   createSession,
   getSession,
   getLatestSession,
+  updateSession,
   deleteSession
 };

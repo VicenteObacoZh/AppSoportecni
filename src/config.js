@@ -95,6 +95,7 @@
       liveMonitorData: '/live/monitor/data',
       liveAlertsList: '/live/alerts/list',
       liveMonitorRoute: '/live/monitor/route',
+      liveMonitorCommand: '/live/monitor/command',
       liveEventsRecent: '/live/monitor/events/recent',
       liveGeofences: '/live/monitor/geofences'
     }

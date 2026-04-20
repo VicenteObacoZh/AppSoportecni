@@ -17,12 +17,14 @@
   const zoomInButton = document.getElementById('mapZoomInButton');
   const zoomOutButton = document.getElementById('mapZoomOutButton');
   const locateButton = document.getElementById('mapLocateButton');
+  const userLocationButton = document.getElementById('mapUserLocationButton');
   const layerButton = document.getElementById('mapLayerButton');
   const layerPanel = document.getElementById('mapLayerPanel');
   const geofencesToggle = document.getElementById('mapGeofencesToggle');
   const geofencesStatus = document.getElementById('mapGeofencesStatus');
   const alertsButton = document.getElementById('mapAlertsButton');
   const routesButton = document.getElementById('mapRoutesButton');
+  const geofenceFabButton = document.getElementById('mapGeofenceFabButton');
   const headerTitle = document.getElementById('mapHeaderTitle');
   const backButton = document.getElementById('mapBackButton');
   const eventPanel = document.getElementById('mapEventPanel');
@@ -41,8 +43,19 @@
   const deviceUniqueId = document.getElementById('mapDeviceUniqueId');
   const deviceStatus = document.getElementById('mapDeviceStatus');
   const deviceAddressButton = document.getElementById('mapDeviceAddressButton');
+  const deviceCommandButton = document.getElementById('mapDeviceCommandButton');
   const deviceAddressText = document.getElementById('mapDeviceAddressText');
   const deviceHistoryButton = document.getElementById('mapDeviceHistoryButton');
+  const deviceSensorsList = document.getElementById('mapDeviceSensorsList');
+  const commandModal = document.getElementById('mapCommandModal');
+  const commandModalBackdrop = document.getElementById('mapCommandModalBackdrop');
+  const commandModalClose = document.getElementById('mapCommandModalClose');
+  const commandDeviceName = document.getElementById('mapCommandDeviceName');
+  const commandType = document.getElementById('mapCommandType');
+  const commandAuthCode = document.getElementById('mapCommandAuthCode');
+  const commandMessage = document.getElementById('mapCommandMessage');
+  const commandSendButton = document.getElementById('mapCommandSendButton');
+  const commandCancelButton = document.getElementById('mapCommandCancelButton');
   const appShell = window.GpsRastreoShell;
 
   let liveMap = null;
@@ -50,6 +63,13 @@
   let activeLayerKey = 'osm';
   let geofenceLayerGroup = null;
   let trailLayerGroup = null;
+  let trafficLayer = null;
+  let trafficLayerFallback = null;
+  let trafficLayerFallback2 = null;
+  let trafficLayerPrimaryFailed = false;
+  let trafficFallbackFailed = false;
+  let userLocationMarker = null;
+  let userAccuracyCircle = null;
   let renderMarkers = [];
   let eventFocusMarker = null;
   let currentDevices = [];
@@ -61,9 +81,11 @@
   let currentAlertSummary = null;
   let selectedEvent = null;
   let selectedDevice = null;
+  let commandSending = false;
   let autoRefreshTimer = null;
   let hasInitializedViewport = false;
   let geofencesVisible = false;
+  let trafficVisible = false;
   let detailedMarkers = new Map();
   let detailedSnapshots = new Map();
   let resolvedAddressByKey = new Map();
@@ -95,6 +117,26 @@
     }
 
     return parsed.toLocaleString();
+  }
+
+  function formatFixAge(value) {
+    if (!value) {
+      return '--';
+    }
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return '--';
+    }
+    const diffMs = Math.max(0, Date.now() - parsed.getTime());
+    const min = Math.floor(diffMs / 60000);
+    if (min < 1) {
+      return 'hace 1 min';
+    }
+    if (min < 60) {
+      return `hace ${min} min`;
+    }
+    const hours = Math.floor(min / 60);
+    return `hace ${hours} h`;
   }
 
   function parseFixTime(value) {
@@ -301,10 +343,48 @@
     const lat = Number(fallback?.lat ?? fallback?.latitude ?? fallback?.Lat ?? fallback?.Latitude);
     const lon = Number(fallback?.lon ?? fallback?.longitude ?? fallback?.Lon ?? fallback?.Longitude);
     if (Number.isFinite(lat) && Number.isFinite(lon)) {
-      return `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+      return 'Obteniendo direccion...';
     }
 
     return 'Obteniendo direccion...';
+  }
+
+  function formatCourse(device) {
+    const course = Number(device?.course ?? device?.heading ?? device?.direction);
+    if (!Number.isFinite(course)) {
+      return 'Curso --';
+    }
+    return `Curso ${Math.round(course)}`;
+  }
+
+  function sensorValue(device, keys, fallback = '-') {
+    for (const key of keys) {
+      const value = device?.[key];
+      if (value === null || value === undefined || value === '') {
+        continue;
+      }
+      return String(value);
+    }
+    return fallback;
+  }
+
+  function renderSensorRows(device, statusLabel) {
+    if (!deviceSensorsList) {
+      return;
+    }
+
+    const rows = [
+      { icon: '🔌', name: 'Encendido', value: statusLabel === 'Detenido' ? 'Apagado' : 'Encendido' },
+      { icon: '⏱', name: 'Horas Motor', value: sensorValue(device, ['hoursMotor', 'engineHours', 'horasMotor'], '-') },
+      { icon: '📳', name: 'Vibracion', value: sensorValue(device, ['vibration', 'vibracion'], '-') },
+      { icon: '🛣', name: 'Kilometraje', value: sensorValue(device, ['odometer', 'mileage', 'kilometraje'], '-') },
+      { icon: '📶', name: 'Conectado', value: formatFixAge(device?.fixTime) === '--' ? 'Sin dato' : 'Conectado' },
+      { icon: '🛰', name: 'Satelites', value: sensorValue(device, ['satellites', 'sats'], '-') }
+    ];
+
+    deviceSensorsList.innerHTML = rows
+      .map((row) => `<p><span>${row.icon} ${escapeHtml(row.name)}</span><strong>${escapeHtml(row.value)}</strong></p>`)
+      .join('');
   }
 
   function initializePanelHeight(panel, compactHeightPx = 220) {
@@ -324,14 +404,15 @@
     let dragging = false;
     let startY = 0;
     let startHeight = 0;
+    let activePointerId = null;
 
-    const minHeight = 120;
-    const maxHeight = () => Math.round(window.innerHeight * 0.78);
+    const minHeight = 116;
+    const maxHeight = () => Math.round(window.innerHeight * 0.92);
 
     function applyHeight(heightPx) {
       const clamped = Math.max(minHeight, Math.min(maxHeight(), Math.round(heightPx)));
       panel.style.maxHeight = `${clamped}px`;
-      const expanded = clamped > 320;
+      const expanded = clamped > 280;
       panel.classList.toggle('mobile-map-panel--expanded', expanded);
       panel.classList.toggle('mobile-map-panel--compact', !expanded);
     }
@@ -344,51 +425,57 @@
       applyHeight(startHeight + delta);
     }
 
-    function onMouseMove(event) {
+    function stopDrag() {
+      dragging = false;
+      activePointerId = null;
+      document.removeEventListener('pointermove', onPointerMove);
+      document.removeEventListener('pointerup', onPointerEnd);
+      document.removeEventListener('pointercancel', onPointerEnd);
+    }
+
+    function startDrag(clientY, pointerId) {
+      dragging = true;
+      startY = clientY;
+      startHeight = panel.getBoundingClientRect().height;
+      activePointerId = pointerId;
+      document.addEventListener('pointermove', onPointerMove, { passive: false });
+      document.addEventListener('pointerup', onPointerEnd);
+      document.addEventListener('pointercancel', onPointerEnd);
+    }
+
+    function onPointerMove(event) {
+      if (!dragging || activePointerId === null || event.pointerId !== activePointerId) {
+        return;
+      }
       event.preventDefault();
       onMove(event.clientY);
     }
 
-    function onTouchMove(event) {
-      if (!event.touches?.length) {
+    function onPointerEnd(event) {
+      if (activePointerId !== null && event.pointerId !== activePointerId) {
         return;
       }
-      onMove(event.touches[0].clientY);
+      stopDrag();
     }
 
-    function stopDrag() {
-      dragging = false;
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', stopDrag);
-      document.removeEventListener('touchmove', onTouchMove);
-      document.removeEventListener('touchend', stopDrag);
-    }
-
-    function startDrag(clientY) {
-      dragging = true;
-      startY = clientY;
-      startHeight = panel.getBoundingClientRect().height;
-      document.addEventListener('mousemove', onMouseMove);
-      document.addEventListener('mouseup', stopDrag);
-      document.addEventListener('touchmove', onTouchMove, { passive: true });
-      document.addEventListener('touchend', stopDrag);
-    }
-
-    grabber.addEventListener('mousedown', (event) => {
-      event.preventDefault();
-      startDrag(event.clientY);
-    });
-
-    grabber.addEventListener('touchstart', (event) => {
-      if (!event.touches?.length) {
+    function bindPointerDragStart(target) {
+      if (!target) {
         return;
       }
-      startDrag(event.touches[0].clientY);
-    }, { passive: true });
+      target.addEventListener('pointerdown', (event) => {
+        if (event.pointerType === 'mouse' && event.button !== 0) {
+          return;
+        }
+        event.preventDefault();
+        startDrag(event.clientY, event.pointerId);
+      }, { passive: false });
+    }
+
+    bindPointerDragStart(grabber);
 
     grabber.addEventListener('click', () => {
       const currentHeight = panel.getBoundingClientRect().height;
-      const target = currentHeight > 340 ? 290 : Math.min(520, maxHeight());
+      const target = currentHeight > 280 ? minHeight : maxHeight();
       applyHeight(target);
     });
   }
@@ -557,10 +644,45 @@
       baseLayers[activeLayerKey].addTo(liveMap);
       geofenceLayerGroup = window.L.layerGroup().addTo(liveMap);
       trailLayerGroup = window.L.layerGroup().addTo(liveMap);
+      trafficLayer = window.L.tileLayer('https://traffic.arcgis.com/arcgis/rest/services/World/Traffic/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 19,
+        opacity: 0.9
+      });
+      trafficLayerFallback = window.L.tileLayer('https://mt1.google.com/vt/lyrs=h,traffic&x={x}&y={y}&z={z}', {
+        maxZoom: 20,
+        opacity: 0.9
+      });
+      trafficLayerFallback2 = window.L.tileLayer('https://core-renderer-tiles.maps.yandex.net/tiles?l=trf,trfe&x={x}&y={y}&z={z}&scale=1&lang=es_ES', {
+        maxZoom: 19,
+        opacity: 0.9
+      });
+      trafficLayer.on('tileerror', () => {
+        trafficLayerPrimaryFailed = true;
+        if (trafficVisible && liveMap) {
+          if (liveMap.hasLayer(trafficLayer)) {
+            liveMap.removeLayer(trafficLayer);
+          }
+          if (trafficLayerFallback && !liveMap.hasLayer(trafficLayerFallback)) {
+            trafficLayerFallback.addTo(liveMap);
+          }
+        }
+      });
+      trafficLayerFallback.on('tileerror', () => {
+        trafficFallbackFailed = true;
+        if (trafficVisible && liveMap) {
+          if (liveMap.hasLayer(trafficLayerFallback)) {
+            liveMap.removeLayer(trafficLayerFallback);
+          }
+          if (trafficLayerFallback2 && !liveMap.hasLayer(trafficLayerFallback2)) {
+            trafficLayerFallback2.addTo(liveMap);
+          }
+        }
+      });
 
       liveMap.on('zoomend moveend', () => {
         renderMap(filterDevices());
       });
+
     }
 
     return liveMap;
@@ -632,6 +754,57 @@
     }
   }
 
+  function findNearestDeviceAtLatLng(latlng, maxDistancePx = 34) {
+    if (!liveMap || !latlng) {
+      return null;
+    }
+
+    const tapPoint = liveMap.latLngToContainerPoint(latlng);
+    let bestDevice = null;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    const devices = filterDevices();
+
+    devices.forEach((device) => {
+      const lat = Number(device?.lat);
+      const lon = Number(device?.lon);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+        return;
+      }
+
+      const point = liveMap.latLngToContainerPoint([lat, lon]);
+      const dx = point.x - tapPoint.x;
+      const dy = point.y - tapPoint.y;
+      const distance = Math.hypot(dx, dy);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestDevice = device;
+      }
+    });
+
+    if (bestDistance <= maxDistancePx) {
+      return bestDevice;
+    }
+
+    return null;
+  }
+
+  function bindMapTapSelection() {
+    if (!liveMap || liveMap.__tapSelectionBound) {
+      return;
+    }
+
+    liveMap.__tapSelectionBound = true;
+    liveMap.on('click', (event) => {
+      if (selectedEvent) {
+        return;
+      }
+      const nearest = findNearestDeviceAtLatLng(event?.latlng, 34);
+      if (nearest) {
+        selectDeviceFromMap(nearest);
+      }
+    });
+  }
+
   function switchBaseLayer(nextKey) {
     if (!liveMap || !baseLayers[nextKey] || nextKey === activeLayerKey) {
       return;
@@ -653,6 +826,72 @@
     if (geofencesStatus) {
       geofencesStatus.textContent = text;
     }
+  }
+
+  function syncGeofenceFabState() {
+    if (!geofenceFabButton) {
+      return;
+    }
+    geofenceFabButton.classList.toggle('mobile-map-action--geofence-on', geofencesVisible);
+  }
+
+  function syncGeofencesControls() {
+    if (geofencesToggle) {
+      geofencesToggle.textContent = geofencesVisible ? 'Ocultar geocercas' : 'Mostrar geocercas';
+    }
+    syncGeofenceFabState();
+  }
+
+  function syncTrafficButtonState() {
+    alertsButton?.classList.toggle('mobile-map-action--active', trafficVisible);
+  }
+
+  function setTrafficVisible(isVisible) {
+    trafficVisible = Boolean(isVisible);
+    if (liveMap && trafficLayer) {
+      if (trafficVisible) {
+        if (!trafficLayerPrimaryFailed) {
+          if (!liveMap.hasLayer(trafficLayer)) {
+            trafficLayer.addTo(liveMap);
+          }
+          if (trafficLayerFallback && liveMap.hasLayer(trafficLayerFallback)) {
+            liveMap.removeLayer(trafficLayerFallback);
+          }
+          if (trafficLayerFallback2 && liveMap.hasLayer(trafficLayerFallback2)) {
+            liveMap.removeLayer(trafficLayerFallback2);
+          }
+        } else if (!trafficFallbackFailed && trafficLayerFallback) {
+          if (!liveMap.hasLayer(trafficLayerFallback)) {
+            trafficLayerFallback.addTo(liveMap);
+          }
+          if (liveMap.hasLayer(trafficLayer)) {
+            liveMap.removeLayer(trafficLayer);
+          }
+          if (trafficLayerFallback2 && liveMap.hasLayer(trafficLayerFallback2)) {
+            liveMap.removeLayer(trafficLayerFallback2);
+          }
+        } else if (trafficLayerFallback2 && !liveMap.hasLayer(trafficLayerFallback2)) {
+          trafficLayerFallback2.addTo(liveMap);
+          if (liveMap.hasLayer(trafficLayer)) {
+            liveMap.removeLayer(trafficLayer);
+          }
+          if (trafficLayerFallback && liveMap.hasLayer(trafficLayerFallback)) {
+            liveMap.removeLayer(trafficLayerFallback);
+          }
+        }
+      } else {
+        if (liveMap.hasLayer(trafficLayer)) {
+          liveMap.removeLayer(trafficLayer);
+        }
+        if (trafficLayerFallback && liveMap.hasLayer(trafficLayerFallback)) {
+          liveMap.removeLayer(trafficLayerFallback);
+        }
+        if (trafficLayerFallback2 && liveMap.hasLayer(trafficLayerFallback2)) {
+          liveMap.removeLayer(trafficLayerFallback2);
+        }
+      }
+    }
+    syncTrafficButtonState();
   }
 
   function renderGeofences() {
@@ -721,7 +960,7 @@
       return;
     }
     if (wasHidden) {
-      initializePanelHeight(devicePanel, 152);
+      initializePanelHeight(devicePanel, 116);
     }
 
     const status = getStatusTone(device);
@@ -739,11 +978,7 @@
       deviceTime.textContent = formatDateTime(device.fixTime);
     }
     if (deviceUniqueId) {
-      const lat = Number(device.lat);
-      const lon = Number(device.lon);
-      deviceUniqueId.textContent = Number.isFinite(lat) && Number.isFinite(lon)
-        ? `${lat.toFixed(5)}, ${lon.toFixed(5)}`
-        : '-';
+      deviceUniqueId.textContent = formatCourse(device);
     }
     if (deviceStatus) {
       deviceStatus.textContent = status.label;
@@ -753,16 +988,118 @@
       deviceAddressText.hidden = true;
     }
 
+    renderSensorRows(device, status.label);
+
     resolveAddressNowIfNeeded(device).then((resolved) => {
       if (resolved && selectedDevice && getAddressKey(selectedDevice) === getAddressKey(device)) {
         if (deviceCompany) {
           deviceCompany.textContent = resolved;
         }
-        if (deviceAddressText && !deviceAddressText.hidden) {
+        if (deviceAddressText) {
           deviceAddressText.textContent = resolved;
         }
       }
     });
+  }
+
+  function openCommandModal() {
+    if (!commandModal) {
+      return;
+    }
+
+    setCommandMessage('');
+
+    if (!selectedDevice) {
+      if (commandDeviceName) {
+        commandDeviceName.value = '';
+      }
+      setCommandMessage('Primero seleccione una unidad en el mapa.', 'error');
+    } else {
+      if (commandDeviceName) {
+        commandDeviceName.value = selectedDevice.vehicleName || selectedDevice.name || `ID ${selectedDevice.deviceId || '-'}`;
+      }
+    }
+
+    if (commandAuthCode) {
+      commandAuthCode.value = '';
+    }
+    if (commandSendButton) {
+      commandSendButton.disabled = false;
+    }
+    if (commandCancelButton) {
+      commandCancelButton.disabled = false;
+    }
+    commandSending = false;
+
+    commandModal.hidden = false;
+  }
+
+  function closeCommandModal() {
+    if (!commandModal) {
+      return;
+    }
+    commandModal.hidden = true;
+  }
+
+  function setCommandMessage(text, tone = 'muted') {
+    if (!commandMessage) {
+      return;
+    }
+
+    commandMessage.hidden = !text;
+    commandMessage.textContent = text || '';
+
+    if (tone === 'error') {
+      commandMessage.style.color = '#dc2626';
+      return;
+    }
+
+    if (tone === 'success') {
+      commandMessage.style.color = '#15803d';
+      return;
+    }
+
+    commandMessage.style.color = '';
+  }
+
+  function resolveCommandLabel(commandValue) {
+    return String(commandValue || '').trim() === 'engine_unlock'
+      ? 'Desbloquear motor'
+      : 'Apagar motor';
+  }
+
+  function selectDeviceFromMap(device, options = {}) {
+    if (!device) {
+      return;
+    }
+
+    selectedEvent = null;
+    apiClient?.clearSelectedEvent?.();
+    if (eventPanel) {
+      eventPanel.hidden = true;
+    }
+    document.body.classList.remove('dashboard-body--event-focus');
+    applyEventFocusState();
+
+    try {
+      apiClient?.storeSelectedDevice?.(device);
+    } catch (_error) {
+      // no-op: if persistence fails we still open the unit panel
+    }
+
+    showDevicePanel(device);
+    if (devicePanel) {
+      devicePanel.hidden = false;
+    }
+
+    const shouldCenter = Boolean(options.center);
+    if (shouldCenter && liveMap) {
+      const lat = Number(device.lat);
+      const lon = Number(device.lon);
+      if (Number.isFinite(lat) && Number.isFinite(lon)) {
+        liveMap.setView([lat, lon], Math.max(16, liveMap.getZoom() || 16));
+      }
+    }
   }
 
   function buildDeviceIcon(device, rotationDeg = 0) {
@@ -1038,18 +1375,18 @@
       icon: buildDeviceIcon(device, Number(device?.course || 0))
     }).addTo(liveMap);
 
-    marker.bindPopup(`
-      <div class="gps-popup">
-        <strong>${escapeHtml(device.vehicleName || device.name || 'Unidad')}</strong>
-        <span>Direccion: ${escapeHtml(getAddressLabel(device.address, device))}</span>
-        <span>Velocidad: ${formatSpeed(device.speedKmh)}</span>
-      </div>
-    `);
-
-    marker.on('click', () => {
-      apiClient?.storeSelectedDevice?.(device);
-      showDevicePanel(device);
+    marker.bindTooltip(escapeHtml(device.vehicleName || device.name || 'Unidad'), {
+      permanent: true,
+      direction: 'top',
+      offset: [0, -18],
+      className: 'gps-name-label'
     });
+
+    const onSelectMarker = () => {
+      selectDeviceFromMap(device, { center: true });
+    };
+    marker.on('click', onSelectMarker);
+    marker.on('touchstart', onSelectMarker);
 
     renderMarkers.push(marker);
   }
@@ -1245,15 +1582,21 @@
           icon: buildDeviceIcon(device, rotation)
         }).addTo(liveMap);
 
-        bindDevicePopup(created, device);
-        created.on('click', () => {
-          apiClient?.storeSelectedDevice?.(device);
-          showDevicePanel(device);
+        created.bindTooltip(escapeHtml(device.vehicleName || device.name || 'Unidad'), {
+          permanent: true,
+          direction: 'top',
+          offset: [0, -18],
+          className: 'gps-name-label'
         });
+        const onSelectMarker = () => {
+          selectDeviceFromMap(device, { center: true });
+        };
+        created.on('click', onSelectMarker);
+        created.on('touchstart', onSelectMarker);
         detailedMarkers.set(markerId, created);
       } else {
         marker.setIcon(buildDeviceIcon(device, rotation));
-        bindDevicePopup(marker, device);
+        marker.unbindPopup();
         marker.setLatLng([lat, lon]);
       }
 
@@ -1383,6 +1726,138 @@
     renderFocusedEventMarker();
   }
 
+  function fitAllDevicesOnMap() {
+    const map = ensureMap();
+    if (!map) {
+      return;
+    }
+
+    const withLocation = (Array.isArray(currentDevices) ? currentDevices : [])
+      .filter((item) => Number.isFinite(Number(item?.lat)) && Number.isFinite(Number(item?.lon)));
+
+    if (!withLocation.length) {
+      return;
+    }
+
+    if (withLocation.length === 1) {
+      map.setView([Number(withLocation[0].lat), Number(withLocation[0].lon)], 16);
+      return;
+    }
+
+    const bounds = window.L.latLngBounds(withLocation.map((item) => [Number(item.lat), Number(item.lon)]));
+    if (bounds.isValid()) {
+      map.fitBounds(bounds.pad(0.18));
+    }
+  }
+
+  function openPanoramicView(lat, lon) {
+    const safeLat = Number(lat);
+    const safeLon = Number(lon);
+    if (!Number.isFinite(safeLat) || !Number.isFinite(safeLon)) {
+      return;
+    }
+
+    const url = `https://www.google.com/maps?q=&layer=c&cbll=${safeLat},${safeLon}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+
+  function openUserCurrentLocation() {
+    const map = ensureMap();
+    if (!map) {
+      return;
+    }
+
+    const paintUserLocation = (coords) => {
+      const lat = Number(coords?.latitude);
+      const lon = Number(coords?.longitude);
+      const accuracy = Number(coords?.accuracy || 0);
+
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+        return false;
+      }
+
+      if (userLocationMarker) {
+        map.removeLayer(userLocationMarker);
+        userLocationMarker = null;
+      }
+
+      if (userAccuracyCircle) {
+        map.removeLayer(userAccuracyCircle);
+        userAccuracyCircle = null;
+      }
+
+      userLocationMarker = window.L.circleMarker([lat, lon], {
+        radius: 7,
+        color: '#ffffff',
+        weight: 2,
+        fillColor: '#2563eb',
+        fillOpacity: 1
+      }).addTo(map);
+
+      if (accuracy > 0) {
+        userAccuracyCircle = window.L.circle([lat, lon], {
+          radius: accuracy,
+          color: '#3b82f6',
+          weight: 1,
+          fillColor: '#60a5fa',
+          fillOpacity: 0.14
+        }).addTo(map);
+      }
+
+      userLocationMarker.bindPopup('Tu ubicacion actual').openPopup();
+      map.setView([lat, lon], Math.max(16, map.getZoom() || 16), { animate: true });
+      return true;
+    };
+
+    const getCurrentPositionWeb = () => new Promise((resolve, reject) => {
+      if (!window.navigator?.geolocation) {
+        reject(new Error('GEOLOCATION_UNSUPPORTED'));
+        return;
+      }
+
+      window.navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: true,
+        timeout: 12000,
+        maximumAge: 10000
+      });
+    });
+
+    userLocationButton?.classList.add('mobile-map-action--active');
+
+    (async () => {
+      try {
+        const capGeo = window.Capacitor?.Plugins?.Geolocation;
+        if (capGeo?.getCurrentPosition) {
+          try {
+            await capGeo.requestPermissions?.();
+          } catch {
+            // continuar con el intento de lectura
+          }
+
+          const pos = await capGeo.getCurrentPosition({
+            enableHighAccuracy: true,
+            timeout: 12000
+          });
+
+          if (paintUserLocation(pos?.coords || pos)) {
+            return;
+          }
+        }
+
+        const posWeb = await getCurrentPositionWeb();
+        if (paintUserLocation(posWeb?.coords || posWeb)) {
+          return;
+        }
+
+        throw new Error('GEOLOCATION_INVALID_COORDS');
+      } catch {
+        window.alert('No se pudo obtener tu ubicacion. Verifica permisos de ubicacion del dispositivo.');
+      } finally {
+        userLocationButton?.classList.remove('mobile-map-action--active');
+      }
+    })();
+  }
+
   function applyEventFocusState() {
     const hasEvent = Boolean(selectedEvent);
     const wasHidden = Boolean(eventPanel?.hidden);
@@ -1410,7 +1885,7 @@
     }
 
     if (wasHidden) {
-      initializePanelHeight(eventPanel, 138);
+      initializePanelHeight(eventPanel, 220);
     }
 
     if (eventType) {
@@ -1584,7 +2059,7 @@
   });
 
   refreshButton?.addEventListener('click', () => {
-    loadMapPage({ preserveViewport: true });
+    fitAllDevicesOnMap();
   });
 
   layerButton?.addEventListener('click', () => {
@@ -1612,7 +2087,13 @@
 
   geofencesToggle?.addEventListener('click', () => {
     geofencesVisible = !geofencesVisible;
-    geofencesToggle.textContent = geofencesVisible ? 'Ocultar geocercas' : 'Mostrar geocercas';
+    syncGeofencesControls();
+    renderGeofences();
+  });
+
+  geofenceFabButton?.addEventListener('click', () => {
+    geofencesVisible = !geofencesVisible;
+    syncGeofencesControls();
     renderGeofences();
   });
 
@@ -1625,42 +2106,29 @@
   });
 
   locateButton?.addEventListener('click', () => {
-    if (selectedEvent) {
-      focusSelectedEvent();
-      return;
-    }
-
-    if (selectedDevice && liveMap && Number.isFinite(Number(selectedDevice.lat)) && Number.isFinite(Number(selectedDevice.lon))) {
-      liveMap.setView([Number(selectedDevice.lat), Number(selectedDevice.lon)], 16);
+    if (selectedDevice && Number.isFinite(Number(selectedDevice.lat)) && Number.isFinite(Number(selectedDevice.lon))) {
+      openPanoramicView(selectedDevice.lat, selectedDevice.lon);
       return;
     }
 
     const withLocation = currentDevices.filter((item) => Number.isFinite(Number(item?.lat)) && Number.isFinite(Number(item?.lon)));
-    if (!withLocation.length || !liveMap) {
+    if (!withLocation.length) {
       return;
     }
 
-    liveMap.setView([Number(withLocation[0].lat), Number(withLocation[0].lon)], 15);
+    openPanoramicView(withLocation[0].lat, withLocation[0].lon);
+  });
+
+  userLocationButton?.addEventListener('click', () => {
+    openUserCurrentLocation();
   });
 
   alertsButton?.addEventListener('click', () => {
-    window.location.href = './alerts.html';
+    setTrafficVisible(!trafficVisible);
   });
 
   routesButton?.addEventListener('click', () => {
-    if (selectedDevice?.deviceId) {
-      const now = new Date();
-      const before = new Date(now.getTime() - (4 * 60 * 60 * 1000));
-      apiClient?.storeRouteContext?.({
-        deviceId: selectedDevice.deviceId,
-        from: before.toISOString(),
-        to: now.toISOString()
-      });
-      appShell?.navigate?.('./routes.html', { deviceId: selectedDevice.deviceId, from: 'map' });
-      return;
-    }
-
-    window.location.href = './routes.html';
+    openCommandModal();
   });
 
   backButton?.addEventListener('click', () => {
@@ -1676,26 +2144,111 @@
   });
 
   deviceAddressButton?.addEventListener('click', () => {
-    if (!deviceAddressText) {
+    if (!selectedDevice || !liveMap) {
       return;
     }
-    deviceAddressText.hidden = !deviceAddressText.hidden;
+    const lat = Number(selectedDevice.lat);
+    const lon = Number(selectedDevice.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      return;
+    }
+    liveMap.setView([lat, lon], Math.max(16, liveMap.getZoom() || 16));
+    if (deviceAddressText) {
+      deviceAddressText.hidden = false;
+    }
+  });
+
+  deviceCommandButton?.addEventListener('click', () => {
+    openCommandModal();
   });
 
   deviceHistoryButton?.addEventListener('click', () => {
-    if (!selectedDevice?.deviceId) {
+    openCommandModal();
+  });
+
+  commandModalBackdrop?.addEventListener('click', closeCommandModal);
+  commandModalClose?.addEventListener('click', closeCommandModal);
+  commandCancelButton?.addEventListener('click', closeCommandModal);
+  commandSendButton?.addEventListener('click', async () => {
+    if (commandSending) {
       return;
     }
 
-    const now = new Date();
-    const before = new Date(now.getTime() - (4 * 60 * 60 * 1000));
-    apiClient?.storeRouteContext?.({
-      deviceId: selectedDevice.deviceId,
-      from: before.toISOString(),
-      to: now.toISOString()
-    });
-    apiClient?.storeSelectedDevice?.(selectedDevice);
-    appShell?.navigate?.('./routes.html', { deviceId: selectedDevice.deviceId, from: 'map' });
+    if (!selectedDevice) {
+      setCommandMessage('Seleccione una unidad antes de enviar comando.', 'error');
+      return;
+    }
+
+    const deviceId = Number(selectedDevice.deviceId);
+    if (!Number.isFinite(deviceId) || deviceId <= 0) {
+      setCommandMessage('La unidad seleccionada no tiene un identificador valido.', 'error');
+      return;
+    }
+
+    const authCode = String(commandAuthCode?.value || '').trim();
+    if (!authCode) {
+      setCommandMessage('Ingrese la clave de autorizacion.', 'error');
+      return;
+    }
+
+    const commandValue = String(commandType?.value || 'engine_stop').trim();
+    if (commandValue !== 'engine_stop' && commandValue !== 'engine_unlock') {
+      setCommandMessage('Seleccione un comando valido.', 'error');
+      return;
+    }
+
+    if (!apiClient?.sendCommand) {
+      setCommandMessage('El API de comandos no esta disponible en esta version.', 'error');
+      return;
+    }
+
+    const commandLabel = resolveCommandLabel(commandValue);
+    const targetLabel = selectedDevice.vehicleName || selectedDevice.name || 'unidad';
+
+    try {
+      commandSending = true;
+      if (commandSendButton) {
+        commandSendButton.disabled = true;
+      }
+      if (commandCancelButton) {
+        commandCancelButton.disabled = true;
+      }
+
+      setCommandMessage(`Enviando "${commandLabel}" para ${targetLabel}...`);
+
+      const result = await apiClient.sendCommand({
+        deviceId,
+        command: commandValue,
+        authorizationKey: authCode
+      });
+
+      if (commandAuthCode) {
+        commandAuthCode.value = '';
+      }
+
+      setCommandMessage(result?.message || `Comando "${commandLabel}" enviado correctamente.`, 'success');
+    } catch (error) {
+      const code = String(error?.code || error?.payload?.code || '').toUpperCase();
+      if (code === 'SESSION_EXPIRED' || code === 'SESSION_NOT_FOUND') {
+        setCommandMessage('La sesion expiro. Vuelva a iniciar sesion para enviar comandos.', 'error');
+        return;
+      }
+
+      const message =
+        String(error?.payload?.message || '').trim() ||
+        String(error?.message || '').trim() ||
+        'No se pudo enviar el comando.';
+
+      setCommandMessage(message, 'error');
+    } finally {
+      commandSending = false;
+      if (commandSendButton) {
+        commandSendButton.disabled = false;
+      }
+      if (commandCancelButton) {
+        commandCancelButton.disabled = false;
+      }
+    }
   });
 
   sheet?.addEventListener('wheel', (event) => {
@@ -1711,10 +2264,12 @@
   });
 
   switchTab('devices');
-  initializePanelHeight(devicePanel, 152);
-  initializePanelHeight(eventPanel, 138);
+  initializePanelHeight(devicePanel, 116);
+  initializePanelHeight(eventPanel, 220);
   setupDraggablePanel(devicePanel, devicePanelGrabber);
   setupDraggablePanel(eventPanel, eventPanelGrabber);
+  syncGeofencesControls();
+  setTrafficVisible(false);
   applyEventFocusState();
   loadMapPage();
   startAutoRefresh();

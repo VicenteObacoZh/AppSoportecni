@@ -1,7 +1,7 @@
 const express = require('express');
 const mockData = require('../data/mockDashboard');
-const { getSession } = require('../services/sessionStore');
-const { fetchPlatform } = require('../services/platformClient');
+const { getSession, updateSession } = require('../services/sessionStore');
+const { fetchPlatform, sendMonitorCommand } = require('../services/platformClient');
 const config = require('../config');
 const geocodeCacheService = require('../services/geocodeCacheService');
 
@@ -244,6 +244,61 @@ function normalizeGeofences(payload) {
     (Array.isArray(payload?.rows) ? payload.rows : null) ||
     [];
 
+  function parsePolygonWkt(areaText) {
+    const source = String(areaText || '').trim();
+    const match = source.match(/POLYGON\s*\(\((.*)\)\)/i);
+    if (!match || !match[1]) {
+      return [];
+    }
+
+    const points = match[1]
+      .split(',')
+      .map((pair) => pair.trim().split(/\s+/))
+      .map((parts) => {
+        if (parts.length < 2) {
+          return null;
+        }
+        const lon = Number(parts[0]);
+        const lat = Number(parts[1]);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+          return null;
+        }
+        return { lat, lon };
+      })
+      .filter(Boolean);
+
+    if (points.length > 1) {
+      const first = points[0];
+      const last = points[points.length - 1];
+      if (first.lat === last.lat && first.lon === last.lon) {
+        points.pop();
+      }
+    }
+
+    return points;
+  }
+
+  function parseCircleWkt(areaText) {
+    const source = String(areaText || '').trim();
+    const match = source.match(/CIRCLE\s*\(\s*([-\d.]+)\s+([-\d.]+)\s*,\s*([-\d.]+)\s*\)/i);
+    if (!match) {
+      return null;
+    }
+
+    const lon = Number(match[1]);
+    const lat = Number(match[2]);
+    const radiusMeters = Number(match[3]);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon) || !Number.isFinite(radiusMeters) || radiusMeters <= 0) {
+      return null;
+    }
+
+    return {
+      centerLat: lat,
+      centerLon: lon,
+      radiusMeters
+    };
+  }
+
   const items = rawItems
     .map((item, index) => {
       const polygon = Array.isArray(item?.points)
@@ -253,18 +308,27 @@ function normalizeGeofences(payload) {
           })).filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lon))
         : [];
 
+      const areaWkt = String(item?.area ?? item?.Area ?? '').trim();
+      const wktPolygon = polygon.length ? [] : parsePolygonWkt(areaWkt);
+      const circleFromWkt = (!polygon.length && !wktPolygon.length) ? parseCircleWkt(areaWkt) : null;
+
       const centerLat = Number(item?.centerLat ?? item?.lat ?? item?.latitude ?? item?.Lat ?? item?.Latitude);
       const centerLon = Number(item?.centerLon ?? item?.lon ?? item?.longitude ?? item?.Lon ?? item?.Longitude);
       const radiusMeters = Number(item?.radiusMeters ?? item?.radius ?? item?.RadiusMeters ?? item?.Radius ?? 0);
 
+      const finalPoints = polygon.length ? polygon : wktPolygon;
+      const finalCenterLat = Number.isFinite(centerLat) ? centerLat : Number(circleFromWkt?.centerLat);
+      const finalCenterLon = Number.isFinite(centerLon) ? centerLon : Number(circleFromWkt?.centerLon);
+      const finalRadiusMeters = radiusMeters > 0 ? radiusMeters : Number(circleFromWkt?.radiusMeters);
+
       return {
         geofenceId: String(item?.geofenceId ?? item?.GeofenceId ?? item?.id ?? item?.Id ?? `geofence-${index + 1}`),
         name: item?.name ?? item?.Name ?? 'Geocerca',
-        type: polygon.length >= 3 ? 'polygon' : 'circle',
-        centerLat,
-        centerLon,
-        radiusMeters,
-        points: polygon
+        type: finalPoints.length >= 3 ? 'polygon' : 'circle',
+        centerLat: finalCenterLat,
+        centerLon: finalCenterLon,
+        radiusMeters: finalRadiusMeters,
+        points: finalPoints
       };
     })
     .filter((item) => {
@@ -371,6 +435,138 @@ function buildMockGeofencesSummary() {
 
 function hasLiveCookies(session) {
   return Array.isArray(session?.cookies) && session.cookies.length > 0;
+}
+
+async function resolveLiveGeofences(cookies = []) {
+  const cookieHeader = cookies.join('; ');
+  const platformBase = String(config.platformBaseUrl || '').replace(/\/$/, '');
+
+  function toRelativePlatformPath(rawPath) {
+    const value = String(rawPath || '').trim();
+    if (!value) {
+      return null;
+    }
+
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      try {
+        const absolute = new URL(value);
+        const base = new URL(platformBase);
+        if (absolute.origin !== base.origin) {
+          return null;
+        }
+        return `${absolute.pathname}${absolute.search || ''}`;
+      } catch {
+        return null;
+      }
+    }
+
+    if (value.startsWith('/')) {
+      return value;
+    }
+
+    return `/${value}`;
+  }
+
+  async function getGeofenceUrlFromMonitorConfig() {
+    try {
+      const monitorPage = await fetchPlatform('/Monitoreo/Monitor', {
+        headers: {
+          Cookie: cookieHeader
+        }
+      });
+
+      const html = String(monitorPage.text || '');
+      const match = html.match(/geofenceListUrl\s*:\s*['"]([^'"]+)['"]/i);
+      if (!match?.[1]) {
+        return null;
+      }
+
+      return toRelativePlatformPath(match[1]);
+    } catch {
+      return null;
+    }
+  }
+
+  const monitorConfigPath = await getGeofenceUrlFromMonitorConfig();
+  const candidates = [...new Set([
+    monitorConfigPath,
+    '/Monitoreo/Monitor?handler=GeofenceList',
+    '/Monitoreo/Monitor?handler=Geofences',
+    '/Geocerca?handler=List',
+    '/Geocerca?handler=GeofenceList'
+  ].filter(Boolean))];
+
+  let lastError = null;
+
+  for (const path of candidates) {
+    try {
+      const result = await fetchPlatform(path, {
+        headers: {
+          Cookie: cookieHeader
+        }
+      });
+
+      const text = String(result.text || '');
+      const looksLikeLogin =
+        text.includes('Iniciar sesi') ||
+        text.includes('class="login-form"') ||
+        text.includes('placeholder="Correo electr');
+
+      if (looksLikeLogin) {
+        return {
+          ok: false,
+          code: 'SESSION_EXPIRED',
+          message: 'La sesion del portal expiro o ya no es valida para consultar geocercas.'
+        };
+      }
+
+      let payload = null;
+      try {
+        payload = JSON.parse(text);
+      } catch {
+        payload = null;
+      }
+
+      if (payload == null) {
+        continue;
+      }
+
+      return {
+        ok: true,
+        payload,
+        sourcePath: path
+      };
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  return {
+    ok: false,
+    code: 'GEOFENCES_SOURCE_UNAVAILABLE',
+    message: 'No fue posible obtener geocercas desde los handlers disponibles del portal.',
+    error: lastError
+  };
+}
+
+function normalizeCommand(commandRaw) {
+  const command = String(commandRaw || '').trim().toLowerCase();
+
+  if (command === 'enginestop' || command === 'engine_stop' || command === 'engine-stop') {
+    return 'engineStop';
+  }
+
+  if (
+    command === 'engineresume' ||
+    command === 'engine_resume' ||
+    command === 'engine-resume' ||
+    command === 'engine_unlock' ||
+    command === 'engineunlock'
+  ) {
+    return 'engineResume';
+  }
+
+  return null;
 }
 
 router.get('/monitor/data', async (req, res) => {
@@ -657,11 +853,153 @@ router.get('/monitor/geofences', async (req, res) => {
     });
   }
 
-  return res.status(501).json({
-    ok: false,
-    code: 'GEOFENCES_NOT_IMPLEMENTED',
-    message: 'La carga real de geocercas aun no esta conectada al portal.'
-  });
+  if (!hasLiveCookies(session)) {
+    return respondSessionNotFound(res);
+  }
+
+  try {
+    const resolved = await resolveLiveGeofences(session.cookies);
+    if (!resolved.ok) {
+      if (resolved.code === 'SESSION_EXPIRED') {
+        return res.status(401).json({
+          ok: false,
+          code: 'SESSION_EXPIRED',
+          message: resolved.message
+        });
+      }
+
+      return res.status(502).json({
+        ok: false,
+        code: resolved.code || 'GEOFENCES_ERROR',
+        message: resolved.message || 'No se pudieron cargar geocercas.'
+      });
+    }
+
+    const data = normalizeGeofences(resolved.payload);
+    return res.json({
+      ok: true,
+      mode: session.mode,
+      data: {
+        ...data,
+        source: resolved.sourcePath
+      }
+    });
+  } catch (error) {
+    return res.status(502).json({
+      ok: false,
+      code: 'GEOFENCES_PROXY_ERROR',
+      message: error?.message || 'No se pudieron cargar geocercas.'
+    });
+  }
+});
+
+router.post('/monitor/command', async (req, res) => {
+  const sessionId = String(req.body?.sessionId || '').trim();
+  const rawDeviceId = req.body?.deviceId;
+  const rawCommand = req.body?.command;
+  const authorizationKey = String(req.body?.authorizationKey || '').trim();
+
+  if (!sessionId) {
+    return respondMissingSessionId(res);
+  }
+
+  const deviceId = Number(rawDeviceId);
+  if (!Number.isFinite(deviceId) || deviceId <= 0) {
+    return res.status(400).json({
+      ok: false,
+      code: 'INVALID_DEVICE_ID',
+      message: 'deviceId es obligatorio y debe ser numerico.'
+    });
+  }
+
+  const command = normalizeCommand(rawCommand);
+  if (!command) {
+    return res.status(400).json({
+      ok: false,
+      code: 'INVALID_COMMAND',
+      message: 'Comando invalido. Use engine_stop o engine_unlock.'
+    });
+  }
+
+  const session = getSession(sessionId);
+  if (!session) {
+    return respondSessionNotFound(res);
+  }
+
+  if (session.mode === 'mock') {
+    return res.json({
+      ok: true,
+      mode: 'mock',
+      data: {
+        ok: true,
+        message: command === 'engineStop'
+          ? 'Comando engineStop simulado correctamente.'
+          : 'Comando engineResume simulado correctamente.'
+      }
+    });
+  }
+
+  if (!hasLiveCookies(session)) {
+    return respondSessionNotFound(res);
+  }
+
+  try {
+    const result = await sendMonitorCommand({
+      deviceId,
+      command,
+      authorizationKey,
+      cookies: session.cookies
+    });
+
+    if (Array.isArray(result.cookies) && result.cookies.length > 0) {
+      updateSession(sessionId, { cookies: result.cookies });
+    }
+
+    if (result.isLoginScreen) {
+      return res.status(401).json({
+        ok: false,
+        code: 'SESSION_EXPIRED',
+        message: 'La sesion del portal expiro o ya no es valida para enviar comandos.'
+      });
+    }
+
+    if (!result.payload || typeof result.payload !== 'object') {
+      return res.status(502).json({
+        ok: false,
+        code: 'INVALID_COMMAND_RESPONSE',
+        message: 'La plataforma respondio con un formato inesperado al enviar el comando.'
+      });
+    }
+
+    if (!result.ok || result.payload.ok !== true) {
+      const message =
+        String(result.payload?.message || '').trim() ||
+        'La plataforma no confirmo el envio del comando.';
+
+      return res.status(result.status >= 400 ? result.status : 400).json({
+        ok: false,
+        code: 'COMMAND_REJECTED',
+        message,
+        data: result.payload
+      });
+    }
+
+    return res.json({
+      ok: true,
+      mode: session.mode,
+      data: {
+        ok: true,
+        message: String(result.payload.message || 'Comando enviado correctamente.'),
+        platform: result.payload
+      }
+    });
+  } catch (error) {
+    return res.status(502).json({
+      ok: false,
+      code: 'COMMAND_PROXY_ERROR',
+      message: error?.message || 'No se pudo enviar el comando al portal.'
+    });
+  }
 });
 
 router.get('/geocode/reverse', async (req, res) => {

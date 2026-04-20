@@ -24,6 +24,10 @@ function normalizeCookies(setCookieHeaders) {
     .filter(Boolean);
 }
 
+function mergeCookies(...cookieLists) {
+  return [...new Set(cookieLists.flat().filter(Boolean))];
+}
+
 function extractRequestVerificationToken(html) {
   const source = String(html || '');
   const patterns = [
@@ -96,13 +100,15 @@ function looksLikeLoginScreen(html) {
 }
 
 async function fetchPlatform(path = '/', options = {}) {
+  const method = options.method || 'GET';
   const response = await fetch(buildUrl(path), {
-    method: 'GET',
+    method,
     redirect: 'manual',
     headers: {
       'User-Agent': 'GpsRastreo-Backend/0.1',
       ...(options.headers || {})
-    }
+    },
+    body: options.body
   });
 
   if (!response.ok) {
@@ -202,10 +208,105 @@ async function submitLogin({ email, password, rememberMe = true, returnUrl = '/'
   };
 }
 
+async function fetchMonitorCommandContext(cookies = []) {
+  const response = await fetch(buildUrl('/Monitoreo/Monitor'), {
+    method: 'GET',
+    redirect: 'manual',
+    headers: {
+      'User-Agent': 'GpsRastreo-Backend/0.1',
+      Cookie: cookies.join('; ')
+    }
+  });
+
+  const html = await response.text();
+  const location = response.headers.get('location');
+  const responseCookies = normalizeCookies(getSetCookieHeaders(response));
+  const mergedCookies = mergeCookies(cookies, responseCookies);
+  const token = extractRequestVerificationToken(html);
+  const isLoginRedirect = response.status >= 300 && response.status < 400 && /\/Cuenta\/Login/i.test(location || '');
+
+  return {
+    status: response.status,
+    html,
+    token,
+    cookies: mergedCookies,
+    location,
+    isLoginScreen: isLoginRedirect || looksLikeLoginScreen(html)
+  };
+}
+
+async function sendMonitorCommand({ deviceId, command, authorizationKey, cookies = [] }) {
+  const context = await fetchMonitorCommandContext(cookies);
+
+  if (!context.token) {
+    return {
+      ok: false,
+      status: context.status,
+      payload: null,
+      responseText: context.html || '',
+      cookies: context.cookies,
+      code: context.isLoginScreen ? 'SESSION_EXPIRED' : 'MONITOR_TOKEN_MISSING',
+      isLoginScreen: context.isLoginScreen
+    };
+  }
+
+  const response = await fetch(buildUrl('/Monitoreo/Monitor?handler=SendCommand'), {
+    method: 'POST',
+    redirect: 'manual',
+    headers: {
+      'User-Agent': 'GpsRastreo-Backend/0.1',
+      'Content-Type': 'application/json',
+      RequestVerificationToken: context.token,
+      Cookie: context.cookies.join('; ')
+    },
+    body: JSON.stringify({
+      deviceId,
+      command,
+      authorizationKey
+    })
+  });
+
+  const responseText = await response.text();
+  const location = response.headers.get('location');
+  const responseCookies = normalizeCookies(getSetCookieHeaders(response));
+  const mergedCookies = mergeCookies(context.cookies, responseCookies);
+  const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+
+  let payload = null;
+  if (contentType.includes('application/json')) {
+    try {
+      payload = JSON.parse(responseText);
+    } catch {
+      payload = null;
+    }
+  } else {
+    try {
+      payload = JSON.parse(responseText);
+    } catch {
+      payload = null;
+    }
+  }
+
+  const isLoginRedirect = response.status >= 300 && response.status < 400 && /\/Cuenta\/Login/i.test(location || '');
+  const isLoginScreen = isLoginRedirect || looksLikeLoginScreen(responseText);
+
+  return {
+    ok: response.ok,
+    status: response.status,
+    location,
+    payload,
+    responseText,
+    cookies: mergedCookies,
+    isLoginScreen
+  };
+}
+
 module.exports = {
   fetchPlatform,
   validatePlatformAvailability,
   fetchLoginPage,
   submitLogin,
+  fetchMonitorCommandContext,
+  sendMonitorCommand,
   looksLikeLoginScreen
 };

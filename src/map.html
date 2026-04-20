@@ -1,4 +1,4 @@
-ï»¿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css?v=6" />
+  <link rel="stylesheet" href="./styles.css?v=26" />
 </head>
 <body class="dashboard-body dashboard-body--map">
   <div class="mobile-map-app">
@@ -37,13 +37,33 @@
       </button>
 
       <div class="mobile-map-actions">
-        <button type="button" class="mobile-map-action" id="mapLayerButton" title="Capas">&#128506;</button>
-        <button type="button" class="mobile-map-action" id="mapAlertsButton" title="Alertas">&#128680;</button>
-        <button type="button" class="mobile-map-action" id="refreshMapButton" title="Actualizar">&#8635;</button>
-        <button type="button" class="mobile-map-action mobile-map-action--active" id="mapRoutesButton" title="Historial">&#10136;</button>
-        <button type="button" class="mobile-map-action" id="mapZoomInButton" title="Acercar">+</button>
-        <button type="button" class="mobile-map-action" id="mapZoomOutButton" title="Alejar">&#8722;</button>
-        <button type="button" class="mobile-map-action" id="mapLocateButton" title="Centrar">&#8998;</button>
+        <button type="button" class="mobile-map-action" id="mapLayerButton" title="Capas">
+          <img src="./assets/icons/floating/mapa.png?v=1" alt="Capas" />
+        </button>
+        <button type="button" class="mobile-map-action" id="mapAlertsButton" title="Trafico">
+          <img src="./assets/icons/floating/trafico.png?v=1" alt="Trafico" />
+        </button>
+        <button type="button" class="mobile-map-action" id="refreshMapButton" title="Actualizar">
+          <img src="./assets/icons/floating/actualiza.png?v=1" alt="Actualizar" />
+        </button>
+        <button type="button" class="mobile-map-action" id="mapRoutesButton" title="Enviar comando">
+          <img src="./assets/icons/floating/enviar_comando.png?v=1" alt="Enviar comando" />
+        </button>
+        <button type="button" class="mobile-map-action" id="mapGeofenceFabButton" title="Geocercas">
+          <img src="./assets/icons/floating/geocerca.png?v=1" alt="Geocercas" />
+        </button>
+        <button type="button" class="mobile-map-action" id="mapZoomInButton" title="Acercar">
+          <img src="./assets/icons/floating/zoom_mas.png?v=1" alt="Zoom mas" />
+        </button>
+        <button type="button" class="mobile-map-action" id="mapZoomOutButton" title="Alejar">
+          <img src="./assets/icons/floating/zoom_menos.png?v=1" alt="Zoom menos" />
+        </button>
+        <button type="button" class="mobile-map-action" id="mapLocateButton" title="Vista panoramica">
+          <img src="./assets/icons/floating/ubicacion_panoramica.png?v=1" alt="Ubicacion panoramica" />
+        </button>
+        <button type="button" class="mobile-map-action" id="mapUserLocationButton" title="Mi ubicacion">
+          <img src="./assets/icons/floating/ubicacion_usuario.png?v=1" alt="Mi ubicacion" />
+        </button>
       </div>
 
       <section class="mobile-map-layer-panel" id="mapLayerPanel" hidden>
@@ -116,38 +136,85 @@
         <p class="mobile-map-event-panel__address-text" id="mapEventAddressText" hidden></p>
       </section>
 
-      <section class="mobile-map-device-panel" id="mapDevicePanel" hidden>
+      <section class="mobile-map-device-panel mobile-map-device-panel--v2" id="mapDevicePanel" hidden>
         <button class="mobile-map-panel-grabber" type="button" id="mapDevicePanelGrabber" aria-label="Ajustar panel"></button>
-        <div class="mobile-map-device-panel__top">
-          <div>
-            <p class="eyebrow">Unidad</p>
-            <h3 id="mapDeviceTitle">Sin unidad</h3>
+        <div class="mobile-map-device-panel__head">
+          <div class="mobile-map-device-panel__title-wrap">
+            <div class="mobile-map-device-panel__title-main">
+              <span aria-hidden="true">??</span>
+              <h3 id="mapDeviceTitle">Sin unidad</h3>
+            </div>
+            <p class="mobile-map-device-panel__speedline"><span aria-hidden="true">?</span><strong id="mapDeviceSpeed">0 kph</strong></p>
           </div>
-          <button class="mobile-map-device-panel__action" type="button" id="mapDeviceHistoryButton">Historico</button>
+          <div class="mobile-map-device-panel__actions-top">
+            <button class="mobile-map-device-panel__action" type="button" id="mapDeviceInfoButton" title="Info">
+              <span class="mobile-map-device-panel__action-fallback">i</span>
+              <img src="./assets/icons/panel/icon_info_bold_white.png?v=1" alt="Info" onerror="this.style.display='none';this.previousElementSibling.style.display='grid'" />
+            </button>
+            <button class="mobile-map-device-panel__action" type="button" id="mapDeviceRouteButton" title="Ruta">
+              <span class="mobile-map-device-panel__action-fallback">&#10132;</span>
+              <img src="./assets/icons/panel/icon_arrow_bold_white.png?v=1" alt="Ruta" onerror="this.style.display='none';this.previousElementSibling.style.display='grid'" />
+            </button>
+            <button class="mobile-map-device-panel__action" type="button" id="mapDeviceShareButton" title="Compartir">
+              <span class="mobile-map-device-panel__action-fallback">&#10547;</span>
+              <img src="./assets/icons/panel/icon_share_bold_white.png?v=1" alt="Compartir" onerror="this.style.display='none';this.previousElementSibling.style.display='grid'" />
+            </button>
+            <button class="mobile-map-device-panel__action" type="button" id="mapDeviceHistoryButton" title="Histórico">
+              <span class="mobile-map-device-panel__action-fallback">&#9654;</span>
+              <img src="./assets/icons/panel/icon_play_bold_white.png?v=1" alt="Histórico" onerror="this.style.display='none';this.previousElementSibling.style.display='grid'" />
+            </button>
+          </div>
         </div>
-        <div class="mobile-map-device-panel__meta">
-          <article>
-            <span>Direccion</span>
-            <strong id="mapDeviceCompany">-</strong>
-          </article>
-          <article>
-            <span>Velocidad</span>
-            <strong id="mapDeviceSpeed">0 kph</strong>
-          </article>
-          <article>
-            <span>Ultima posicion</span>
-            <strong id="mapDeviceTime">--</strong>
-          </article>
-          <article>
-            <span>Coordenadas</span>
-            <strong id="mapDeviceUniqueId">-</strong>
-          </article>
+
+        <div class="mobile-map-device-panel__facts">
+          <p><span aria-hidden="true">??</span><strong id="mapDeviceTime">--</strong></p>
+          <p><span aria-hidden="true">??</span><strong id="mapDeviceUniqueId">-</strong></p>
+          <p><span aria-hidden="true">??</span><strong id="mapDeviceCompany">Obteniendo direccion...</strong></p>
+          <p><span aria-hidden="true">??</span><strong id="mapDeviceStatus">Sin estado</strong></p>
         </div>
-        <div class="mobile-map-device-panel__footer">
-          <span class="mobile-map-device-panel__status" id="mapDeviceStatus">Sin estado</span>
-          <button class="mobile-map-device-panel__address" type="button" id="mapDeviceAddressButton">Mostrar direccion</button>
+
+        <div class="mobile-map-device-panel__buttons">
+          <button class="mobile-map-device-panel__address" type="button" id="mapDeviceAddressButton">?? Ubicacion actual</button>
+          <button class="mobile-map-device-panel__address" type="button" id="mapDeviceCommandButton">?? Comando</button>
         </div>
-        <p class="mobile-map-device-panel__address-text" id="mapDeviceAddressText" hidden></p>
+
+        <section class="mobile-map-device-panel__sensors">
+          <h4>Sensores</h4>
+          <div id="mapDeviceSensorsList" class="mobile-map-device-panel__sensor-list"></div>
+        </section>
+        <p class="mobile-map-device-panel__address-text" id="mapDeviceAddressText" hidden>Obteniendo direccion...</p>
+      </section>
+
+      <section class="mobile-command-modal" id="mapCommandModal" hidden>
+        <div class="mobile-command-modal__backdrop" id="mapCommandModalBackdrop"></div>
+        <div class="mobile-command-modal__card" role="dialog" aria-modal="true" aria-labelledby="mapCommandModalTitle">
+          <header class="mobile-command-modal__head">
+            <h3 id="mapCommandModalTitle">Enviar comando</h3>
+            <button type="button" id="mapCommandModalClose" aria-label="Cerrar">?</button>
+          </header>
+          <div class="mobile-command-modal__body">
+            <label>
+              <span>Dispositivo</span>
+              <input type="text" id="mapCommandDeviceName" readonly />
+            </label>
+            <label>
+              <span>Tipo</span>
+              <select id="mapCommandType">
+                <option value="engine_stop">Apagar motor</option>
+                <option value="engine_unlock">Desbloquear motor</option>
+              </select>
+            </label>
+            <label>
+              <span>Clave de autorizacion</span>
+              <input type="password" id="mapCommandAuthCode" placeholder="Ingrese su clave" />
+            </label>
+            <p class="mobile-command-modal__msg" id="mapCommandMessage" hidden></p>
+          </div>
+          <footer class="mobile-command-modal__actions">
+            <button type="button" class="mobile-command-modal__btn mobile-command-modal__btn--primary" id="mapCommandSendButton">Enviar</button>
+            <button type="button" class="mobile-command-modal__btn" id="mapCommandCancelButton">Cancelar</button>
+          </footer>
+        </div>
       </section>
     </main>
 
@@ -171,12 +238,12 @@
     </nav>
   </div>
 
-  <script src="./config.js?v=3"></script>
+  <script src="./config.js?v=4"></script>
   <script src="./mock-data.js?v=3"></script>
-  <script src="./api.js?v=3"></script>
+  <script src="./api.js?v=4"></script>
   <script src="./app-shell.js?v=1"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="./map.js?v=6"></script>
+  <script src="./map.js?v=30"></script>
 </body>
 </html>
 

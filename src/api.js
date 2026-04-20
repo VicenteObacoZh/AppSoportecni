@@ -277,6 +277,20 @@
     return payload?.data?.address || null;
   }
 
+  async function sendCommandBySession(sessionId, { deviceId, command, authorizationKey }) {
+    const payload = await request(config.endpoints.liveMonitorCommand || '/live/monitor/command', {
+      method: 'POST',
+      body: JSON.stringify({
+        sessionId,
+        deviceId,
+        command,
+        authorizationKey
+      })
+    });
+
+    return payload?.data || payload || null;
+  }
+
   window.GpsRastreoApi = {
     async checkPlatform() {
       const payload = await request(config.endpoints.health || '/health', { method: 'GET' });
@@ -439,6 +453,27 @@
           nextError.code = error.code || error.payload?.code || 'SESSION_EXPIRED';
           throw nextError;
         }
+        throw error;
+      }
+    },
+
+    async sendCommand(commandData) {
+      const sessionId = getStoredSessionId();
+      if (!sessionId) {
+        throw new Error('SESSION_REQUIRED');
+      }
+
+      try {
+        return await sendCommandBySession(sessionId, commandData || {});
+      } catch (error) {
+        if (error.status === 404 || error.status === 401) {
+          clearOperationalState();
+          const nextError = new Error('SESSION_EXPIRED');
+          nextError.payload = error.payload;
+          nextError.code = error.code || error.payload?.code || 'SESSION_EXPIRED';
+          throw nextError;
+        }
+
         throw error;
       }
     },
