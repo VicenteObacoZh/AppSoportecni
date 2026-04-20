@@ -19,6 +19,7 @@
   const mapEmptyState = document.getElementById('mapEmptyState');
   const loginForm = document.getElementById('loginForm');
   const loginMessage = document.getElementById('loginMessage');
+  const rememberCredentials = document.getElementById('rememberCredentials');
   const apiStatus = document.getElementById('apiStatus');
   const apiMessage = document.getElementById('apiMessage');
   const refreshDashboardButton = document.getElementById('refreshDashboardButton');
@@ -40,6 +41,53 @@
     apiClient.storeSessionId(sessionId);
     url.searchParams.delete('sessionId');
     window.history.replaceState({}, '', url.toString());
+  }
+
+  function readSavedCredentials() {
+    if (typeof window === 'undefined') {
+      return null;
+    }
+
+    try {
+      const raw = window.localStorage.getItem('gpsrastreo.savedCredentials');
+      if (!raw) {
+        return null;
+      }
+
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') {
+        return null;
+      }
+
+      return {
+        email: String(parsed.email || ''),
+        password: String(parsed.password || ''),
+        remember: Boolean(parsed.remember)
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  function saveCredentials(email, password, remember) {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    try {
+      if (!remember) {
+        window.localStorage.removeItem('gpsrastreo.savedCredentials');
+        return;
+      }
+
+      window.localStorage.setItem('gpsrastreo.savedCredentials', JSON.stringify({
+        email: String(email || ''),
+        password: String(password || ''),
+        remember: true
+      }));
+    } catch {
+      // no-op
+    }
   }
 
   function renderKpis(items) {
@@ -294,6 +342,19 @@
       loginMessage.textContent = loginReasonMessage;
     }
 
+    const savedCredentials = readSavedCredentials();
+    if (savedCredentials) {
+      if (loginForm.elements.email) {
+        loginForm.elements.email.value = savedCredentials.email;
+      }
+      if (loginForm.elements.password) {
+        loginForm.elements.password.value = savedCredentials.password;
+      }
+      if (rememberCredentials) {
+        rememberCredentials.checked = savedCredentials.remember;
+      }
+    }
+
     apiClient.getSessionInfo().then((session) => {
       if (session && window.location.pathname.endsWith('/login.html')) {
         window.location.href = new URL('./map.html', window.location.href).toString();
@@ -317,6 +378,12 @@
         email: loginForm.elements.email.value,
         password: loginForm.elements.password.value
       }).then((result) => {
+        saveCredentials(
+          loginForm.elements.email.value,
+          loginForm.elements.password.value,
+          Boolean(rememberCredentials?.checked)
+        );
+
         if (loginMessage) {
           loginMessage.textContent = 'Autenticacion completada. Redirigiendo al mapa operativo...';
         }
@@ -329,6 +396,12 @@
           window.location.href = nextUrl.toString();
         }, 700);
       }).catch((error) => {
+        saveCredentials(
+          loginForm.elements.email.value,
+          loginForm.elements.password.value,
+          Boolean(rememberCredentials?.checked)
+        );
+
         const validationMessages = Array.isArray(error?.payload?.validationMessages)
           ? error.payload.validationMessages.filter(Boolean)
           : [];

@@ -1,8 +1,6 @@
 (function () {
   const apiClient = window.GpsRastreoApi;
 
-  const sessionTitle = document.getElementById('alertsSessionTitle');
-  const sessionText = document.getElementById('alertsSessionText');
   const refreshButton = document.getElementById('refreshAlertsButton');
   const searchInput = document.getElementById('alertsSearch');
   const typeFilter = document.getElementById('alertsTypeFilter');
@@ -163,9 +161,7 @@
 
     try {
       const session = await appShell?.requireSession?.({
-        redirectOnMissing: true,
-        sessionTitleEl: sessionTitle,
-        sessionTextEl: sessionText
+        redirectOnMissing: true
       });
 
       if (!session) {
@@ -176,17 +172,12 @@
         return;
       }
 
-      sessionTitle.textContent = session.mode === 'live' ? 'Sesion real detectada' : 'Sesion mock detectada';
-      sessionText.textContent = `SessionId activa: ${session.id}. Consultando eventos recientes del monitor.`;
-
       const payload = await apiClient.getRecentEvents(40);
       currentEvents = Array.isArray(payload.items) ? payload.items : [];
       renderSummary(currentEvents);
       renderTypeOptions(currentEvents);
       applyFilter();
     } catch (_error) {
-      sessionTitle.textContent = 'No fue posible cargar eventos';
-      sessionText.textContent = 'Revisa la sesion, el backend o la conectividad con el portal.';
       currentEvents = [];
       renderSummary([]);
       renderTypeOptions([]);

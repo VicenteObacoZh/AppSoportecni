@@ -50,6 +50,48 @@
     navigate('./login.html', { reason });
   }
 
+  function initBottomNavFocusMode() {
+    const nav = document.querySelector('.mobile-bottom-nav');
+    if (!nav) {
+      return;
+    }
+
+    const items = Array.from(nav.querySelectorAll('.mobile-bottom-nav__item'));
+    if (!items.length) {
+      return;
+    }
+
+    function clearExpanded() {
+      items.forEach((item) => item.classList.remove('nav-item--expanded'));
+    }
+
+    items.forEach((item) => {
+      item.addEventListener('pointerdown', () => {
+        clearExpanded();
+        item.classList.add('nav-item--expanded');
+      });
+
+      item.addEventListener('focus', () => {
+        clearExpanded();
+        item.classList.add('nav-item--expanded');
+      });
+
+      item.addEventListener('blur', () => {
+        window.setTimeout(() => {
+          if (!nav.contains(document.activeElement)) {
+            clearExpanded();
+          }
+        }, 120);
+      });
+    });
+
+    document.addEventListener('pointerdown', (event) => {
+      if (!nav.contains(event.target)) {
+        clearExpanded();
+      }
+    }, { passive: true });
+  }
+
   function clearOperationalState() {
     apiClient?.clearOperationalState?.();
   }
@@ -113,4 +155,6 @@
     requireSession,
     readLoginMessageFromUrl
   };
+
+  initBottomNavFocusMode();
 })();

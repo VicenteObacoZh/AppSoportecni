@@ -2,8 +2,6 @@
   const apiClient = window.GpsRastreoApi;
   const appShell = window.GpsRastreoShell;
 
-  const sessionTitle = document.getElementById('routesSessionTitle');
-  const sessionText = document.getElementById('routesSessionText');
   const deviceSelect = document.getElementById('routeDeviceSelect');
   const fromInput = document.getElementById('routeFrom');
   const toInput = document.getElementById('routeTo');
@@ -491,9 +489,7 @@
 
     try {
       const session = await appShell?.requireSession?.({
-        redirectOnMissing: true,
-        sessionTitleEl: sessionTitle,
-        sessionTextEl: sessionText
+        redirectOnMissing: true
       });
 
       if (!session) {
@@ -502,9 +498,6 @@
         renderRoute([]);
         return false;
       }
-
-      sessionTitle.textContent = session.mode === 'live' ? 'Sesion real detectada' : 'Sesion mock detectada';
-      sessionText.textContent = `SessionId activa: ${session.id}. Lista para consultar historicos y playback.`;
 
       const dashboard = await apiClient.getDashboard();
       const devices = Array.isArray(dashboard.devices) ? dashboard.devices : [];
@@ -523,8 +516,6 @@
       }
       return devices.length > 0;
     } catch (_error) {
-      sessionTitle.textContent = 'No fue posible cargar la vista';
-      sessionText.textContent = 'Revisa la sesion, el backend o la conectividad con el portal.';
       renderSummary({ summary: { total: 0, moving: 0 }, points: [] });
       renderPoints([]);
       renderRoute([]);

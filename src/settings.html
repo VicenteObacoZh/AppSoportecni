@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GpsRastreo | Configuraciones</title>
+  <meta name="description" content="Vista movil de configuraciones para GpsRastreo." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body class="dashboard-body dashboard-body--settings-mobile">
+  <div class="mobile-settings-app">
+    <header class="mobile-settings-topbar">
+      <h1>Configuraciones</h1>
+    </header>
+
+    <main class="mobile-settings-main">
+      <section class="mobile-settings-profile">
+        <div class="mobile-settings-profile__user">
+          <strong id="settingsUserTitle">Usuario</strong>
+          <span id="settingsUserEmail">Sin correo guardado</span>
+        </div>
+        <button class="mobile-settings-exit" id="settingsLogoutButton" type="button">Salir</button>
+      </section>
+
+      <section class="mobile-settings-card">
+        <article class="mobile-settings-row">
+          <div>
+            <strong>Alertas</strong>
+          </div>
+        </article>
+
+        <article class="mobile-settings-row">
+          <div>
+            <strong>Cambiar contrasena</strong>
+          </div>
+        </article>
+
+        <article class="mobile-settings-row">
+          <div>
+            <strong>Vencimiento</strong>
+          </div>
+          <span>Sin datos</span>
+        </article>
+
+        <article class="mobile-settings-row mobile-settings-row--lang">
+          <div>
+            <strong>Idioma</strong>
+          </div>
+          <button type="button" class="mobile-settings-lang">
+            Espanol
+            <span aria-hidden="true">&#9662;</span>
+          </button>
+        </article>
+
+        <article class="mobile-settings-row">
+          <div>
+            <strong>Vaciar cache de mapas</strong>
+            <small>Eliminar los datos almacenados localmente para los mapas.</small>
+          </div>
+          <button class="mobile-settings-trash" id="settingsClearCacheButton" type="button" aria-label="Vaciar cache">
+            &#128465;
+          </button>
+        </article>
+      </section>
+    </main>
+
+    <nav class="mobile-bottom-nav mobile-bottom-nav--settings">
+      <a class="mobile-bottom-nav__item" href="./devices.html" aria-label="Dispositivos">
+        <span class="mobile-bottom-nav__icon">&#128663;</span>
+        <span>Dispositivos</span>
+      </a>
+      <a class="mobile-bottom-nav__item" href="./alerts.html" aria-label="Eventos">
+        <span class="mobile-bottom-nav__icon">&#128276;</span>
+        <span>Eventos</span>
+      </a>
+      <a class="mobile-bottom-nav__item" href="./map.html" aria-label="Mapa">
+        <span class="mobile-bottom-nav__icon">&#128506;</span>
+        <span>Mapa</span>
+      </a>
+      <a class="mobile-bottom-nav__item mobile-bottom-nav__item--active" href="./settings.html" aria-label="Configuraciones">
+        <span class="mobile-bottom-nav__icon">&#128736;</span>
+        <span>Configuraciones</span>
+      </a>
+    </nav>
+  </div>
+
+  <script src="./config.js?v=1"></script>
+  <script src="./mock-data.js?v=1"></script>
+  <script src="./api.js?v=1"></script>
+  <script src="./app-shell.js?v=1"></script>
+  <script src="./settings.js?v=1"></script>
+</body>
+</html>

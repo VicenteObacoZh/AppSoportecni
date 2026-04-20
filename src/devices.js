@@ -3,8 +3,6 @@
   const appShell = window.GpsRastreoShell;
   const searchInput = document.getElementById('devicesSearch');
   const companyList = document.getElementById('devicesCompanyList');
-  const sessionTitle = document.getElementById('devicesSessionTitle');
-  const sessionText = document.getElementById('devicesSessionText');
   const summary = document.getElementById('devicesSummary');
   const filterButtons = Array.from(document.querySelectorAll('[data-device-filter]'));
 
@@ -107,20 +105,16 @@
 
     summary.innerHTML = `
       <article class="mobile-devices-kpi">
-        <span>Total</span>
-        <strong>${devices.length}</strong>
+        <strong>Total: ${devices.length}</strong>
       </article>
       <article class="mobile-devices-kpi">
-        <span>Movimiento</span>
-        <strong>${moving}</strong>
+        <strong>Movimiento: ${moving}</strong>
       </article>
       <article class="mobile-devices-kpi">
-        <span>Reposo</span>
-        <strong>${idle}</strong>
+        <strong>Reposo: ${idle}</strong>
       </article>
       <article class="mobile-devices-kpi">
-        <span>Detenido / sin senal</span>
-        <strong>${stopped + offline}</strong>
+        <strong>Detenido / sin senal: ${stopped + offline}</strong>
       </article>
     `;
   }
@@ -246,9 +240,7 @@
 
     try {
       const session = await appShell?.requireSession?.({
-        redirectOnMissing: true,
-        sessionTitleEl: sessionTitle,
-        sessionTextEl: sessionText
+        redirectOnMissing: true
       });
 
       if (!session) {
@@ -256,9 +248,6 @@
         renderSummary([]);
         return;
       }
-
-      sessionTitle.textContent = session.mode === 'live' ? 'Sesion real detectada' : 'Sesion mock detectada';
-      sessionText.textContent = `SessionId activa: ${session.id}. Flota lista para operar.`;
 
       const dashboard = await apiClient.getDashboard();
       currentDevices = Array.isArray(dashboard.devices) ? dashboard.devices : [];
