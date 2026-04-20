@@ -3,105 +3,64 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GpsRastreo | Alertas</title>
-  <meta name="description" content="Vista real de alertas para GpsRastreo." />
+  <title>GpsRastreo | Eventos recientes</title>
+  <meta name="description" content="Vista movil de eventos recientes para GpsRastreo." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="./styles.css" />
 </head>
-<body class="dashboard-body">
-  <div class="app-dashboard">
-    <aside class="app-sidebar">
-      <div class="app-sidebar__brand">
-        <img src="../assets/icono.png" alt="GpsRastreo" class="brand__icon" />
-        <div>
-          <p class="eyebrow">Cabina de control</p>
-          <h1>GpsRastreo</h1>
-        </div>
-        <button class="nav-toggle" type="button" aria-label="Abrir menu" aria-expanded="false" data-nav-toggle>
-          Menu
-        </button>
+<body class="dashboard-body dashboard-body--events-mobile">
+  <div class="mobile-events-app">
+    <header class="mobile-events-topbar">
+      <div>
+        <p class="eyebrow">Operacion</p>
+        <h1>Eventos recientes</h1>
       </div>
+      <button class="mobile-events-refresh" id="refreshAlertsButton" type="button" aria-label="Actualizar eventos">&#8635;</button>
+    </header>
 
-      <nav class="app-nav">
-        <a class="app-nav__item" href="./dashboard.html">Resumen general</a>
-        <a class="app-nav__item" href="./map.html">Mapa en vivo</a>
-        <a class="app-nav__item app-nav__item--active" href="./alerts.html">Alertas</a>
-        <a class="app-nav__item" href="./routes.html">Rutas e historicos</a>
-        <a class="app-nav__item" href="#">Clientes</a>
-        <a class="app-nav__item" href="./devices.html">Dispositivos</a>
-        <a class="app-nav__item" href="./login.html">Cerrar sesion</a>
-      </nav>
+    <section class="mobile-events-session">
+      <strong id="alertsSessionTitle">Validando sesion...</strong>
+      <span id="alertsSessionText">Preparando acceso al historial reciente del monitor.</span>
+    </section>
 
-      <article class="sidebar-card">
-        <p class="eyebrow">Lectura rapida</p>
-        <h3>Reglas del portal</h3>
-        <p>Consulta el nombre, el tipo y la cantidad de dispositivos vinculados a cada alerta real.</p>
-      </article>
-    </aside>
+    <main class="mobile-events-main">
+      <section class="mobile-events-summary" id="alertsSummary"></section>
 
-    <main class="app-main">
-      <header class="app-main__top">
-        <div>
-          <p class="eyebrow">Operacion en vivo</p>
-          <h2>Alertas configuradas</h2>
-        </div>
-        <div class="topbar__actions">
-          <button class="pill pill--primary" id="refreshAlertsButton" type="button">Actualizar alertas</button>
-          <a class="pill pill--ghost" href="./dashboard.html">Dashboard</a>
-        </div>
-      </header>
+      <label class="mobile-events-search">
+        <span class="mobile-events-search__icon">&#128269;</span>
+        <input type="text" id="alertsSearch" placeholder="Buscar vehiculo o evento" />
+      </label>
 
-      <section class="session-strip">
-        <div>
-          <p class="eyebrow">Sesion</p>
-          <h3 id="alertsSessionTitle">Validando sesion...</h3>
-        </div>
-        <p id="alertsSessionText">Preparando acceso al modulo Alertas del portal.</p>
-      </section>
-
-      <section class="devices-toolbar">
-        <label class="field devices-filter">
-          <span>Buscar alerta</span>
-          <input type="text" id="alertsSearch" placeholder="Nombre o tipo de alerta" />
-        </label>
-      </section>
-
-      <section class="devices-summary" id="alertsSummary"></section>
-
-      <section class="table-card devices-card">
-        <div class="table-card__top">
-          <div>
-            <p class="eyebrow">Vista operativa</p>
-            <h3>Alertas reales del portal</h3>
-          </div>
-        </div>
-        <div class="devices-table-wrap">
-          <table class="devices-table">
-            <thead>
-              <tr>
-                <th>Nombre</th>
-                <th>Tipo</th>
-                <th>Estado</th>
-                <th>Dispositivos</th>
-              </tr>
-            </thead>
-            <tbody id="alertsTableBody">
-              <tr>
-                <td colspan="4">Cargando alertas...</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+      <section class="mobile-events-list" id="alertsEventsList">
+        <div class="mobile-map-empty">Cargando eventos recientes...</div>
       </section>
     </main>
+
+    <nav class="mobile-bottom-nav mobile-bottom-nav--icons-only">
+      <a class="mobile-bottom-nav__item" href="./devices.html" aria-label="Dispositivos">
+        <span class="mobile-bottom-nav__icon">&#128663;</span>
+        <span>Dispositivos</span>
+      </a>
+      <a class="mobile-bottom-nav__item mobile-bottom-nav__item--active" href="./alerts.html" aria-label="Eventos">
+        <span class="mobile-bottom-nav__icon">&#128276;</span>
+        <span>Eventos</span>
+      </a>
+      <a class="mobile-bottom-nav__item" href="./map.html" aria-label="Mapa">
+        <span class="mobile-bottom-nav__icon">&#128506;</span>
+        <span>Mapa</span>
+      </a>
+      <a class="mobile-bottom-nav__item" href="./routes.html" aria-label="Historico">
+        <span class="mobile-bottom-nav__icon">&#128736;</span>
+        <span>Historico</span>
+      </a>
+    </nav>
   </div>
 
-  <script src="./config.js?v=3"></script>
-  <script src="./mock-data.js?v=3"></script>
-  <script src="./api.js?v=3"></script>
-  <script src="./shell.js?v=1"></script>
-  <script src="./alerts.js?v=1"></script>
+  <script src="./config.js?v=4"></script>
+  <script src="./mock-data.js?v=4"></script>
+  <script src="./api.js?v=4"></script>
+  <script src="./alerts.js?v=4"></script>
 </body>
 </html>

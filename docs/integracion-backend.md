@@ -10,16 +10,23 @@ La interfaz ya quedo preparada con una capa de integracion simple en frontend:
 - `src/runtime.js`: consumo de servicios y renderizado
 - `backend/`: proxy local para evolucionar hacia integracion real
 
-## Enfoque recomendado
+## Enfoque actual
 
-Por ahora `mockMode` esta en `true` porque no tenemos un contrato documentado de endpoints reales.
+La fuente de verdad para `mock` vs `live` es el backend de `backend/`.
 
-Cuando se definan endpoints reales, el cambio ideal es:
+- el frontend ya no debe inventar contratos aparte
+- `src/api.js` consume el mismo flujo tanto en mock como en live
+- el modo real se refleja desde `GET /api/health` y desde las respuestas de sesion/login
 
-1. poner `mockMode` en `false`
-2. levantar el backend local en `http://localhost:4100/api`
-3. adaptar `login()` y `getDashboard()` en `src/api.js` si cambia el contrato
-4. mantener intactas las vistas HTML/CSS
+## Flujo alineado hoy
+
+1. `GET /api/health`
+2. `POST /api/auth/login`
+3. guardar `sessionId`
+4. `GET /api/auth/session/:id`
+5. `GET /api/live/monitor/data?sessionId=...`
+6. `GET /api/live/alerts/list?sessionId=...`
+7. `GET /api/live/monitor/route?...`
 
 ## Riesgos actuales
 
@@ -36,7 +43,7 @@ La integracion real deberia pasar por una de estas rutas:
 
 ## Proxima fase tecnica
 
-1. documentar el flujo real de autenticacion
-2. identificar endpoints de unidades, alertas y reportes
-3. implementar un backend intermedio
-4. conectar mapa real con posiciones operativas
+1. endurecer manejo de sesion expirada y re-login
+2. ampliar handlers del portal real sin romper contratos actuales
+3. agregar pruebas de humo para health, login y monitor
+4. documentar estrategia Android (`http://localhost` + `adb reverse`)

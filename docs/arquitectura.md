@@ -54,7 +54,9 @@ GpsRastreo se plantea como una cabina de monitoreo satelital para operaciones, s
 ## Integracion tecnica sugerida
 
 ### Frontend
-- evolucionar esta base HTML/CSS/JS hacia React, Next.js o una SPA modular si el proyecto crece rapido
+- mantener HTML/CSS/JS vanilla dentro de `src/`
+- preservar la separacion entre vistas, cliente API y empaquetado Capacitor
+- evitar migraciones de framework hasta estabilizar login, monitor, alertas y rutas
 
 ### Backend
 - consumir la plataforma viva o exponer integraciones controladas desde `https://rastreo.soportecni.com`

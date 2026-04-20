@@ -1,6 +1,23 @@
 (function () {
   const config = window.GpsRastreoConfig || {};
-  const mock = window.GpsRastreoMock || {};
+
+  function syncRuntimeMode(payload) {
+    const mode = String(payload?.mode || '').trim().toLowerCase();
+    if (!mode) {
+      return;
+    }
+
+    config.mockMode = mode === 'mock';
+    config.runtimeMode = mode;
+
+    if (payload?.sessionTtlMinutes) {
+      config.sessionTtlMinutes = Number(payload.sessionTtlMinutes);
+    }
+
+    if (payload?.capabilities && typeof payload.capabilities === 'object') {
+      config.capabilities = payload.capabilities;
+    }
+  }
 
   function normalizeBaseUrl(value) {
     return String(value || '').trim().replace(/\/$/, '');
@@ -54,6 +71,33 @@
   function clearStoredSessionId() {
     try {
       window.localStorage.removeItem('gpsrastreo.sessionId');
+    } catch {
+      // no-op
+    }
+  }
+
+  function storeSelectedEvent(eventItem) {
+    try {
+      if (eventItem) {
+        window.sessionStorage.setItem('gpsrastreo.selectedEvent', JSON.stringify(eventItem));
+      }
+    } catch {
+      // no-op
+    }
+  }
+
+  function getSelectedEvent() {
+    try {
+      const raw = window.sessionStorage.getItem('gpsrastreo.selectedEvent');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function clearSelectedEvent() {
+    try {
+      window.sessionStorage.removeItem('gpsrastreo.selectedEvent');
     } catch {
       // no-op
     }
@@ -135,42 +179,42 @@
     return payload?.data || null;
   }
 
+  async function getRecentEventsBySession(sessionId, limit = 30) {
+    const query = new URLSearchParams({
+      sessionId,
+      limit: String(limit)
+    });
+
+    const payload = await request(`${config.endpoints.liveEventsRecent || '/live/monitor/events/recent'}?${query.toString()}`);
+    return payload?.data || {
+      items: [],
+      summary: { total: 0 }
+    };
+  }
+
   window.GpsRastreoApi = {
     async checkPlatform() {
-      if (config.mockMode) {
-        return {
-          isAvailable: true,
-          isLoginScreen: true
-        };
-      }
-
       const payload = await request(config.endpoints.health || '/health', { method: 'GET' });
+      syncRuntimeMode(payload);
       return {
         isAvailable: payload.ok,
-        isLoginScreen: Boolean(payload.isLoginScreen)
+        isLoginScreen: Boolean(payload.isLoginScreen ?? true),
+        mode: payload.mode || (config.mockMode ? 'mock' : 'live'),
+        capabilities: payload.capabilities || null,
+        sessionTtlMinutes: payload.sessionTtlMinutes || null
       };
     },
 
     async login(credentials) {
-      if (config.mockMode) {
-        return {
-          ok: true,
-          user: mock.session,
-          credentials
-        };
-      }
-
-      return request(config.endpoints.login || '/auth/login', {
+      const payload = await request(config.endpoints.login || '/auth/login', {
         method: 'POST',
         body: JSON.stringify(credentials)
       });
+      syncRuntimeMode(payload);
+      return payload;
     },
 
     async getDashboard() {
-      if (config.mockMode) {
-        return mock.dashboard;
-      }
-
       const sessionId = getStoredSessionId();
       if (!sessionId) {
         throw new Error('SESSION_REQUIRED');
@@ -191,6 +235,7 @@
         }
 
         if (payload?.ok && payload?.data) {
+          syncRuntimeMode(payload);
           const live = payload.data;
           let liveAlerts = null;
           try {
@@ -259,18 +304,6 @@
     },
 
     async getAlerts() {
-      if (config.mockMode) {
-        return {
-          summary: {
-            total: 0,
-            active: 0,
-            inactive: 0,
-            types: 0
-          },
-          items: []
-        };
-      }
-
       const sessionId = getStoredSessionId();
       if (!sessionId) {
         throw new Error('SESSION_REQUIRED');
@@ -289,16 +322,6 @@
     },
 
     async getRoute(deviceId, from, to) {
-      if (config.mockMode) {
-        return {
-          summary: {
-            total: 0,
-            moving: 0
-          },
-          points: []
-        };
-      }
-
       const sessionId = getStoredSessionId();
       if (!sessionId) {
         throw new Error('SESSION_REQUIRED');
@@ -307,12 +330,22 @@
       return await getLiveRoute(sessionId, deviceId, from, to);
     },
 
+    async getRecentEvents(limit = 30) {
+      const sessionId = getStoredSessionId();
+      if (!sessionId) {
+        throw new Error('SESSION_REQUIRED');
+      }
+
+      return await getRecentEventsBySession(sessionId, limit);
+    },
+
     async getSessionInfo() {
       const sessionId = getStoredSessionId();
       if (!sessionId) {
         try {
           const latest = await request('/auth/latest-session');
           if (latest?.id) {
+            syncRuntimeMode(latest);
             storeSessionId(latest.id);
             return latest;
           }
@@ -324,7 +357,9 @@
       }
 
       try {
-        return await request(`/auth/session/${encodeURIComponent(sessionId)}`);
+        const payload = await request(`/auth/session/${encodeURIComponent(sessionId)}`);
+        syncRuntimeMode(payload);
+        return payload;
       } catch (error) {
         if (error.status === 404) {
           clearStoredSessionId();
@@ -336,6 +371,9 @@
 
     getStoredSessionId,
     storeSessionId,
-    clearStoredSessionId
+    clearStoredSessionId,
+    storeSelectedEvent,
+    getSelectedEvent,
+    clearSelectedEvent
   };
 })();

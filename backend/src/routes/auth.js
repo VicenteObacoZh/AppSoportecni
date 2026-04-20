@@ -56,7 +56,8 @@ router.post('/login', async (req, res) => {
       ok: true,
       mode: 'mock',
       user: mockData.session,
-      sessionId: session.id
+      sessionId: session.id,
+      expiresAt: session.expiresAt
     });
   }
 
@@ -101,7 +102,8 @@ router.post('/login', async (req, res) => {
       ok: true,
       mode: 'live',
       sessionId: session.id,
-      nextUrl: result.location || '/Dashboard'
+      nextUrl: result.location || '/Dashboard',
+      expiresAt: session.expiresAt
     });
   } catch (error) {
     return res.status(502).json({
@@ -127,6 +129,7 @@ router.get('/session/:id', (req, res) => {
     id: session.id,
     mode: session.mode,
     createdAt: session.createdAt,
+    expiresAt: session.expiresAt,
     email: session.email || null,
     nextUrl: session.location || null,
     hasCookies: Array.isArray(session.cookies) && session.cookies.length > 0
@@ -148,6 +151,7 @@ router.get('/latest-session', (_req, res) => {
     id: session.id,
     mode: session.mode,
     createdAt: session.createdAt,
+    expiresAt: session.expiresAt,
     email: session.email || null,
     nextUrl: session.location || null,
     hasCookies: Array.isArray(session.cookies) && session.cookies.length > 0

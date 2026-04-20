@@ -90,7 +90,8 @@
       health: '/health',
       login: '/auth/login',
       dashboard: '/dashboard',
-      liveMonitorData: '/live/monitor/data'
+      liveMonitorData: '/live/monitor/data',
+      liveEventsRecent: '/live/monitor/events/recent'
     }
   };
 })();

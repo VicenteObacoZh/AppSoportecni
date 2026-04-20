@@ -212,8 +212,8 @@
 
       sessionTitle.textContent = session.mode === 'live' ? 'Sesion real detectada' : 'Sesion demo detectada';
       sessionText.textContent = session.hasCookies
-        ? `SessionId activa: ${session.id}. El backend tiene cookies para consultar el portal.`
-        : `SessionId activa: ${session.id}. La sesion aun no tiene cookies reales.`;
+        ? `SessionId activa: ${session.id}. El backend tiene cookies para consultar el portal.${session.expiresAt ? ` Expira ${new Date(session.expiresAt).toLocaleString()}.` : ''}`
+        : `SessionId activa: ${session.id}. La sesion esta en modo mock controlado por backend.${session.expiresAt ? ` Expira ${new Date(session.expiresAt).toLocaleString()}.` : ''}`;
       return true;
     } catch {
       sessionTitle.textContent = 'No fue posible validar la sesion';
@@ -273,10 +273,14 @@
 
     try {
       const status = await apiClient.checkPlatform();
-      apiStatus.textContent = status.isLoginScreen ? 'Servicio operativo' : 'Servicio accesible';
-      apiMessage.textContent = status.isLoginScreen
-        ? 'La plataforma respondio correctamente y devolvio la pantalla de acceso.'
-        : 'La plataforma respondio, aunque la respuesta no coincide con la vista esperada.';
+      apiStatus.textContent = status.mode === 'mock'
+        ? 'Backend en modo mock'
+        : (status.isLoginScreen ? 'Servicio operativo' : 'Servicio accesible');
+      apiMessage.textContent = status.mode === 'mock'
+        ? 'El backend esta entregando contratos simulados compatibles con login, sessionId, monitor, alertas y rutas.'
+        : (status.isLoginScreen
+            ? 'La plataforma respondio correctamente y devolvio la pantalla de acceso.'
+            : 'La plataforma respondio, aunque la respuesta no coincide con la vista esperada.');
     } catch (error) {
       apiStatus.textContent = 'Validacion desde navegador limitada';
       apiMessage.textContent = 'La plataforma existe, pero el navegador puede bloquear la consulta directa por CORS. La integracion real se puede hacer con backend o proxy seguro.';
@@ -293,7 +297,7 @@
 
       if (integrationBanner) {
         integrationBanner.textContent = appConfig.mockMode
-          ? 'Modo demo activo. El formulario ya esta listo para conectarse a un endpoint real.'
+          ? 'Modo mock controlado por backend. El flujo usa el mismo contrato de login y sessionId.'
           : 'Conectando con el servicio configurado...';
       }
 

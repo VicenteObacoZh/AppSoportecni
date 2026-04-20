@@ -9,7 +9,16 @@ router.get('/', async (_req, res) => {
     return res.json({
       ok: true,
       mode: 'mock',
-      platformBaseUrl: config.platformBaseUrl
+      mockMode: true,
+      platformBaseUrl: config.platformBaseUrl,
+      sessionTtlMinutes: config.sessionTtlMinutes,
+      capabilities: {
+        login: true,
+        sessionId: true,
+        monitor: true,
+        alerts: true,
+        route: true
+      }
     });
   }
 
@@ -18,9 +27,18 @@ router.get('/', async (_req, res) => {
     return res.json({
       ok: true,
       mode: 'live',
+      mockMode: false,
       platformBaseUrl: config.platformBaseUrl,
+      sessionTtlMinutes: config.sessionTtlMinutes,
       platformStatus: result.status,
-      isLoginScreen: result.isLoginScreen
+      isLoginScreen: result.isLoginScreen,
+      capabilities: {
+        login: true,
+        sessionId: true,
+        monitor: true,
+        alerts: true,
+        route: true
+      }
     });
   } catch (error) {
     return res.status(502).json({

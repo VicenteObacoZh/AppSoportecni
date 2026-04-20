@@ -14,8 +14,9 @@
 <body class="dashboard-body dashboard-body--map">
   <div class="mobile-map-app">
     <header class="mobile-map-topbar">
+      <button class="mobile-map-topbar__back" type="button" id="mapBackButton" aria-label="Volver">&#8592;</button>
       <div class="mobile-map-topbar__title">
-        <h1>Mapa</h1>
+        <h1 id="mapHeaderTitle">Mapa</h1>
       </div>
       <div class="mobile-map-topbar__status" aria-hidden="true">&#128663;</div>
       <div class="mobile-map-counters">
@@ -65,6 +66,27 @@
           <div class="mobile-map-company-list" id="mapCompanyList"></div>
         </div>
       </aside>
+
+      <section class="mobile-map-event-panel" id="mapEventPanel" hidden>
+        <div class="mobile-map-event-panel__top">
+          <div>
+            <p class="eyebrow">Evento</p>
+            <h3 id="mapEventType">Sin evento</h3>
+          </div>
+          <button class="mobile-map-event-panel__address" type="button" id="mapEventAddressButton">Mostrar direccion</button>
+        </div>
+        <div class="mobile-map-event-panel__meta">
+          <article>
+            <span>Velocidad</span>
+            <strong id="mapEventSpeed">0 kph</strong>
+          </article>
+          <article>
+            <span>Fecha y hora</span>
+            <strong id="mapEventTime">--</strong>
+          </article>
+        </div>
+        <p class="mobile-map-event-panel__address-text" id="mapEventAddressText" hidden></p>
+      </section>
     </main>
 
     <nav class="mobile-bottom-nav mobile-bottom-nav--icons-only">

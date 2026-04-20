@@ -1,4 +1,5 @@
 const express = require('express');
+const mockData = require('../data/mockDashboard');
 const { getSession } = require('../services/sessionStore');
 const { fetchPlatform } = require('../services/platformClient');
 
@@ -76,6 +77,91 @@ function buildRouteSummary(payload) {
   };
 }
 
+function normalizeRecentEvents(payload, limit = 30) {
+  const rawItems =
+    (Array.isArray(payload) ? payload : null) ||
+    (Array.isArray(payload?.items) ? payload.items : null) ||
+    (Array.isArray(payload?.events) ? payload.events : null) ||
+    (Array.isArray(payload?.data) ? payload.data : null) ||
+    (Array.isArray(payload?.rows) ? payload.rows : null) ||
+    [];
+
+  const normalized = rawItems
+    .map((item, index) => {
+      const latitude = Number(item?.latitude ?? item?.lat ?? item?.Latitude ?? item?.Lat);
+      const longitude = Number(item?.longitude ?? item?.lon ?? item?.Longitude ?? item?.Lon);
+      const speed = Number(item?.speed ?? item?.speedKmh ?? item?.Speed ?? item?.SpeedKmh ?? 0);
+      const eventTime =
+        item?.eventTime ??
+        item?.EventTime ??
+        item?.deviceTime ??
+        item?.DeviceTime ??
+        item?.fixTime ??
+        item?.FixTime ??
+        item?.serverTime ??
+        item?.ServerTime ??
+        null;
+
+      return {
+        eventId: String(item?.eventId ?? item?.EventId ?? item?.id ?? item?.Id ?? `event-${index + 1}`),
+        deviceId: String(item?.deviceId ?? item?.DeviceId ?? item?.idDispositivo ?? item?.IdDispositivo ?? ''),
+        vehicleName:
+          item?.vehicleName ??
+          item?.VehicleName ??
+          item?.deviceName ??
+          item?.DeviceName ??
+          item?.name ??
+          item?.Name ??
+          'Unidad',
+        eventType:
+          item?.eventType ??
+          item?.EventType ??
+          item?.description ??
+          item?.Description ??
+          item?.type ??
+          item?.Type ??
+          item?.eventName ??
+          item?.EventName ??
+          'Evento',
+        latitude,
+        longitude,
+        speed: Number.isFinite(speed) ? speed : 0,
+        eventTime,
+        address: item?.address ?? item?.Address ?? item?.direccion ?? item?.Direccion ?? null,
+        iconBase: item?.iconBase ?? item?.IconBase ?? 'flecha'
+      };
+    })
+    .filter((item) => Number.isFinite(item.latitude) && Number.isFinite(item.longitude) && item.eventTime)
+    .sort((a, b) => new Date(b.eventTime).getTime() - new Date(a.eventTime).getTime());
+
+  return {
+    items: normalized.slice(0, Math.max(1, limit)),
+    summary: {
+      total: normalized.length
+    }
+  };
+}
+
+function buildMockMonitorSummary() {
+  return buildMonitorSummary(mockData.liveMonitor);
+}
+
+function buildMockAlertsSummary() {
+  return buildAlertsSummary(mockData.alerts);
+}
+
+function buildMockRouteSummary() {
+  return buildRouteSummary(mockData.routePoints);
+}
+
+function buildMockEventsSummary(limit) {
+  return normalizeRecentEvents(mockData.recentEvents, limit);
+}
+
+function hasLiveCookies(session) {
+  return Array.isArray(session?.cookies) && session.cookies.length > 0;
+}
+
 router.get('/monitor/data', async (req, res) => {
   const sessionId = String(req.query.sessionId || '').trim();
   if (!sessionId) {
@@ -86,7 +172,22 @@ router.get('/monitor/data', async (req, res) => {
   }
 
   const session = getSession(sessionId);
-  if (!session || !Array.isArray(session.cookies) || session.cookies.length === 0) {
+  if (!session) {
+    return res.status(404).json({
+      ok: false,
+      message: 'Sesion valida no encontrada.'
+    });
+  }
+
+  if (session.mode === 'mock') {
+    return res.json({
+      ok: true,
+      mode: 'mock',
+      data: buildMockMonitorSummary()
+    });
+  }
+
+  if (!hasLiveCookies(session)) {
     return res.status(404).json({
       ok: false,
       message: 'Sesion valida no encontrada.'
@@ -141,7 +242,22 @@ router.get('/alerts/list', async (req, res) => {
   }
 
   const session = getSession(sessionId);
-  if (!session || !Array.isArray(session.cookies) || session.cookies.length === 0) {
+  if (!session) {
+    return res.status(404).json({
+      ok: false,
+      message: 'Sesion valida no encontrada.'
+    });
+  }
+
+  if (session.mode === 'mock') {
+    return res.json({
+      ok: true,
+      mode: 'mock',
+      data: buildMockAlertsSummary()
+    });
+  }
+
+  if (!hasLiveCookies(session)) {
     return res.status(404).json({
       ok: false,
       message: 'Sesion valida no encontrada.'
@@ -200,7 +316,22 @@ router.get('/monitor/route', async (req, res) => {
   }
 
   const session = getSession(sessionId);
-  if (!session || !Array.isArray(session.cookies) || session.cookies.length === 0) {
+  if (!session) {
+    return res.status(404).json({
+      ok: false,
+      message: 'Sesion valida no encontrada.'
+    });
+  }
+
+  if (session.mode === 'mock') {
+    return res.json({
+      ok: true,
+      mode: 'mock',
+      data: buildMockRouteSummary()
+    });
+  }
+
+  if (!hasLiveCookies(session)) {
     return res.status(404).json({
       ok: false,
       message: 'Sesion valida no encontrada.'
@@ -241,6 +372,77 @@ router.get('/monitor/route', async (req, res) => {
       ok: true,
       mode: session.mode,
       data: buildRouteSummary(payload)
+    });
+  } catch (error) {
+    return res.status(502).json({
+      ok: false,
+      message: error.message
+    });
+  }
+});
+
+router.get('/monitor/events/recent', async (req, res) => {
+  const sessionId = String(req.query.sessionId || '').trim();
+  const limit = Number(req.query.limit || 30);
+
+  if (!sessionId) {
+    return res.status(400).json({
+      ok: false,
+      message: 'sessionId es obligatorio.'
+    });
+  }
+
+  const session = getSession(sessionId);
+  if (!session) {
+    return res.status(404).json({
+      ok: false,
+      message: 'Sesion valida no encontrada.'
+    });
+  }
+
+  if (session.mode === 'mock') {
+    return res.json({
+      ok: true,
+      mode: 'mock',
+      data: buildMockEventsSummary(limit)
+    });
+  }
+
+  if (!hasLiveCookies(session)) {
+    return res.status(404).json({
+      ok: false,
+      message: 'Sesion valida no encontrada.'
+    });
+  }
+
+  try {
+    const result = await fetchPlatform('/Monitoreo/Monitor?handler=Events', {
+      headers: {
+        Cookie: session.cookies.join('; ')
+      }
+    });
+
+    let payload;
+    try {
+      payload = JSON.parse(result.text);
+    } catch {
+      const looksLikeLogin =
+        String(result.text || '').includes('Iniciar sesi') ||
+        String(result.text || '').includes('class="login-form"');
+
+      return res.status(401).json({
+        ok: false,
+        code: looksLikeLogin ? 'SESSION_EXPIRED' : 'INVALID_EVENTS_RESPONSE',
+        message: looksLikeLogin
+          ? 'La sesion del portal expiro o ya no es valida para consultar eventos.'
+          : 'El modulo de eventos respondio con un contenido inesperado.'
+      });
+    }
+
+    return res.json({
+      ok: true,
+      mode: session.mode,
+      data: normalizeRecentEvents(payload, limit)
     });
   } catch (error) {
     return res.status(502).json({
