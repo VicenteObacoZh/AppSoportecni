@@ -1135,35 +1135,45 @@ img {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
-  padding: 20px 18px;
+  gap: 10px;
+  padding: 14px 14px;
   color: #fff;
-  background: #4a4546;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
+  background: #4b4547;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.16);
 }
 
 .mobile-map-topbar__title h1 {
   margin: 0;
-  font-size: 2rem;
-  font-weight: 700;
+  font-size: 1.35rem;
+  font-weight: 600;
+}
+
+.mobile-map-topbar__status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 34px;
+  color: #f3f3f3;
+  font-size: 1.45rem;
 }
 
 .mobile-map-counters {
   display: flex;
-  gap: 10px;
+  gap: 6px;
 }
 
 .mobile-map-counter {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 52px;
-  height: 52px;
-  padding: 0 12px;
+  min-width: 42px;
+  height: 42px;
+  padding: 0 9px;
   border-radius: 999px;
   color: #fff;
-  font-weight: 800;
-  font-size: 1.15rem;
+  font-weight: 700;
+  font-size: 0.9rem;
 }
 
 .mobile-map-counter--green {
@@ -1180,13 +1190,13 @@ img {
 
 .mobile-map-stage {
   position: relative;
-  min-height: calc(100vh - 96px);
-  padding-bottom: 104px;
+  min-height: calc(100vh - 70px);
+  padding-bottom: 94px;
 }
 
 .mobile-map-canvas {
   width: 100%;
-  min-height: calc(100vh - 96px);
+  min-height: calc(100vh - 70px);
 }
 
 .map-empty-state--overlay {
@@ -1458,34 +1468,40 @@ img {
 .mobile-bottom-nav {
   position: fixed;
   left: 50%;
-  bottom: 16px;
+  bottom: 0;
   z-index: 600;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  align-items: end;
-  gap: 16px;
-  width: min(calc(100% - 24px), 560px);
-  padding: 0 8px;
+  align-items: center;
+  gap: 4px;
+  width: min(100%, 560px);
+  min-height: 84px;
+  padding: 8px 12px 14px;
   transform: translateX(-50%);
+  background: #f8f7f6;
+  border-top: 1px solid rgba(67, 67, 67, 0.08);
+  box-shadow: 0 -4px 14px rgba(28, 29, 33, 0.08);
 }
 
 .mobile-bottom-nav__item {
-  display: grid;
-  justify-items: center;
-  gap: 6px;
-  color: #3b3b3b;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  color: #38363a;
   text-decoration: none;
-  font-size: 0.92rem;
-  font-weight: 700;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border-radius: 999px;
 }
 
 .mobile-bottom-nav__icon {
-  font-size: 1.7rem;
+  font-size: 1.72rem;
 }
 
 .mobile-bottom-nav__item--active {
-  padding: 14px 18px;
-  border-radius: 999px;
+  padding: 14px 22px;
   color: #fff;
   background: #8d8a8d;
 }
@@ -2380,8 +2396,8 @@ img {
 }
 
 .mobile-bottom-nav--icons-only {
-  grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
 }
 
 .mobile-bottom-nav--icons-only .mobile-bottom-nav__item {
@@ -2393,7 +2409,7 @@ img {
 }
 
 .mobile-bottom-nav--icons-only .mobile-bottom-nav__icon {
-  font-size: 2rem;
+  font-size: 1.72rem;
 }
 
 .mobile-bottom-nav--icons-only .mobile-bottom-nav__item--active {
@@ -2411,15 +2427,17 @@ img {
 
 /* Bottom nav active pill fix */
 .mobile-bottom-nav--icons-only {
-  align-items: end;
-  gap: 14px;
+  align-items: center;
+  gap: 4px;
 }
 
 .mobile-bottom-nav--icons-only .mobile-bottom-nav__item {
-  display: grid;
-  justify-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   gap: 4px;
   min-width: 42px;
+  width: 100%;
   color: #2f2f2f;
 }
 
@@ -2431,22 +2449,25 @@ img {
   width: auto;
   height: auto;
   min-width: 0;
-  padding: 12px 18px;
+  min-height: 50px;
+  padding: 0 22px;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 8px;
   color: #fff;
-  background: #8d8a8d;
+  background: #918c8f;
+  place-self: center;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
 }
 
 .mobile-bottom-nav--icons-only .mobile-bottom-nav__item--active span:last-child {
   display: inline;
-  font-size: 1rem;
-  font-weight: 700;
+  font-size: 0.88rem;
+  font-weight: 600;
 }
 
 .mobile-bottom-nav--icons-only .mobile-bottom-nav__item--active .mobile-bottom-nav__icon {
-  font-size: 1.8rem;
+  font-size: 1.45rem;
 }
