@@ -157,6 +157,13 @@
     }
   }
 
+  function clearOperationalState() {
+    clearStoredSessionId();
+    clearSelectedEvent();
+    clearSelectedDevice();
+    clearRouteContext();
+  }
+
   async function requestJson(path, options) {
     const backendBaseUrls = getBackendBaseUrls();
     let lastNetworkError = null;
@@ -198,6 +205,7 @@
 
     if (lastNetworkError) {
       const networkError = new Error(`No se pudo conectar con ${lastNetworkError.requestUrl}. ${lastNetworkError.error?.message || 'Revisa backend y red local.'}`);
+      networkError.code = 'BACKEND_UNAVAILABLE';
       networkError.cause = lastNetworkError.error;
       throw networkError;
     }
@@ -266,6 +274,9 @@
         body: JSON.stringify(credentials)
       });
       syncRuntimeMode(payload);
+      if (payload?.sessionId) {
+        storeSessionId(payload.sessionId);
+      }
       return payload;
     },
 
@@ -281,9 +292,10 @@
           payload = await request(`${config.endpoints.liveMonitorData || '/live/monitor/data'}?sessionId=${encodeURIComponent(sessionId)}`);
         } catch (error) {
           if (error.status === 404 || error.status === 401) {
-            clearStoredSessionId();
+            clearOperationalState();
             const nextError = new Error('SESSION_EXPIRED');
             nextError.payload = error.payload;
+            nextError.code = error.code || error.payload?.code || 'SESSION_EXPIRED';
             throw nextError;
           }
           throw error;
@@ -364,7 +376,20 @@
         throw new Error('SESSION_REQUIRED');
       }
 
-      const liveAlerts = await getLiveAlerts(sessionId);
+      let liveAlerts;
+      try {
+        liveAlerts = await getLiveAlerts(sessionId);
+      } catch (error) {
+        if (error.status === 404 || error.status === 401) {
+          clearOperationalState();
+          const nextError = new Error('SESSION_EXPIRED');
+          nextError.payload = error.payload;
+          nextError.code = error.code || error.payload?.code || 'SESSION_EXPIRED';
+          throw nextError;
+        }
+        throw error;
+      }
+
       return liveAlerts || {
         summary: {
           total: 0,
@@ -382,7 +407,18 @@
         throw new Error('SESSION_REQUIRED');
       }
 
-      return await getLiveRoute(sessionId, deviceId, from, to);
+      try {
+        return await getLiveRoute(sessionId, deviceId, from, to);
+      } catch (error) {
+        if (error.status === 404 || error.status === 401) {
+          clearOperationalState();
+          const nextError = new Error('SESSION_EXPIRED');
+          nextError.payload = error.payload;
+          nextError.code = error.code || error.payload?.code || 'SESSION_EXPIRED';
+          throw nextError;
+        }
+        throw error;
+      }
     },
 
     async getRecentEvents(limit = 30) {
@@ -391,7 +427,18 @@
         throw new Error('SESSION_REQUIRED');
       }
 
-      return await getRecentEventsBySession(sessionId, limit);
+      try {
+        return await getRecentEventsBySession(sessionId, limit);
+      } catch (error) {
+        if (error.status === 404 || error.status === 401) {
+          clearOperationalState();
+          const nextError = new Error('SESSION_EXPIRED');
+          nextError.payload = error.payload;
+          nextError.code = error.code || error.payload?.code || 'SESSION_EXPIRED';
+          throw nextError;
+        }
+        throw error;
+      }
     },
 
     async getSessionInfo() {
@@ -417,7 +464,7 @@
         return payload;
       } catch (error) {
         if (error.status === 404 || error.status === 401) {
-          clearStoredSessionId();
+          clearOperationalState();
           return null;
         }
         throw error;
@@ -435,6 +482,7 @@
     clearSelectedDevice,
     storeRouteContext,
     getRouteContext,
-    clearRouteContext
+    clearRouteContext,
+    clearOperationalState
   };
 })();

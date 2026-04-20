@@ -5,6 +5,22 @@ const { fetchPlatform } = require('../services/platformClient');
 
 const router = express.Router();
 
+function respondMissingSessionId(res) {
+  return res.status(400).json({
+    ok: false,
+    code: 'SESSION_REQUIRED',
+    message: 'sessionId es obligatorio.'
+  });
+}
+
+function respondSessionNotFound(res) {
+  return res.status(404).json({
+    ok: false,
+    code: 'SESSION_NOT_FOUND',
+    message: 'Sesion valida no encontrada.'
+  });
+}
+
 function buildMonitorSummary(payload) {
   const devices = Array.isArray(payload?.devices) ? payload.devices : [];
   const moving = devices.filter((item) => Number(item.speedKmh || 0) > 3);
@@ -165,18 +181,12 @@ function hasLiveCookies(session) {
 router.get('/monitor/data', async (req, res) => {
   const sessionId = String(req.query.sessionId || '').trim();
   if (!sessionId) {
-    return res.status(400).json({
-      ok: false,
-      message: 'sessionId es obligatorio.'
-    });
+    return respondMissingSessionId(res);
   }
 
   const session = getSession(sessionId);
   if (!session) {
-    return res.status(404).json({
-      ok: false,
-      message: 'Sesion valida no encontrada.'
-    });
+    return respondSessionNotFound(res);
   }
 
   if (session.mode === 'mock') {
@@ -188,10 +198,7 @@ router.get('/monitor/data', async (req, res) => {
   }
 
   if (!hasLiveCookies(session)) {
-    return res.status(404).json({
-      ok: false,
-      message: 'Sesion valida no encontrada.'
-    });
+    return respondSessionNotFound(res);
   }
 
   try {
@@ -235,18 +242,12 @@ router.get('/monitor/data', async (req, res) => {
 router.get('/alerts/list', async (req, res) => {
   const sessionId = String(req.query.sessionId || '').trim();
   if (!sessionId) {
-    return res.status(400).json({
-      ok: false,
-      message: 'sessionId es obligatorio.'
-    });
+    return respondMissingSessionId(res);
   }
 
   const session = getSession(sessionId);
   if (!session) {
-    return res.status(404).json({
-      ok: false,
-      message: 'Sesion valida no encontrada.'
-    });
+    return respondSessionNotFound(res);
   }
 
   if (session.mode === 'mock') {
@@ -258,10 +259,7 @@ router.get('/alerts/list', async (req, res) => {
   }
 
   if (!hasLiveCookies(session)) {
-    return res.status(404).json({
-      ok: false,
-      message: 'Sesion valida no encontrada.'
-    });
+    return respondSessionNotFound(res);
   }
 
   try {
@@ -311,16 +309,14 @@ router.get('/monitor/route', async (req, res) => {
   if (!sessionId || !deviceId || !from || !to) {
     return res.status(400).json({
       ok: false,
+      code: 'ROUTE_PARAMETERS_REQUIRED',
       message: 'sessionId, deviceId, from y to son obligatorios.'
     });
   }
 
   const session = getSession(sessionId);
   if (!session) {
-    return res.status(404).json({
-      ok: false,
-      message: 'Sesion valida no encontrada.'
-    });
+    return respondSessionNotFound(res);
   }
 
   if (session.mode === 'mock') {
@@ -332,10 +328,7 @@ router.get('/monitor/route', async (req, res) => {
   }
 
   if (!hasLiveCookies(session)) {
-    return res.status(404).json({
-      ok: false,
-      message: 'Sesion valida no encontrada.'
-    });
+    return respondSessionNotFound(res);
   }
 
   const query = new URLSearchParams({
@@ -386,18 +379,12 @@ router.get('/monitor/events/recent', async (req, res) => {
   const limit = Number(req.query.limit || 30);
 
   if (!sessionId) {
-    return res.status(400).json({
-      ok: false,
-      message: 'sessionId es obligatorio.'
-    });
+    return respondMissingSessionId(res);
   }
 
   const session = getSession(sessionId);
   if (!session) {
-    return res.status(404).json({
-      ok: false,
-      message: 'Sesion valida no encontrada.'
-    });
+    return respondSessionNotFound(res);
   }
 
   if (session.mode === 'mock') {
@@ -409,10 +396,7 @@ router.get('/monitor/events/recent', async (req, res) => {
   }
 
   if (!hasLiveCookies(session)) {
-    return res.status(404).json({
-      ok: false,
-      message: 'Sesion valida no encontrada.'
-    });
+    return respondSessionNotFound(res);
   }
 
   try {

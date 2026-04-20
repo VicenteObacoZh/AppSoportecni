@@ -46,6 +46,8 @@
   let currentAlertSummary = null;
   let selectedEvent = null;
   let selectedDevice = null;
+  let autoRefreshTimer = null;
+  let hasInitializedViewport = false;
 
   function escapeHtml(value) {
     return String(value ?? '')
@@ -172,6 +174,23 @@
 
     renderMarkers.forEach((marker) => marker.remove());
     renderMarkers = [];
+  }
+
+  function startAutoRefresh() {
+    stopAutoRefresh();
+    autoRefreshTimer = window.setInterval(() => {
+      if (document.hidden) {
+        return;
+      }
+      loadMapPage({ preserveViewport: true, silentRefresh: true });
+    }, 60000);
+  }
+
+  function stopAutoRefresh() {
+    if (autoRefreshTimer) {
+      window.clearInterval(autoRefreshTimer);
+      autoRefreshTimer = null;
+    }
   }
 
   function clearEventFocusMarker() {
@@ -673,7 +692,8 @@
     liveMap.setView([lat, lon], 16);
   }
 
-  async function loadMapPage() {
+  async function loadMapPage(options = {}) {
+    const preserveViewport = Boolean(options.preserveViewport);
     if (!apiClient) {
       return;
     }
@@ -717,13 +737,14 @@
             liveMap.setView([Number(device.lat), Number(device.lon)], 16);
           }
         }
-      } else if (currentDevices.length > 0 && liveMap && renderMarkers.length === 0) {
+      } else if (!preserveViewport && !hasInitializedViewport && currentDevices.length > 0 && liveMap) {
         showDevicePanel(null);
         const bounds = window.L.latLngBounds(currentDevices
           .filter((item) => Number.isFinite(Number(item.lat)) && Number.isFinite(Number(item.lon)))
           .map((item) => [Number(item.lat), Number(item.lon)]));
         if (bounds.isValid()) {
           liveMap.fitBounds(bounds.pad(0.2));
+          hasInitializedViewport = true;
         }
       }
     } catch (_error) {
@@ -767,7 +788,7 @@
   });
 
   refreshButton?.addEventListener('click', () => {
-    loadMapPage();
+    loadMapPage({ preserveViewport: true });
   });
 
   zoomInButton?.addEventListener('click', () => {
@@ -837,7 +858,16 @@
     event.stopPropagation();
   }, { passive: true });
 
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      stopAutoRefresh();
+      return;
+    }
+    startAutoRefresh();
+  });
+
   switchTab('devices');
   applyEventFocusState();
   loadMapPage();
+  startAutoRefresh();
 })();

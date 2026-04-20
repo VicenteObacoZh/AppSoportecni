@@ -317,12 +317,8 @@
         email: loginForm.elements.email.value,
         password: loginForm.elements.password.value
       }).then((result) => {
-        if (result?.sessionId) {
-          apiClient.storeSessionId(result.sessionId);
-        }
-
         if (loginMessage) {
-          loginMessage.textContent = 'Validacion completada. Redirigiendo al dashboard operativo...';
+          loginMessage.textContent = 'Autenticacion completada. Redirigiendo al mapa operativo...';
         }
 
         window.setTimeout(() => {
@@ -337,8 +333,19 @@
           ? error.payload.validationMessages.filter(Boolean)
           : [];
         const backendMessage = error?.payload?.message || '';
+        const backendCode = error?.payload?.code || error?.code || '';
+        const fallbackByCode = backendCode === 'INVALID_CREDENTIALS'
+          ? 'Las credenciales no fueron aceptadas por el portal.'
+          : backendCode === 'SESSION_NOT_CREATED'
+            ? 'El portal autentico, pero no devolvio cookies reutilizables.'
+            : backendCode === 'LOGIN_TOKEN_MISSING'
+              ? 'No se pudo obtener el token de seguridad del login.'
+              : backendCode === 'BACKEND_UNAVAILABLE'
+                ? 'No se pudo conectar con el backend local.'
+                : '';
         const detailedMessage =
           validationMessages[0] ||
+          fallbackByCode ||
           backendMessage ||
           error?.message ||
           'No fue posible iniciar sesion. Revisa la integracion real.';

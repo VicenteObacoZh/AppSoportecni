@@ -54,6 +54,14 @@ Desde `C:\AppSoportecni\backend`:
 1. `npm run dev` para levantar el proxy local
 2. `npm test` para correr las pruebas smoke del contrato mock
 
+## Login real y sesion
+
+- `src/login.html` envia credenciales solo al backend proxy local
+- `backend/src/routes/auth.js` obtiene el token antifalsificacion y autentica contra `https://rastreo.soportecni.com`
+- el backend guarda las cookies reales del portal y crea una `sessionId` interna
+- `src/api.js` persiste esa `sessionId` y la reutiliza entre pantallas
+- si la sesion expira o el portal ya no acepta las cookies, el frontend limpia el estado operativo y vuelve a `login.html`
+
 Las pruebas actuales validan el contrato base de:
 
 - raiz `/`

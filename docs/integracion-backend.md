@@ -49,6 +49,18 @@ La fuente de verdad para `mock` vs `live` es el backend de `backend/`.
   - `GET /api/live/monitor/data`
   - `GET /api/live/monitor/route`
 
+## Flujo manual recomendado
+
+1. iniciar backend con `npm run dev` en `backend/`
+2. abrir `login.html`
+3. autenticar contra el portal real
+4. verificar que el frontend guarde `sessionId`
+5. abrir `map.html` y confirmar carga de unidades
+6. tocar una unidad para abrir detalle operativo
+7. abrir `devices.html` y navegar a mapa o historico
+8. abrir `alerts.html` y navegar de evento a mapa
+9. forzar expiracion o borrar sesion para confirmar retorno limpio a `login.html`
+
 ## Riesgos actuales
 
 - la plataforma `https://rastreo.soportecni.com` responde en vivo

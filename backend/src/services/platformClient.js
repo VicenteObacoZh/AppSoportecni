@@ -25,13 +25,37 @@ function normalizeCookies(setCookieHeaders) {
 }
 
 function extractRequestVerificationToken(html) {
-  const match = String(html || '').match(/name="__RequestVerificationToken"\s+type="hidden"\s+value="([^"]+)"/i);
-  return match ? match[1] : null;
+  const source = String(html || '');
+  const patterns = [
+    /<input[^>]*name=["']__RequestVerificationToken["'][^>]*value=["']([^"']+)["'][^>]*>/i,
+    /<input[^>]*value=["']([^"']+)["'][^>]*name=["']__RequestVerificationToken["'][^>]*>/i
+  ];
+
+  for (const pattern of patterns) {
+    const match = source.match(pattern);
+    if (match?.[1]) {
+      return match[1];
+    }
+  }
+
+  return null;
 }
 
 function extractReturnUrl(html) {
-  const match = String(html || '').match(/id="ReturnUrl"\s+name="ReturnUrl"\s+value="([^"]*)"/i);
-  return match ? match[1] : '/';
+  const source = String(html || '');
+  const patterns = [
+    /<input[^>]*name=["']ReturnUrl["'][^>]*value=["']([^"']*)["'][^>]*>/i,
+    /<input[^>]*value=["']([^"']*)["'][^>]*name=["']ReturnUrl["'][^>]*>/i
+  ];
+
+  for (const pattern of patterns) {
+    const match = source.match(pattern);
+    if (match) {
+      return match[1] || '/';
+    }
+  }
+
+  return '/';
 }
 
 function stripTags(value) {
@@ -58,6 +82,17 @@ function extractValidationMessages(html) {
   }
 
   return [...new Set(messages)];
+}
+
+function looksLikeLoginScreen(html) {
+  const source = String(html || '');
+  return (
+    source.includes('login-form') ||
+    source.includes('__RequestVerificationToken') ||
+    source.includes('Input.Email') ||
+    source.includes('Iniciar sesi') ||
+    source.includes('Soportecni GPS')
+  );
 }
 
 async function fetchPlatform(path = '/', options = {}) {
@@ -155,6 +190,11 @@ async function submitLogin({ email, password, rememberMe = true, returnUrl = '/'
     cookies: mergedCookies,
     validationMessages: extractValidationMessages(html),
     isSuccessRedirect: response.status >= 300 && response.status < 400 && Boolean(location),
+    looksLikeLoginScreen: looksLikeLoginScreen(html),
+    looksLikeInvalidCredentials:
+      response.status === 200 &&
+      looksLikeLoginScreen(html) &&
+      extractValidationMessages(html).length > 0,
     looksAuthenticated:
       Boolean(location && /dashboard/i.test(location)) ||
       html.includes('/Cuenta/Logout') ||
@@ -166,5 +206,6 @@ module.exports = {
   fetchPlatform,
   validatePlatformAvailability,
   fetchLoginPage,
-  submitLogin
+  submitLogin,
+  looksLikeLoginScreen
 };

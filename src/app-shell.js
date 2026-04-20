@@ -51,10 +51,7 @@
   }
 
   function clearOperationalState() {
-    apiClient?.clearStoredSessionId?.();
-    apiClient?.clearSelectedEvent?.();
-    apiClient?.clearSelectedDevice?.();
-    apiClient?.clearRouteContext?.();
+    apiClient?.clearOperationalState?.();
   }
 
   async function requireSession(options = {}) {

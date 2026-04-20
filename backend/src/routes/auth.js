@@ -41,6 +41,7 @@ router.post('/login', async (req, res) => {
   if (!email || !password) {
     return res.status(400).json({
       ok: false,
+      code: 'VALIDATION_ERROR',
       message: 'Correo y contrasena son obligatorios.'
     });
   }
@@ -57,7 +58,13 @@ router.post('/login', async (req, res) => {
       mode: 'mock',
       user: mockData.session,
       sessionId: session.id,
-      expiresAt: session.expiresAt
+      expiresAt: session.expiresAt,
+      session: {
+        id: session.id,
+        mode: session.mode,
+        expiresAt: session.expiresAt,
+        hasCookies: false
+      }
     });
   }
 
@@ -68,6 +75,7 @@ router.post('/login', async (req, res) => {
       return res.status(502).json({
         ok: false,
         mode: 'live',
+        code: 'LOGIN_TOKEN_MISSING',
         message: 'No fue posible extraer el token antifalsificacion de la pagina de login.'
       });
     }
@@ -81,13 +89,34 @@ router.post('/login', async (req, res) => {
       cookies: loginPage.cookies
     });
 
+    if (result.looksLikeInvalidCredentials) {
+      return res.status(401).json({
+        ok: false,
+        mode: 'live',
+        code: 'INVALID_CREDENTIALS',
+        message: result.validationMessages?.[0] || 'El portal rechazo las credenciales ingresadas.',
+        status: result.status,
+        validationMessages: result.validationMessages || []
+      });
+    }
+
     if (!result.isSuccessRedirect && !result.looksAuthenticated) {
       return res.status(401).json({
         ok: false,
         mode: 'live',
+        code: result.looksLikeLoginScreen ? 'LOGIN_REJECTED' : 'LOGIN_UNCONFIRMED',
         message: 'El portal no confirmo una autenticacion valida. Revisa credenciales o flujo de sesion.',
         status: result.status,
         validationMessages: result.validationMessages || []
+      });
+    }
+
+    if (!Array.isArray(result.cookies) || result.cookies.length === 0) {
+      return res.status(502).json({
+        ok: false,
+        mode: 'live',
+        code: 'SESSION_NOT_CREATED',
+        message: 'El portal respondio sin cookies utiles. No se pudo crear una sesion reutilizable.'
       });
     }
 
@@ -103,12 +132,19 @@ router.post('/login', async (req, res) => {
       mode: 'live',
       sessionId: session.id,
       nextUrl: result.location || '/Dashboard',
-      expiresAt: session.expiresAt
+      expiresAt: session.expiresAt,
+      session: {
+        id: session.id,
+        mode: session.mode,
+        expiresAt: session.expiresAt,
+        hasCookies: true
+      }
     });
   } catch (error) {
     return res.status(502).json({
       ok: false,
       mode: 'live',
+      code: 'LOGIN_PROXY_ERROR',
       message: error.message
     });
   }
@@ -132,7 +168,8 @@ router.get('/session/:id', (req, res) => {
     expiresAt: session.expiresAt,
     email: session.email || null,
     nextUrl: session.location || null,
-    hasCookies: Array.isArray(session.cookies) && session.cookies.length > 0
+    hasCookies: Array.isArray(session.cookies) && session.cookies.length > 0,
+    sessionTtlMinutes: config.sessionTtlMinutes
   });
 });
 
@@ -154,7 +191,8 @@ router.get('/latest-session', (_req, res) => {
     expiresAt: session.expiresAt,
     email: session.email || null,
     nextUrl: session.location || null,
-    hasCookies: Array.isArray(session.cookies) && session.cookies.length > 0
+    hasCookies: Array.isArray(session.cookies) && session.cookies.length > 0,
+    sessionTtlMinutes: config.sessionTtlMinutes
   });
 });
 
