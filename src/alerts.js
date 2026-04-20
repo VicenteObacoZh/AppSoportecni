@@ -9,6 +9,9 @@
   const appShell = window.GpsRastreoShell;
 
   let currentEvents = [];
+  let geocodeRefreshTimer = null;
+  let geocodeRefreshAttempts = 0;
+  const MAX_GEOCODE_REFRESH_ATTEMPTS = 6;
 
   function escapeHtml(value) {
     return String(value ?? '')
@@ -33,18 +36,25 @@
   }
 
   function getEventTone(eventItem) {
-    const eventType = String(eventItem?.eventType || '').toUpperCase();
-    if (eventType.includes('ENCENDIDO')) {
-      return { accent: 'green', icon: 'power', label: 'Encendido' };
+    const raw = String(eventItem?.eventType || '').trim();
+    const eventType = raw.toUpperCase();
+    if (eventType.includes('IGNITIONON') || eventType.includes('ENCENDIDO')) {
+      return { accent: 'green', icon: 'power', label: 'Encendido de motor' };
     }
-    if (eventType.includes('APAGADO')) {
-      return { accent: 'red', icon: 'power-off', label: 'Apagado' };
+    if (eventType.includes('IGNITIONOFF') || eventType.includes('APAGADO')) {
+      return { accent: 'red', icon: 'power-off', label: 'Apagado de motor' };
+    }
+    if (eventType.includes('DEVICEMOVING') || eventType.includes('MOVING') || eventType.includes('MOVIMIENTO')) {
+      return { accent: 'orange', icon: 'speed', label: 'En movimiento' };
+    }
+    if (eventType.includes('DEVICESTOPPED') || eventType.includes('STOPPED') || eventType.includes('DETENIDO')) {
+      return { accent: 'gray', icon: 'event', label: 'Detenido' };
     }
     if (eventType.includes('VELOCIDAD')) {
-      return { accent: 'orange', icon: 'speed', label: 'Velocidad' };
+      return { accent: 'orange', icon: 'speed', label: 'Exceso de velocidad' };
     }
     if (eventType.includes('GEOCERCA')) {
-      return { accent: 'blue', icon: 'geo', label: 'Geocerca' };
+      return { accent: 'blue', icon: 'geo', label: 'Alerta de geocerca' };
     }
 
     return { accent: 'gray', icon: 'event', label: 'Evento' };
@@ -84,7 +94,10 @@
 
     typeFilter.innerHTML = [
       '<option value="all">Todos</option>',
-      ...types.map((item) => `<option value="${escapeHtml(item)}">${escapeHtml(item)}</option>`)
+      ...types.map((item) => {
+        const tone = getEventTone({ eventType: item });
+        return `<option value="${escapeHtml(item)}">${escapeHtml(tone.label)}</option>`;
+      })
     ].join('');
 
     typeFilter.value = types.includes(currentValue) || currentValue === 'all'
@@ -107,11 +120,11 @@
       return `
         <button class="mobile-event-card mobile-event-card--${tone.accent}" type="button" data-event-id="${escapeHtml(eventItem.eventId)}">
           <div class="mobile-event-card__icon mobile-event-card__icon--${tone.accent}">
-            <span>${tone.label}</span>
+            <span>EVENTO</span>
           </div>
           <div class="mobile-event-card__body">
             <strong>${escapeHtml(eventItem.vehicleName || 'Unidad')}</strong>
-            <span>${escapeHtml(eventItem.eventType || 'Evento')}</span>
+            <span>${escapeHtml(tone.label)}</span>
             <small>${escapeHtml(formatDateTime(eventItem.eventTime))}</small>
           </div>
           <div class="mobile-event-card__meta">
@@ -134,6 +147,48 @@
         window.location.href = `./map.html?eventId=${encodeURIComponent(selected.eventId)}&from=events`;
       });
     });
+  }
+
+  function hasAddressText(eventItem) {
+    const candidates = [
+      eventItem?.address,
+      eventItem?.Address,
+      eventItem?.direccion,
+      eventItem?.Direccion,
+      eventItem?.locationAddress,
+      eventItem?.LocationAddress,
+      eventItem?.formattedAddress,
+      eventItem?.FormattedAddress
+    ];
+
+    return candidates.some((value) => String(value || '').trim().length > 0);
+  }
+
+  function scheduleGeocodeRefreshIfNeeded(events) {
+    if (geocodeRefreshTimer) {
+      window.clearTimeout(geocodeRefreshTimer);
+      geocodeRefreshTimer = null;
+    }
+
+    if (geocodeRefreshAttempts >= MAX_GEOCODE_REFRESH_ATTEMPTS) {
+      return;
+    }
+
+    const unresolved = events.some((eventItem) => {
+      const lat = Number(eventItem?.latitude ?? eventItem?.lat ?? eventItem?.Latitude ?? eventItem?.Lat);
+      const lon = Number(eventItem?.longitude ?? eventItem?.lon ?? eventItem?.Longitude ?? eventItem?.Lon);
+      return Number.isFinite(lat) && Number.isFinite(lon) && !hasAddressText(eventItem);
+    });
+
+    if (!unresolved) {
+      geocodeRefreshAttempts = 0;
+      return;
+    }
+
+    geocodeRefreshAttempts += 1;
+    geocodeRefreshTimer = window.setTimeout(() => {
+      loadEvents();
+    }, 6000);
   }
 
   function applyFilter() {
@@ -177,6 +232,7 @@
       renderSummary(currentEvents);
       renderTypeOptions(currentEvents);
       applyFilter();
+      scheduleGeocodeRefreshIfNeeded(currentEvents);
     } catch (_error) {
       currentEvents = [];
       renderSummary([]);

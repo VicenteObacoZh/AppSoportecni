@@ -268,6 +268,15 @@
     };
   }
 
+  async function reverseGeocode(lat, lon) {
+    const query = new URLSearchParams({
+      lat: String(lat),
+      lon: String(lon)
+    });
+    const payload = await request(`/live/geocode/reverse?${query.toString()}`);
+    return payload?.data?.address || null;
+  }
+
   window.GpsRastreoApi = {
     async checkPlatform() {
       const payload = await request(config.endpoints.health || '/health', { method: 'GET' });
@@ -480,6 +489,18 @@
         }
 
         throw error;
+      }
+    },
+
+    async reverseGeocode(lat, lon) {
+      if (!Number.isFinite(Number(lat)) || !Number.isFinite(Number(lon))) {
+        return null;
+      }
+
+      try {
+        return await reverseGeocode(lat, lon);
+      } catch {
+        return null;
       }
     },
 

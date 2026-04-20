@@ -2,8 +2,135 @@ const express = require('express');
 const mockData = require('../data/mockDashboard');
 const { getSession } = require('../services/sessionStore');
 const { fetchPlatform } = require('../services/platformClient');
+const config = require('../config');
+const geocodeCacheService = require('../services/geocodeCacheService');
 
 const router = express.Router();
+
+function pickAddress(item) {
+  const candidates = [
+    item?.address,
+    item?.Address,
+    item?.direccion,
+    item?.Direccion,
+    item?.location,
+    item?.Location,
+    item?.locationAddress,
+    item?.LocationAddress,
+    item?.formattedAddress,
+    item?.FormattedAddress,
+    item?.streetAddress,
+    item?.StreetAddress,
+    item?.lastAddress,
+    item?.LastAddress,
+    item?.fullAddress,
+    item?.FullAddress,
+    item?.descripcionDireccion,
+    item?.DescripcionDireccion,
+    item?.direccionTexto,
+    item?.DireccionTexto,
+    item?.position?.address,
+    item?.Position?.address
+  ];
+
+  const found = candidates.find((value) => String(value || '').trim().length > 0);
+  return found ? String(found).trim() : null;
+}
+
+function isCoordinateAddressText(value) {
+  const text = String(value || '').trim();
+  if (!text) {
+    return false;
+  }
+
+  // Matches "lat, lon" style values commonly returned as fallback.
+  return /^-?\d{1,3}(?:\.\d+)?\s*,\s*-?\d{1,3}(?:\.\d+)?$/.test(text);
+}
+
+function normalizeCoordinatePair(item) {
+  const lat = Number(item?.lat ?? item?.latitude ?? item?.Lat ?? item?.Latitude);
+  const lon = Number(item?.lon ?? item?.longitude ?? item?.Lon ?? item?.Longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+    return null;
+  }
+
+  return { lat, lon };
+}
+
+async function fillMissingAddresses(items = []) {
+  if (!config.geocodeEnabled || !Array.isArray(items) || items.length === 0) {
+    return;
+  }
+
+  const eligible = [];
+  const seen = new Set();
+
+  items.forEach((item) => {
+    const pair = normalizeCoordinatePair(item);
+    if (!pair) {
+      return;
+    }
+
+    const rawAddress = String(item?.address || '').trim();
+    const hasUsableAddress = rawAddress && !isCoordinateAddressText(rawAddress);
+    if (hasUsableAddress) {
+      return;
+    }
+
+    const key = geocodeCacheService.buildCoordinateKey(pair.lat, pair.lon);
+    if (!key || seen.has(key)) {
+      return;
+    }
+
+    seen.add(key);
+    eligible.push({ key, lat: pair.lat, lon: pair.lon });
+  });
+
+  const limited = eligible.slice(0, config.geocodeMaxPerRequest);
+  if (!limited.length) {
+    return;
+  }
+
+  const unresolved = [];
+  const resolvedByKey = new Map();
+
+  for (const target of limited) {
+    const cachedAddress = await geocodeCacheService.getCachedAddressAsync(target.lat, target.lon);
+    if (cachedAddress) {
+      resolvedByKey.set(target.key, cachedAddress);
+    } else {
+      unresolved.push(target);
+    }
+  }
+
+  if (!resolvedByKey.size) {
+    return;
+  }
+
+  items.forEach((item) => {
+    const pair = normalizeCoordinatePair(item);
+    if (!pair) {
+      return;
+    }
+
+    const rawAddress = String(item?.address || '').trim();
+    const hasUsableAddress = rawAddress && !isCoordinateAddressText(rawAddress);
+    if (hasUsableAddress) {
+      return;
+    }
+
+    const key = geocodeCacheService.buildCoordinateKey(pair.lat, pair.lon);
+    const resolved = key ? resolvedByKey.get(key) : null;
+    if (resolved) {
+      item.address = resolved;
+    }
+  });
+
+  // Queue missing points for async geocoding without delaying response.
+  unresolved.forEach((target) => {
+    geocodeCacheService.warmAddressAsync(target.lat, target.lon);
+  });
+}
 
 function respondMissingSessionId(res) {
   return res.status(400).json({
@@ -31,8 +158,9 @@ function buildMonitorSummary(payload) {
     lat: Number(item?.lat ?? item?.latitude ?? item?.Lat ?? item?.Latitude),
     lon: Number(item?.lon ?? item?.longitude ?? item?.Lon ?? item?.Longitude),
     speedKmh: Number(item?.speedKmh ?? item?.speed ?? item?.SpeedKmh ?? item?.Speed ?? 0),
+    course: Number(item?.course ?? item?.Course ?? item?.heading ?? item?.Heading ?? item?.direction ?? item?.Direction ?? 0),
     fixTime: item?.fixTime ?? item?.FixTime ?? item?.deviceTime ?? item?.DeviceTime ?? null,
-    address: item?.address ?? item?.Address ?? item?.direccion ?? item?.Direccion ?? null
+    address: pickAddress(item)
   }));
   const moving = devices.filter((item) => Number(item.speedKmh || 0) > 3);
   const withLocation = devices.filter((item) => Number.isFinite(Number(item.lat)) && Number.isFinite(Number(item.lon)));
@@ -90,7 +218,7 @@ function buildRouteSummary(payload) {
         lon,
         speedKmh,
         fixTime: item?.fixTime ?? item?.FixTime ?? item?.deviceTime ?? item?.DeviceTime ?? null,
-        address: item?.address ?? item?.Address ?? item?.direccion ?? item?.Direccion ?? null,
+        address: pickAddress(item),
         course: Number(item?.course ?? item?.Course ?? 0)
       };
     })
@@ -206,7 +334,7 @@ function normalizeRecentEvents(payload, limit = 30) {
         longitude,
         speed: Number.isFinite(speed) ? speed : 0,
         eventTime,
-        address: item?.address ?? item?.Address ?? item?.direccion ?? item?.Direccion ?? null,
+        address: pickAddress(item),
         iconBase: item?.iconBase ?? item?.IconBase ?? 'flecha'
       };
     })
@@ -293,10 +421,13 @@ router.get('/monitor/data', async (req, res) => {
       });
     }
 
+    const data = buildMonitorSummary(payload);
+    await fillMissingAddresses(data.devices);
+
     return res.json({
       ok: true,
       mode: session.mode,
-      data: buildMonitorSummary(payload)
+      data
     });
   } catch (error) {
     return res.status(502).json({
@@ -490,10 +621,13 @@ router.get('/monitor/events/recent', async (req, res) => {
       });
     }
 
+    const data = normalizeRecentEvents(payload, limit);
+    await fillMissingAddresses(data.items);
+
     return res.json({
       ok: true,
       mode: session.mode,
-      data: normalizeRecentEvents(payload, limit)
+      data
     });
   } catch (error) {
     return res.status(502).json({
@@ -528,6 +662,45 @@ router.get('/monitor/geofences', async (req, res) => {
     code: 'GEOFENCES_NOT_IMPLEMENTED',
     message: 'La carga real de geocercas aun no esta conectada al portal.'
   });
+});
+
+router.get('/geocode/reverse', async (req, res) => {
+  const lat = Number(req.query.lat);
+  const lon = Number(req.query.lon);
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+    return res.status(400).json({
+      ok: false,
+      code: 'INVALID_COORDINATES',
+      message: 'lat y lon son obligatorios y deben ser numericos.'
+    });
+  }
+
+  if (!config.geocodeEnabled) {
+    return res.status(503).json({
+      ok: false,
+      code: 'GEOCODE_DISABLED',
+      message: 'La geocodificacion esta deshabilitada en backend.'
+    });
+  }
+
+  try {
+    const address = await geocodeCacheService.getAddressAsync(lat, lon);
+    return res.json({
+      ok: true,
+      data: {
+        lat,
+        lon,
+        address: address || null
+      }
+    });
+  } catch (error) {
+    return res.status(502).json({
+      ok: false,
+      code: 'GEOCODE_ERROR',
+      message: error?.message || 'No fue posible resolver direccion.'
+    });
+  }
 });
 
 module.exports = router;

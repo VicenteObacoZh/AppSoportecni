@@ -1,0 +1,203 @@
+{
+  "version": 1,
+  "items": [
+    {
+      "key": "-4.11060,-78.94316",
+      "address": "Jambue Alto, Timbara, Zamora, Zamora Chinchipe, 190101, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-20T15:56:01.779Z",
+      "updatedAt": "2026-04-20T15:56:01.779Z",
+      "lastHitAt": "2026-04-20T16:29:50.961Z",
+      "hitCount": 8
+    },
+    {
+      "key": "-3.85072,-78.76202",
+      "address": "Avenida Iván Riofrío, Piedra Lisa, Yantzaza, Zamora Chinchipe, 190550, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-20T15:59:24.510Z",
+      "updatedAt": "2026-04-20T15:59:24.510Z",
+      "lastHitAt": "2026-04-20T16:33:49.504Z",
+      "hitCount": 161
+    },
+    {
+      "key": "-4.06969,-78.95637",
+      "address": "García Moreno, El Toscón, San Francisco, Santa Elena, Zamora, Zamora Chinchipe, 190101, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-20T15:59:24.617Z",
+      "updatedAt": "2026-04-20T15:59:24.617Z",
+      "lastHitAt": "2026-04-20T16:33:49.504Z",
+      "hitCount": 161
+    },
+    {
+      "key": "-4.06840,-78.95329",
+      "address": "Estacionamiento Centro Comercial Reina del Cisne, Avenida Héroes de Paquisha, El Toscón, Alonso Mercadillo, Santa Elena, Zamora, Zamora Chinchipe, 190101, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-20T15:59:24.781Z",
+      "updatedAt": "2026-04-20T15:59:24.781Z",
+      "lastHitAt": "2026-04-20T15:59:24.781Z",
+      "hitCount": 1
+    },
+    {
+      "key": "-3.91930,-78.84829",
+      "address": "E45, La Saquea, Cumbaratza, Zamora, Zamora Chinchipe, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-20T15:59:24.805Z",
+      "updatedAt": "2026-04-20T15:59:24.805Z",
+      "lastHitAt": "2026-04-20T16:33:49.503Z",
+      "hitCount": 161
+    },
+    {
+      "key": "-3.82692,-78.76648",
+      "address": "22 de Noviembre, Yantzaza, Zamora Chinchipe, 190550, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-20T15:59:24.899Z",
+      "updatedAt": "2026-04-20T15:59:24.899Z",
+      "lastHitAt": "2026-04-20T16:01:45.813Z",
+      "hitCount": 9
+    },
+    {
+      "key": "-3.96174,-78.85316",
+      "address": "E45, Cusuntza, Mejeche, Reina del Cisne, Nambija Bajo, Cumbaratza, Zamora, Zamora Chinchipe, 107302, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-20T15:59:24.908Z",
+      "updatedAt": "2026-04-20T15:59:24.908Z",
+      "lastHitAt": "2026-04-20T15:59:26.288Z",
+      "hitCount": 2
+    },
+    {
+      "key": "-4.11206,-78.94163",
+      "address": "Jambue Alto, Timbara, Zamora, Zamora Chinchipe, 190101, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-20T15:59:25.062Z",
+      "updatedAt": "2026-04-20T15:59:25.062Z",
+      "lastHitAt": "2026-04-20T16:33:49.505Z",
+      "hitCount": 161
+    },
+    {
+      "key": "-4.31782,-79.55159",
+      "address": "E69, Baño del Inca, Ahuaca del Carmen, Parroquia Cariamanga, Calvas, Loja, 110606, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-20T15:59:25.101Z",
+      "updatedAt": "2026-04-20T15:59:25.101Z",
+      "lastHitAt": "2026-04-20T16:33:49.506Z",
+      "hitCount": 161
+    },
+    {
+      "key": "-4.31787,-79.55147",
+      "address": "E69, Baño del Inca, Ahuaca del Carmen, Parroquia Cariamanga, Calvas, Loja, 110606, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-20T15:59:25.403Z",
+      "updatedAt": "2026-04-20T15:59:25.403Z",
+      "lastHitAt": "2026-04-20T16:33:49.507Z",
+      "hitCount": 161
+    },
+    {
+      "key": "-3.93606,-79.64614",
+      "address": "Olmedo, Loja, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-20T15:59:25.464Z",
+      "updatedAt": "2026-04-20T15:59:25.464Z",
+      "lastHitAt": "2026-04-20T16:33:49.508Z",
+      "hitCount": 161
+    },
+    {
+      "key": "-4.31746,-79.55143",
+      "address": "E69, Baño del Inca, Ahuaca del Carmen, Parroquia Cariamanga, Calvas, Loja, 110606, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-20T15:59:25.501Z",
+      "updatedAt": "2026-04-20T15:59:25.501Z",
+      "lastHitAt": "2026-04-20T16:33:49.508Z",
+      "hitCount": 161
+    },
+    {
+      "key": "-4.31773,-79.55165",
+      "address": "E69, Baño del Inca, Ahuaca del Carmen, Parroquia Cariamanga, Calvas, Loja, 110606, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-20T15:59:25.676Z",
+      "updatedAt": "2026-04-20T15:59:25.676Z",
+      "lastHitAt": "2026-04-20T16:33:49.510Z",
+      "hitCount": 161
+    },
+    {
+      "key": "-3.93577,-79.64616",
+      "address": "Olmedo, Loja, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-20T15:59:25.721Z",
+      "updatedAt": "2026-04-20T15:59:25.721Z",
+      "lastHitAt": "2026-04-20T16:33:49.511Z",
+      "hitCount": 161
+    },
+    {
+      "key": "-4.31772,-79.55153",
+      "address": "E69, Baño del Inca, Ahuaca del Carmen, Parroquia Cariamanga, Calvas, Loja, 110606, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-20T15:59:25.722Z",
+      "updatedAt": "2026-04-20T15:59:25.722Z",
+      "lastHitAt": "2026-04-20T16:33:49.512Z",
+      "hitCount": 161
+    },
+    {
+      "key": "-4.26004,-79.55867",
+      "address": "Guara, Yunga, Parroquia Cariamanga, Calvas, Loja, 110603, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-20T15:59:25.792Z",
+      "updatedAt": "2026-04-20T15:59:25.792Z",
+      "lastHitAt": "2026-04-20T16:33:49.512Z",
+      "hitCount": 161
+    },
+    {
+      "key": "-4.04946,-78.92435",
+      "address": "UPC Tunantza, Unidad Amazónica, Pío Jaramillo, La Chacra, Tunantza Bajo, Zamora, Zamora Chinchipe, 190452, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-20T15:59:25.836Z",
+      "updatedAt": "2026-04-20T15:59:25.836Z",
+      "lastHitAt": "2026-04-20T16:33:49.509Z",
+      "hitCount": 161
+    },
+    {
+      "key": "-4.31757,-79.55163",
+      "address": "E69, Baño del Inca, Ahuaca del Carmen, Parroquia Cariamanga, Calvas, Loja, 110606, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-20T15:59:26.083Z",
+      "updatedAt": "2026-04-20T15:59:26.083Z",
+      "lastHitAt": "2026-04-20T16:33:49.516Z",
+      "hitCount": 161
+    },
+    {
+      "key": "-4.26039,-79.55898",
+      "address": "Guara, Yunga, Parroquia Cariamanga, Calvas, Loja, 110603, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-20T15:59:26.191Z",
+      "updatedAt": "2026-04-20T15:59:26.191Z",
+      "lastHitAt": "2026-04-20T16:33:49.513Z",
+      "hitCount": 161
+    },
+    {
+      "key": "-3.93575,-79.64588",
+      "address": "Olmedo, Loja, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-20T15:59:26.280Z",
+      "updatedAt": "2026-04-20T15:59:26.280Z",
+      "lastHitAt": "2026-04-20T16:33:49.515Z",
+      "hitCount": 161
+    },
+    {
+      "key": "-4.26090,-79.55937",
+      "address": "Guara, Yunga, Parroquia Cariamanga, Calvas, Loja, 110603, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-20T15:59:26.300Z",
+      "updatedAt": "2026-04-20T15:59:26.300Z",
+      "lastHitAt": "2026-04-20T16:33:49.514Z",
+      "hitCount": 161
+    },
+    {
+      "key": "-4.31772,-79.55147",
+      "address": "E69, Baño del Inca, Ahuaca del Carmen, Parroquia Cariamanga, Calvas, Loja, 110606, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-20T15:59:26.414Z",
+      "updatedAt": "2026-04-20T15:59:26.414Z",
+      "lastHitAt": "2026-04-20T16:33:49.516Z",
+      "hitCount": 160
+    }
+  ]
+}

@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="./styles.css?v=6" />
 </head>
 <body class="dashboard-body dashboard-body--map">
   <div class="mobile-map-app">
@@ -95,6 +95,7 @@
       </aside>
 
       <section class="mobile-map-event-panel" id="mapEventPanel" hidden>
+        <button class="mobile-map-panel-grabber" type="button" id="mapEventPanelGrabber" aria-label="Ajustar panel"></button>
         <div class="mobile-map-event-panel__top">
           <div>
             <p class="eyebrow">Evento</p>
@@ -116,6 +117,7 @@
       </section>
 
       <section class="mobile-map-device-panel" id="mapDevicePanel" hidden>
+        <button class="mobile-map-panel-grabber" type="button" id="mapDevicePanelGrabber" aria-label="Ajustar panel"></button>
         <div class="mobile-map-device-panel__top">
           <div>
             <p class="eyebrow">Unidad</p>
@@ -125,7 +127,7 @@
         </div>
         <div class="mobile-map-device-panel__meta">
           <article>
-            <span>Empresa</span>
+            <span>Direccion</span>
             <strong id="mapDeviceCompany">-</strong>
           </article>
           <article>
@@ -137,7 +139,7 @@
             <strong id="mapDeviceTime">--</strong>
           </article>
           <article>
-            <span>IMEI</span>
+            <span>Coordenadas</span>
             <strong id="mapDeviceUniqueId">-</strong>
           </article>
         </div>
@@ -174,7 +176,7 @@
   <script src="./api.js?v=3"></script>
   <script src="./app-shell.js?v=1"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="./map.js?v=5"></script>
+  <script src="./map.js?v=6"></script>
 </body>
 </html>
 

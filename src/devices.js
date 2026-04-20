@@ -10,6 +10,9 @@
   let groupedCompanies = [];
   let currentFilter = 'all';
   let expandedCompany = '';
+  let geocodeRefreshTimer = null;
+  let geocodeRefreshAttempts = 0;
+  const MAX_GEOCODE_REFRESH_ATTEMPTS = 6;
 
   function escapeHtml(value) {
     return String(value ?? '')
@@ -24,7 +27,141 @@
     return `${Math.round(Number(speed || 0))} kph`;
   }
 
+  function normalizeStatusText(value) {
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+  }
+
+  function resolveColorFromText(value) {
+    const text = normalizeStatusText(value);
+    if (!text) {
+      return '';
+    }
+
+    if (text.includes('red') || text.includes('rojo')) {
+      return 'red';
+    }
+    if (text.includes('green') || text.includes('verde')) {
+      return 'green';
+    }
+    if (text.includes('yellow') || text.includes('amarillo')) {
+      return 'yellow';
+    }
+    if (text.includes('gray') || text.includes('grey') || text.includes('gris')) {
+      return 'gray';
+    }
+
+    return '';
+  }
+
+  function resolveExplicitColor(device) {
+    const booleanSignals = [
+      device?.engineOn,
+      device?.EngineOn,
+      device?.isEngineOn,
+      device?.IsEngineOn,
+      device?.ignitionOn,
+      device?.IgnitionOn,
+      device?.isIgnitionOn,
+      device?.IsIgnitionOn
+    ];
+
+    for (const signal of booleanSignals) {
+      if (typeof signal === 'boolean') {
+        return signal ? 'green' : 'red';
+      }
+
+      const text = normalizeStatusText(signal);
+      if (text === 'true' || text === '1' || text === 'on' || text === 'encendido') {
+        return 'green';
+      }
+      if (text === 'false' || text === '0' || text === 'off' || text === 'apagado') {
+        return 'red';
+      }
+    }
+
+    const explicitColorFields = [
+      device?.statusColor,
+      device?.StatusColor,
+      device?.color,
+      device?.Color,
+      device?.markerColor,
+      device?.MarkerColor,
+      device?.iconColor,
+      device?.IconColor
+    ];
+
+    for (const value of explicitColorFields) {
+      const color = resolveColorFromText(value);
+      if (color) {
+        return color;
+      }
+    }
+
+    const hints = [
+      device?.status,
+      device?.Status,
+      device?.state,
+      device?.State,
+      device?.movementStatus,
+      device?.MovementStatus,
+      device?.eventType,
+      device?.EventType,
+      device?.engineStatus,
+      device?.EngineStatus,
+      device?.ignition,
+      device?.Ignition,
+      device?.ignitionStatus,
+      device?.IgnitionStatus,
+      device?.icon,
+      device?.Icon,
+      device?.iconName,
+      device?.IconName
+    ].map((value) => normalizeStatusText(value)).join(' | ');
+
+    const byHintColor = resolveColorFromText(hints);
+    if (byHintColor) {
+      return byHintColor;
+    }
+
+    if (hints.includes('sin se') || hints.includes('offline')) {
+      return 'gray';
+    }
+    if (
+      hints.includes('detenido') ||
+      hints.includes('stopped') ||
+      hints.includes('ignitionoff') ||
+      hints.includes('apagado') ||
+      hints.includes('motor off') ||
+      hints.includes('motor apagado')
+    ) {
+      return 'red';
+    }
+    if (
+      hints.includes('movimiento') ||
+      hints.includes('moving') ||
+      hints.includes('ignitionon') ||
+      hints.includes('encendido') ||
+      hints.includes('motor on') ||
+      hints.includes('motor encendido')
+    ) {
+      return 'green';
+    }
+
+    return '';
+  }
+
   function getMarkerColor(device) {
+    const explicitColor = resolveExplicitColor(device);
+    if (explicitColor) {
+      if (explicitColor === 'green') return 'verde';
+      if (explicitColor === 'yellow') return 'amarillo';
+      if (explicitColor === 'gray') return 'gris';
+      return 'rojo';
+    }
+
     const tone = getStatusTone(device).color;
     if (tone === 'green') return 'verde';
     if (tone === 'yellow') return 'amarillo';
@@ -33,6 +170,67 @@
   }
 
   function getStatusTone(device) {
+    const explicitColor = resolveExplicitColor(device);
+    if (explicitColor === 'gray') {
+      return { key: 'offline', label: 'Sin senal', color: 'gray' };
+    }
+    if (explicitColor === 'red') {
+      return { key: 'stopped', label: 'Detenido', color: 'red' };
+    }
+    if (explicitColor === 'green') {
+      return { key: 'moving', label: 'Movimiento', color: 'green' };
+    }
+    if (explicitColor === 'yellow') {
+      return { key: 'idle', label: 'Reposo', color: 'yellow' };
+    }
+
+    const statusHint = [
+      device?.status,
+      device?.Status,
+      device?.state,
+      device?.State,
+      device?.movementStatus,
+      device?.MovementStatus,
+      device?.eventType,
+      device?.EventType,
+      device?.engineStatus,
+      device?.EngineStatus,
+      device?.ignition,
+      device?.Ignition,
+      device?.ignitionStatus,
+      device?.IgnitionStatus,
+      device?.icon,
+      device?.Icon,
+      device?.iconName,
+      device?.IconName
+    ].map((value) => String(value || '').toLowerCase()).join(' | ');
+
+    if (statusHint.includes('sin se') || statusHint.includes('offline')) {
+      return { key: 'offline', label: 'Sin senal', color: 'gray' };
+    }
+    if (
+      statusHint.includes('detenido') ||
+      statusHint.includes('stopped') ||
+      statusHint.includes('ignitionoff') ||
+      statusHint.includes('apagado') ||
+      statusHint.includes('rojo') ||
+      statusHint.includes('_red') ||
+      statusHint.includes('_rojo')
+    ) {
+      return { key: 'stopped', label: 'Detenido', color: 'red' };
+    }
+    if (
+      statusHint.includes('movimiento') ||
+      statusHint.includes('moving') ||
+      statusHint.includes('ignitionon') ||
+      statusHint.includes('encendido') ||
+      statusHint.includes('verde') ||
+      statusHint.includes('_green') ||
+      statusHint.includes('_verde')
+    ) {
+      return { key: 'moving', label: 'Movimiento', color: 'green' };
+    }
+
     const speed = Number(device?.speedKmh || 0);
     const hasLocation = Number.isFinite(Number(device?.lat)) && Number.isFinite(Number(device?.lon));
     const fixTime = device?.fixTime ? new Date(device.fixTime) : null;
@@ -58,6 +256,73 @@
 
   function getMarkerUrl(device, suffix) {
     return `../assets/markers/${getMarkerBase(device)}_${suffix}.png`;
+  }
+
+  function getAddressLabel(device) {
+    const candidates = [
+      device?.address,
+      device?.Address,
+      device?.direccion,
+      device?.Direccion,
+      device?.locationAddress,
+      device?.LocationAddress,
+      device?.formattedAddress,
+      device?.FormattedAddress
+    ];
+    const found = candidates.find((value) => String(value || '').trim().length > 0);
+    if (found) {
+      return String(found).trim();
+    }
+
+    const lat = Number(device?.lat ?? device?.latitude ?? device?.Lat ?? device?.Latitude);
+    const lon = Number(device?.lon ?? device?.longitude ?? device?.Lon ?? device?.Longitude);
+    if (Number.isFinite(lat) && Number.isFinite(lon)) {
+      return `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+    }
+
+    return 'Obteniendo direccion...';
+  }
+
+  function hasAddressText(device) {
+    const candidates = [
+      device?.address,
+      device?.Address,
+      device?.direccion,
+      device?.Direccion,
+      device?.locationAddress,
+      device?.LocationAddress,
+      device?.formattedAddress,
+      device?.FormattedAddress
+    ];
+
+    return candidates.some((value) => String(value || '').trim().length > 0);
+  }
+
+  function scheduleGeocodeRefreshIfNeeded(devices) {
+    if (geocodeRefreshTimer) {
+      window.clearTimeout(geocodeRefreshTimer);
+      geocodeRefreshTimer = null;
+    }
+
+    if (geocodeRefreshAttempts >= MAX_GEOCODE_REFRESH_ATTEMPTS) {
+      return;
+    }
+
+    const unresolved = devices.some((device) => {
+      const lat = Number(device?.lat ?? device?.latitude ?? device?.Lat ?? device?.Latitude);
+      const lon = Number(device?.lon ?? device?.longitude ?? device?.Lon ?? device?.Longitude);
+      return Number.isFinite(lat) && Number.isFinite(lon) && !hasAddressText(device);
+    });
+
+    if (!unresolved) {
+      geocodeRefreshAttempts = 0;
+      return;
+    }
+
+    geocodeRefreshAttempts += 1;
+    geocodeRefreshTimer = window.setTimeout(() => {
+      loadDevices();
+    }, 5500);
   }
 
   function getDeviceSearchText(device) {
@@ -142,10 +407,10 @@
     const status = getStatusTone(device);
     const markerColor = getMarkerColor(device);
     const arrowUrl = `../assets/markers/flecha_${markerColor}.png`;
+    const iconUrl = getMarkerUrl(device, markerColor);
     const title = escapeHtml(device.vehicleName || device.name || 'Unidad');
     const ts = escapeHtml(device.fixTime ? new Date(device.fixTime).toLocaleString() : 'Sin fecha visible');
-    const lat = Number(device.lat);
-    const lon = Number(device.lon);
+    const address = escapeHtml(getAddressLabel(device));
 
     return `
       <article class="fleet-device-card fleet-device-card--${status.color}">
@@ -153,13 +418,12 @@
           <img src="${arrowUrl}" alt="estado" onerror="this.style.display='none'" />
         </div>
         <div class="fleet-device-card__content">
-          <div class="fleet-device-card__title">${title}</div>
-          <div class="fleet-device-card__meta">${status.label} | ${ts}</div>
-          <div class="fleet-device-card__meta">Empresa: ${escapeHtml(device.groupName || 'Sin empresa')}</div>
-          <div class="fleet-device-card__meta">Posicion: ${Number.isFinite(lat) && Number.isFinite(lon) ? `${lat.toFixed(5)}, ${lon.toFixed(5)}` : 'Sin coordenadas'}</div>
-          <div class="fleet-device-card__sensors">
-            <span>IMEI ${escapeHtml(device.uniqueId || '-')}</span>
+          <div class="fleet-device-card__title-row">
+            <img class="fleet-device-card__vehicle-icon" src="${iconUrl}" alt="unidad" onerror="this.style.display='none'" />
+            <div class="fleet-device-card__title">${title}</div>
           </div>
+          <div class="fleet-device-card__meta">${status.label} | ${ts}</div>
+          <div class="fleet-device-card__meta">Direccion: ${address}</div>
           <div class="fleet-device-card__actions">
             <button type="button" class="fleet-device-card__action" data-device-action="map" data-device-id="${escapeHtml(device.deviceId)}">Ver mapa</button>
             <button type="button" class="fleet-device-card__action" data-device-action="route" data-device-id="${escapeHtml(device.deviceId)}">Historico</button>
@@ -257,6 +521,7 @@
         expandedCompany = groupedCompanies[0].name;
       }
       renderCompanies();
+      scheduleGeocodeRefreshIfNeeded(currentDevices);
     } catch (_error) {
       companyList.innerHTML = '<div class="mobile-map-empty">No fue posible cargar los dispositivos.</div>';
       renderSummary([]);

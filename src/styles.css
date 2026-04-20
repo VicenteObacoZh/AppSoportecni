@@ -2038,16 +2038,16 @@ img {
   border: 0;
   border-radius: 999px;
   color: #fff;
-  box-shadow: 0 10px 20px rgba(15, 18, 24, 0.18);
+  box-shadow: 0 8px 14px rgba(15, 18, 24, 0.16);
 }
 
 .gps-cluster-marker__bubble strong {
-  font-size: 1.05rem;
+  font-size: 0.96rem;
   font-weight: 800;
 }
 
 .gps-cluster-marker__bubble--large strong {
-  font-size: 1.18rem;
+  font-size: 1rem;
 }
 
 .gps-cluster-marker__bubble--green {
@@ -2771,6 +2771,19 @@ img {
   min-width: 0;
 }
 
+.fleet-device-card__title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.fleet-device-card__vehicle-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  flex: 0 0 24px;
+}
+
 .fleet-device-card__title {
   color: #171717;
   font-size: 0.92rem;
@@ -2788,6 +2801,7 @@ img {
 
 .fleet-device-card__meta {
   margin-top: 6px;
+  line-height: 1.35;
 }
 
 .fleet-device-card__link {
@@ -3901,4 +3915,232 @@ img {
   min-width: 186px;
   justify-content: flex-start;
   padding: 0 16px;
+}
+
+/* Visual pass: closer to RastreoGps cards */
+.fleet-company-header {
+  border-radius: 10px;
+  padding: 14px 14px;
+  background: #d2ced0;
+}
+
+.fleet-company-header__name {
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.fleet-company-header__count {
+  width: 40px;
+  height: 40px;
+  font-size: 0.95rem;
+}
+
+.fleet-company-header__chevron {
+  font-size: 1.15rem;
+  color: #4b474a;
+}
+
+.fleet-device-card {
+  grid-template-columns: 12px minmax(0, 1fr) 64px;
+  gap: 10px;
+  padding: 12px 12px 14px 0;
+  border-radius: 16px;
+  box-shadow: 0 6px 16px rgba(14, 16, 22, 0.08);
+}
+
+.fleet-device-card__arrow-strip {
+  padding-top: 12px;
+  border-top-left-radius: 16px;
+  border-bottom-left-radius: 16px;
+}
+
+.fleet-device-card__arrow-strip img {
+  width: 16px;
+  height: 16px;
+}
+
+.fleet-device-card__title-row {
+  gap: 8px;
+}
+
+.fleet-device-card__vehicle-icon {
+  width: 22px;
+  height: 22px;
+  flex-basis: 22px;
+}
+
+.fleet-device-card__title {
+  font-size: 0.88rem;
+  letter-spacing: 0.01em;
+}
+
+.fleet-device-card__meta {
+  margin-top: 4px;
+  font-size: 0.76rem;
+  color: #4b535f;
+}
+
+.fleet-device-card__speed {
+  width: 62px;
+  min-width: 62px;
+  height: 62px;
+  margin-top: 2px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.08);
+}
+
+.fleet-device-card__actions {
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.fleet-device-card__action {
+  padding: 7px 11px;
+  font-size: 0.7rem;
+}
+
+.mobile-event-card {
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  gap: 10px;
+  border-radius: 16px;
+  padding: 10px 12px;
+  box-shadow: 0 6px 16px rgba(14, 16, 22, 0.08);
+}
+
+.mobile-event-card__icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+}
+
+.mobile-event-card__icon span {
+  font-size: 0.58rem;
+}
+
+.mobile-event-card__body strong {
+  font-size: 0.9rem;
+}
+
+.mobile-event-card__body span {
+  font-size: 0.82rem;
+  color: #3d4450;
+}
+
+.mobile-event-card__meta span {
+  font-size: 0.8rem;
+}
+
+/* Map bottom sheet draggable */
+.mobile-map-panel-grabber {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 2px 0 10px;
+  cursor: ns-resize;
+}
+
+.mobile-map-panel-grabber::before {
+  content: '';
+  display: block;
+  width: 48px;
+  height: 6px;
+  margin: 0 auto;
+  border-radius: 999px;
+  background: #b2b8c1;
+}
+
+.mobile-map-device-panel,
+.mobile-map-event-panel {
+  left: 10px;
+  right: 10px;
+  bottom: 66px;
+  border-radius: 20px 20px 0 0;
+  padding: 10px 14px 14px;
+  overflow: hidden;
+  transition: max-height 180ms ease;
+  max-height: 290px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Final map sheet behavior (single bottom-sheet style) */
+.mobile-map-device-panel,
+.mobile-map-event-panel {
+  z-index: 565;
+  border: 1px solid rgba(211, 216, 224, 0.9);
+  box-shadow: 0 10px 24px rgba(12, 15, 21, 0.12);
+}
+
+.mobile-map-panel--compact {
+  max-height: 292px !important;
+}
+
+.mobile-map-panel--compact .mobile-map-device-panel__meta article:nth-child(n + 3) {
+  display: none;
+}
+
+.mobile-map-panel--compact .mobile-map-device-panel__footer,
+.mobile-map-panel--compact .mobile-map-device-panel__address-text {
+  display: none;
+}
+
+.mobile-map-panel--compact .mobile-map-event-panel__address-text {
+  display: none;
+}
+
+.mobile-map-panel--expanded {
+  max-height: 78vh !important;
+}
+
+/* Map sheet tune: single compact sheet like reference */
+.mobile-map-device-panel,
+.mobile-map-event-panel {
+  left: 8px;
+  right: 8px;
+  bottom: 66px;
+  border-radius: 20px 20px 0 0;
+  padding: 8px 12px 12px;
+  background: rgba(252, 252, 252, 0.98);
+}
+
+.mobile-map-device-panel__top h3,
+.mobile-map-event-panel__top h3 {
+  font-size: 0.95rem;
+  line-height: 1.2;
+}
+
+.mobile-map-device-panel__action,
+.mobile-map-device-panel__address,
+.mobile-map-event-panel__address {
+  padding: 8px 12px;
+  font-size: 0.76rem;
+}
+
+.mobile-map-device-panel__meta article,
+.mobile-map-event-panel__meta article {
+  border-radius: 12px;
+  padding: 10px;
+  background: #eef1f5;
+}
+
+.mobile-map-device-panel__meta strong,
+.mobile-map-event-panel__meta strong {
+  font-size: 0.84rem;
+}
+
+.mobile-map-panel--compact {
+  max-height: 152px !important;
+}
+
+.mobile-map-panel--compact .mobile-map-device-panel__meta,
+.mobile-map-panel--compact .mobile-map-event-panel__meta,
+.mobile-map-panel--compact .mobile-map-device-panel__footer,
+.mobile-map-panel--compact .mobile-map-device-panel__address-text,
+.mobile-map-panel--compact .mobile-map-event-panel__address-text {
+  display: none;
+}
+
+.mobile-map-panel--expanded {
+  max-height: 76vh !important;
 }
