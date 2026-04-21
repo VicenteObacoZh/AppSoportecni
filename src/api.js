@@ -164,6 +164,124 @@
     clearRouteContext();
   }
 
+  function emitClientEvent(name, detail = {}) {
+    if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function') {
+      return;
+    }
+
+    try {
+      window.dispatchEvent(new CustomEvent(name, { detail }));
+    } catch {
+      // no-op
+    }
+  }
+
+  function normalizeClientError(rawError, fallbackCode = 'REQUEST_FAILED') {
+    const source = rawError || {};
+    const error = source instanceof Error
+      ? source
+      : new Error(String(source.message || source || 'Error de solicitud.'));
+
+    if (!error.code) {
+      error.code = source.code || source?.payload?.code || fallbackCode;
+    }
+    if (typeof error.status !== 'number' && typeof source.status === 'number') {
+      error.status = source.status;
+    }
+    if (!error.payload && source.payload) {
+      error.payload = source.payload;
+    }
+
+    return error;
+  }
+
+  function isSessionError(error) {
+    const code = String(error?.code || error?.payload?.code || '').toUpperCase();
+    if (code === 'SESSION_EXPIRED' || code === 'SESSION_NOT_FOUND' || code === 'SESSION_REQUIRED') {
+      return true;
+    }
+
+    return error?.status === 401 || error?.status === 404;
+  }
+
+  function isNetworkError(error) {
+    const code = String(error?.code || '').toUpperCase();
+    return code === 'BACKEND_UNAVAILABLE' || code === 'FETCH_FAILED';
+  }
+
+  function getUserMessageFromError(error) {
+    if (isSessionError(error)) {
+      return 'Tu sesion expiro o no es valida. Vuelve a iniciar sesion.';
+    }
+
+    if (isNetworkError(error)) {
+      return 'No se pudo conectar con el backend local. Verifica red y servicio.';
+    }
+
+    return String(error?.payload?.message || error?.message || 'No fue posible completar la solicitud.');
+  }
+
+  function handleClientError(rawError, options = {}) {
+    const {
+      context = 'request',
+      emit = true,
+      clearOnSession = true
+    } = options;
+
+    const error = normalizeClientError(rawError);
+    const userMessage = getUserMessageFromError(error);
+    error.userMessage = userMessage;
+
+    if (isSessionError(error) && clearOnSession) {
+      clearOperationalState();
+    }
+
+    if (emit) {
+      if (isSessionError(error)) {
+        emitClientEvent('gpsrastreo:session-expired', {
+          context,
+          code: error.code || 'SESSION_EXPIRED',
+          status: error.status || null,
+          message: userMessage
+        });
+      } else if (isNetworkError(error)) {
+        emitClientEvent('gpsrastreo:network-error', {
+          context,
+          code: error.code || 'BACKEND_UNAVAILABLE',
+          status: error.status || null,
+          message: userMessage
+        });
+      } else {
+        emitClientEvent('gpsrastreo:request-error', {
+          context,
+          code: error.code || 'REQUEST_FAILED',
+          status: error.status || null,
+          message: userMessage
+        });
+      }
+    }
+
+    return error;
+  }
+
+  function ensureSessionId() {
+    const sessionId = getStoredSessionId();
+    if (!sessionId) {
+      const error = normalizeClientError({
+        code: 'SESSION_REQUIRED',
+        status: 401,
+        message: 'Necesitas iniciar sesion para continuar.'
+      });
+      throw handleClientError(error, {
+        context: 'ensure-session',
+        emit: true,
+        clearOnSession: true
+      });
+    }
+
+    return sessionId;
+  }
+
   async function requestJson(path, options) {
     const backendBaseUrls = getBackendBaseUrls();
     let lastNetworkError = null;
@@ -196,6 +314,7 @@
         error.status = response.status;
         error.payload = payload;
         error.code = payload?.code || '';
+        error.context = 'http';
         throw error;
       }
 
@@ -207,6 +326,7 @@
       const networkError = new Error(`No se pudo conectar con ${lastNetworkError.requestUrl}. ${lastNetworkError.error?.message || 'Revisa backend y red local.'}`);
       networkError.code = 'BACKEND_UNAVAILABLE';
       networkError.cause = lastNetworkError.error;
+      networkError.context = 'network';
       throw networkError;
     }
 
@@ -217,12 +337,13 @@
     return requestJson(path, options);
   }
 
-  async function getLiveAlerts(sessionId) {
+  async function getLiveAlerts(sessionId, options = {}) {
+    const { allowSessionMiss = false } = options;
     try {
       const payload = await request(`${config.endpoints.liveAlertsList || '/live/alerts/list'}?sessionId=${encodeURIComponent(sessionId)}`);
       return payload?.data || null;
     } catch (error) {
-      if (error.status === 404 || error.status === 401) {
+      if (allowSessionMiss && (error.status === 404 || error.status === 401)) {
         return null;
       }
 
@@ -317,24 +438,18 @@
     },
 
     async getDashboard() {
-      const sessionId = getStoredSessionId();
-      if (!sessionId) {
-        throw new Error('SESSION_REQUIRED');
-      }
+      const sessionId = ensureSessionId();
 
       if (sessionId) {
         let payload;
         try {
           payload = await request(`${config.endpoints.liveMonitorData || '/live/monitor/data'}?sessionId=${encodeURIComponent(sessionId)}`);
         } catch (error) {
-          if (error.status === 404 || error.status === 401) {
-            clearOperationalState();
-            const nextError = new Error('SESSION_EXPIRED');
-            nextError.payload = error.payload;
-            nextError.code = error.code || error.payload?.code || 'SESSION_EXPIRED';
-            throw nextError;
-          }
-          throw error;
+          throw handleClientError(error, {
+            context: 'dashboard-monitor-data',
+            emit: true,
+            clearOnSession: true
+          });
         }
 
         if (payload?.ok && payload?.data) {
@@ -342,7 +457,7 @@
           const live = payload.data;
           let liveAlerts = null;
           try {
-            liveAlerts = await getLiveAlerts(sessionId);
+            liveAlerts = await getLiveAlerts(sessionId, { allowSessionMiss: true });
           } catch {
             liveAlerts = null;
           }
@@ -407,23 +522,17 @@
     },
 
     async getAlerts() {
-      const sessionId = getStoredSessionId();
-      if (!sessionId) {
-        throw new Error('SESSION_REQUIRED');
-      }
+      const sessionId = ensureSessionId();
 
       let liveAlerts;
       try {
         liveAlerts = await getLiveAlerts(sessionId);
       } catch (error) {
-        if (error.status === 404 || error.status === 401) {
-          clearOperationalState();
-          const nextError = new Error('SESSION_EXPIRED');
-          nextError.payload = error.payload;
-          nextError.code = error.code || error.payload?.code || 'SESSION_EXPIRED';
-          throw nextError;
-        }
-        throw error;
+        throw handleClientError(error, {
+          context: 'alerts-list',
+          emit: true,
+          clearOnSession: true
+        });
       }
 
       return liveAlerts || {
@@ -438,84 +547,60 @@
     },
 
     async getRoute(deviceId, from, to) {
-      const sessionId = getStoredSessionId();
-      if (!sessionId) {
-        throw new Error('SESSION_REQUIRED');
-      }
+      const sessionId = ensureSessionId();
 
       try {
         return await getLiveRoute(sessionId, deviceId, from, to);
       } catch (error) {
-        if (error.status === 404 || error.status === 401) {
-          clearOperationalState();
-          const nextError = new Error('SESSION_EXPIRED');
-          nextError.payload = error.payload;
-          nextError.code = error.code || error.payload?.code || 'SESSION_EXPIRED';
-          throw nextError;
-        }
-        throw error;
+        throw handleClientError(error, {
+          context: 'route-history',
+          emit: true,
+          clearOnSession: true
+        });
       }
     },
 
     async sendCommand(commandData) {
-      const sessionId = getStoredSessionId();
-      if (!sessionId) {
-        throw new Error('SESSION_REQUIRED');
-      }
+      const sessionId = ensureSessionId();
 
       try {
         return await sendCommandBySession(sessionId, commandData || {});
       } catch (error) {
-        if (error.status === 404 || error.status === 401) {
-          clearOperationalState();
-          const nextError = new Error('SESSION_EXPIRED');
-          nextError.payload = error.payload;
-          nextError.code = error.code || error.payload?.code || 'SESSION_EXPIRED';
-          throw nextError;
-        }
-
-        throw error;
+        throw handleClientError(error, {
+          context: 'command-send',
+          emit: true,
+          clearOnSession: true
+        });
       }
     },
 
     async getRecentEvents(limit = 30) {
-      const sessionId = getStoredSessionId();
-      if (!sessionId) {
-        throw new Error('SESSION_REQUIRED');
-      }
+      const sessionId = ensureSessionId();
 
       try {
         return await getRecentEventsBySession(sessionId, limit);
       } catch (error) {
-        if (error.status === 404 || error.status === 401) {
-          clearOperationalState();
-          const nextError = new Error('SESSION_EXPIRED');
-          nextError.payload = error.payload;
-          nextError.code = error.code || error.payload?.code || 'SESSION_EXPIRED';
-          throw nextError;
-        }
-        throw error;
+        throw handleClientError(error, {
+          context: 'events-recent',
+          emit: true,
+          clearOnSession: true
+        });
       }
     },
 
     async getGeofences() {
-      const sessionId = getStoredSessionId();
-      if (!sessionId) {
-        throw new Error('SESSION_REQUIRED');
-      }
+      const sessionId = ensureSessionId();
 
       try {
         return await getGeofencesBySession(sessionId);
       } catch (error) {
-        if (error.status === 404 || error.status === 401) {
-          clearOperationalState();
-          const nextError = new Error('SESSION_EXPIRED');
-          nextError.payload = error.payload;
-          nextError.code = error.code || error.payload?.code || 'SESSION_EXPIRED';
-          throw nextError;
-        }
+        const handled = handleClientError(error, {
+          context: 'geofences',
+          emit: true,
+          clearOnSession: true
+        });
 
-        if (error.status === 501) {
+        if (handled.status === 501) {
           return {
             available: false,
             items: [],
@@ -523,7 +608,7 @@
           };
         }
 
-        throw error;
+        throw handled;
       }
     },
 
@@ -549,8 +634,17 @@
           storeSessionId(latest.id);
           return latest;
           }
-        } catch {
-          return null;
+        } catch (error) {
+          // Si el backend no responde, propagamos error para que UI pueda mostrar estado de red.
+          const handled = handleClientError(error, {
+            context: 'session-latest',
+            emit: true,
+            clearOnSession: false
+          });
+          if (isSessionError(handled)) {
+            return null;
+          }
+          throw handled;
         }
 
         return null;
@@ -561,11 +655,16 @@
         syncRuntimeMode(payload);
         return payload;
       } catch (error) {
-        if (error.status === 404 || error.status === 401) {
-          clearOperationalState();
+        const handled = handleClientError(error, {
+          context: 'session-info',
+          emit: true,
+          clearOnSession: true
+        });
+
+        if (isSessionError(handled)) {
           return null;
         }
-        throw error;
+        throw handled;
       }
     },
 
@@ -581,6 +680,9 @@
     storeRouteContext,
     getRouteContext,
     clearRouteContext,
-    clearOperationalState
+    clearOperationalState,
+    isSessionError,
+    isNetworkError,
+    getUserMessageFromError
   };
 })();

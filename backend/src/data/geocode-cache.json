@@ -2097,6 +2097,339 @@
       "updatedAt": "2026-04-20T21:51:55.615Z",
       "lastHitAt": "2026-04-20T21:58:50.112Z",
       "hitCount": 33
+    },
+    {
+      "key": "-3.83258,-78.76108",
+      "address": "Armando Arias, Yantzaza, Zamora Chinchipe, 190550, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-21T12:27:29.199Z",
+      "updatedAt": "2026-04-21T12:27:29.199Z",
+      "lastHitAt": "2026-04-21T12:29:36.370Z",
+      "hitCount": 18
+    },
+    {
+      "key": "-3.83257,-78.76114",
+      "address": "Armando Arias, Yantzaza, Zamora Chinchipe, 190550, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-21T12:29:46.580Z",
+      "updatedAt": "2026-04-21T12:29:46.580Z",
+      "lastHitAt": "2026-04-21T12:43:33.017Z",
+      "hitCount": 24
+    },
+    {
+      "key": "-3.83257,-78.76115",
+      "address": "Armando Arias, Yantzaza, Zamora Chinchipe, 190550, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-21T12:53:37.724Z",
+      "updatedAt": "2026-04-21T12:53:37.724Z",
+      "lastHitAt": "2026-04-21T13:06:06.959Z",
+      "hitCount": 38
+    },
+    {
+      "key": "-3.83257,-78.76128",
+      "address": "Armando Arias, Yantzaza, Zamora Chinchipe, 190550, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-21T13:06:17.352Z",
+      "updatedAt": "2026-04-21T13:06:17.352Z",
+      "lastHitAt": "2026-04-21T13:07:11.943Z",
+      "hitCount": 8
+    },
+    {
+      "key": "-3.83230,-78.76332",
+      "address": "Armando Arias, Yantzaza, Zamora Chinchipe, 190550, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-21T13:07:21.568Z",
+      "updatedAt": "2026-04-21T13:07:21.568Z",
+      "lastHitAt": "2026-04-21T13:07:59.019Z",
+      "hitCount": 6
+    },
+    {
+      "key": "-3.83204,-78.76543",
+      "address": "Escuela \"General Rumiñahui\", Puente Las Luciernagas, Yantzaza, Zamora Chinchipe, 190550, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-21T13:08:09.068Z",
+      "updatedAt": "2026-04-21T13:08:09.068Z",
+      "lastHitAt": "2026-04-21T13:08:09.068Z",
+      "hitCount": 1
+    },
+    {
+      "key": "-3.83216,-78.76556",
+      "address": "Avenida de Las Luciernagas, Yantzaza, Zamora Chinchipe, 190550, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-21T13:08:16.678Z",
+      "updatedAt": "2026-04-21T13:08:16.678Z",
+      "lastHitAt": "2026-04-21T13:08:22.967Z",
+      "hitCount": 2
+    },
+    {
+      "key": "-3.83296,-78.76566",
+      "address": "Avenida de Las Luciernagas, Yantzaza, Zamora Chinchipe, 190550, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-21T13:08:33.073Z",
+      "updatedAt": "2026-04-21T13:08:33.073Z",
+      "lastHitAt": "2026-04-21T13:08:33.073Z",
+      "hitCount": 1
+    },
+    {
+      "key": "-3.83307,-78.76558",
+      "address": "Avenida de Las Luciernagas, Yantzaza, Zamora Chinchipe, 190550, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-21T13:08:41.141Z",
+      "updatedAt": "2026-04-21T13:08:41.141Z",
+      "lastHitAt": "2026-04-21T13:08:41.141Z",
+      "hitCount": 1
+    },
+    {
+      "key": "-3.83360,-78.76526",
+      "address": "Avenida de Las Luciernagas, Yantzaza, Zamora Chinchipe, 190550, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-21T13:08:48.827Z",
+      "updatedAt": "2026-04-21T13:08:48.827Z",
+      "lastHitAt": "2026-04-21T13:08:48.827Z",
+      "hitCount": 1
+    },
+    {
+      "key": "-3.83366,-78.76537",
+      "address": "Avenida de Las Luciernagas, Yantzaza, Zamora Chinchipe, 190550, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-21T13:08:56.804Z",
+      "updatedAt": "2026-04-21T13:08:56.804Z",
+      "lastHitAt": "2026-04-21T13:08:56.804Z",
+      "hitCount": 1
+    },
+    {
+      "key": "-3.83372,-78.76584",
+      "address": "Avenida de Las Luciernagas, Yantzaza, Zamora Chinchipe, 190550, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-21T13:09:05.103Z",
+      "updatedAt": "2026-04-21T13:09:05.103Z",
+      "lastHitAt": "2026-04-21T13:09:05.103Z",
+      "hitCount": 1
+    },
+    {
+      "key": "-3.83360,-78.76615",
+      "address": "Avenida de Las Luciernagas, Yantzaza, Zamora Chinchipe, 190550, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-21T13:09:12.882Z",
+      "updatedAt": "2026-04-21T13:09:12.882Z",
+      "lastHitAt": "2026-04-21T13:11:19.045Z",
+      "hitCount": 17
+    },
+    {
+      "key": "-3.82835,-78.74179",
+      "address": "Barrio Las Orugas, Yantzaza, Zamora Chinchipe, 190404, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-21T13:29:15.735Z",
+      "updatedAt": "2026-04-21T13:29:15.735Z",
+      "lastHitAt": "2026-04-21T13:29:46.350Z",
+      "hitCount": 5
+    },
+    {
+      "key": "-3.82906,-78.73891",
+      "address": "Barrio Las Orugas, Yantzaza, Zamora Chinchipe, 190404, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-21T13:30:45.075Z",
+      "updatedAt": "2026-04-21T13:30:45.075Z",
+      "lastHitAt": "2026-04-21T13:30:45.075Z",
+      "hitCount": 1
+    },
+    {
+      "key": "-3.82941,-78.73756",
+      "address": "Barrio Las Orugas, Yantzaza, Zamora Chinchipe, 190404, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-21T13:30:47.191Z",
+      "updatedAt": "2026-04-21T13:30:47.191Z",
+      "lastHitAt": "2026-04-21T13:31:22.363Z",
+      "hitCount": 7
+    },
+    {
+      "key": "-3.82969,-78.73637",
+      "address": "Barrio Las Orugas, Yantzaza, Zamora Chinchipe, 190404, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-21T13:34:23.646Z",
+      "updatedAt": "2026-04-21T13:34:23.646Z",
+      "lastHitAt": "2026-04-21T13:35:38.970Z",
+      "hitCount": 11
+    },
+    {
+      "key": "-3.82950,-78.73725",
+      "address": "Barrio Las Orugas, Yantzaza, Zamora Chinchipe, 190404, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-21T13:35:51.028Z",
+      "updatedAt": "2026-04-21T13:35:51.028Z",
+      "lastHitAt": "2026-04-21T13:39:06.908Z",
+      "hitCount": 26
+    },
+    {
+      "key": "-3.82925,-78.73825",
+      "address": "Barrio Las Orugas, Yantzaza, Zamora Chinchipe, 190404, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-21T13:39:19.652Z",
+      "updatedAt": "2026-04-21T13:39:19.652Z",
+      "lastHitAt": "2026-04-21T13:40:10.986Z",
+      "hitCount": 8
+    },
+    {
+      "key": "-3.82858,-78.74089",
+      "address": "Barrio Las Orugas, Pitá, Yantzaza, Zamora Chinchipe, 190404, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-21T13:40:23.017Z",
+      "updatedAt": "2026-04-21T13:40:23.017Z",
+      "lastHitAt": "2026-04-21T13:41:06.964Z",
+      "hitCount": 7
+    },
+    {
+      "key": "-3.82816,-78.74342",
+      "address": "Barrio Las Orugas, Yantzaza, Zamora Chinchipe, 190404, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-21T13:41:19.312Z",
+      "updatedAt": "2026-04-21T13:41:19.312Z",
+      "lastHitAt": "2026-04-21T13:41:38.727Z",
+      "hitCount": 4
+    },
+    {
+      "key": "-3.82810,-78.74508",
+      "address": "Barrio Las Orugas, Yantzaza, Zamora Chinchipe, 190404, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-21T13:41:51.224Z",
+      "updatedAt": "2026-04-21T13:41:51.224Z",
+      "lastHitAt": "2026-04-21T13:41:51.224Z",
+      "hitCount": 1
+    },
+    {
+      "key": "-3.82791,-78.74514",
+      "address": "Alfredo Espinoza Polit, Vista Hermosa, Pitá, Yantzaza, Zamora Chinchipe, 190404, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-21T13:41:59.148Z",
+      "updatedAt": "2026-04-21T13:41:59.148Z",
+      "lastHitAt": "2026-04-21T13:41:59.148Z",
+      "hitCount": 1
+    },
+    {
+      "key": "-3.82725,-78.74458",
+      "address": "Alfredo Espinoza Polit, Vista Hermosa, Pitá, Yantzaza, Zamora Chinchipe, 190404, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-21T13:42:07.033Z",
+      "updatedAt": "2026-04-21T13:42:07.033Z",
+      "lastHitAt": "2026-04-21T13:42:18.961Z",
+      "hitCount": 3
+    },
+    {
+      "key": "-3.82652,-78.74388",
+      "address": "Alfredo Espinoza Polit, Vista Hermosa, Pitá, Yantzaza, Zamora Chinchipe, 190404, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-21T13:42:40.152Z",
+      "updatedAt": "2026-04-21T13:42:40.152Z",
+      "lastHitAt": "2026-04-21T13:42:44.041Z",
+      "hitCount": 2
+    },
+    {
+      "key": "-3.82471,-78.74189",
+      "address": "Alfredo Espinoza Polit, Vista Hermosa, Pitá, Yantzaza, Zamora Chinchipe, 190404, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-21T13:42:56.538Z",
+      "updatedAt": "2026-04-21T13:42:56.538Z",
+      "lastHitAt": "2026-04-21T13:42:56.538Z",
+      "hitCount": 1
+    },
+    {
+      "key": "-3.82412,-78.74150",
+      "address": "Alfredo Espinoza Polit, Vista Hermosa, Pitá, Yantzaza, Zamora Chinchipe, 190404, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-21T13:43:04.137Z",
+      "updatedAt": "2026-04-21T13:43:04.137Z",
+      "lastHitAt": "2026-04-21T13:43:04.137Z",
+      "hitCount": 1
+    },
+    {
+      "key": "-3.82258,-78.74114",
+      "address": "Alfredo Espinoza Polit, Vista Hermosa, Pitá, Yantzaza, Zamora Chinchipe, 190404, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-21T13:43:12.150Z",
+      "updatedAt": "2026-04-21T13:43:12.150Z",
+      "lastHitAt": "2026-04-21T13:43:31.947Z",
+      "hitCount": 4
+    },
+    {
+      "key": "-3.82015,-78.74145",
+      "address": "Alfredo Espinoza Polit, Vista Hermosa, Pitá, Yantzaza, Zamora Chinchipe, 190404, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-21T13:43:44.690Z",
+      "updatedAt": "2026-04-21T13:43:44.690Z",
+      "lastHitAt": "2026-04-21T13:43:56.065Z",
+      "hitCount": 3
+    },
+    {
+      "key": "-3.81911,-78.74181",
+      "address": "Alfredo Espinoza Polit, Vista Hermosa, Pitá, Yantzaza, Zamora Chinchipe, 190404, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-21T13:44:08.215Z",
+      "updatedAt": "2026-04-21T13:44:08.215Z",
+      "lastHitAt": "2026-04-21T13:44:19.631Z",
+      "hitCount": 3
+    },
+    {
+      "key": "-3.81927,-78.74333",
+      "address": "Avenida Rafael Pullaguari, Vista Hermosa, Pitá, Yantzaza, Zamora Chinchipe, 190404, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-21T13:44:32.135Z",
+      "updatedAt": "2026-04-21T13:44:32.135Z",
+      "lastHitAt": "2026-04-21T13:44:59.977Z",
+      "hitCount": 5
+    },
+    {
+      "key": "-3.82163,-78.74665",
+      "address": "Avenida Rafael Pullaguari, Finca Las Vegas, Pitá, Yantzaza, Zamora Chinchipe, 190404, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-21T13:45:12.456Z",
+      "updatedAt": "2026-04-21T13:45:12.456Z",
+      "lastHitAt": "2026-04-21T13:45:47.744Z",
+      "hitCount": 6
+    },
+    {
+      "key": "-3.83207,-78.76395",
+      "address": "Escuela \"General Rumiñahui\", Avenida de Las Luciernagas, Yantzaza, Zamora Chinchipe, 190550, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-21T13:55:56.304Z",
+      "updatedAt": "2026-04-21T13:55:56.304Z",
+      "lastHitAt": "2026-04-21T13:55:57.113Z",
+      "hitCount": 2
+    },
+    {
+      "key": "-3.83135,-78.76369",
+      "address": "Primero de Mayo, Yantzaza, Zamora Chinchipe, 190550, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-21T13:56:09.643Z",
+      "updatedAt": "2026-04-21T13:56:09.643Z",
+      "lastHitAt": "2026-04-21T13:56:36.947Z",
+      "hitCount": 5
+    },
+    {
+      "key": "-3.83157,-78.76188",
+      "address": "Primero de Mayo, Yantzaza, Zamora Chinchipe, 190550, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-21T13:56:48.962Z",
+      "updatedAt": "2026-04-21T13:56:48.962Z",
+      "lastHitAt": "2026-04-21T13:57:25.811Z",
+      "hitCount": 6
+    },
+    {
+      "key": "-3.83180,-78.76076",
+      "address": "Avenida Iván Riofrío, Yantzaza, Zamora Chinchipe, 190550, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-21T13:57:37.608Z",
+      "updatedAt": "2026-04-21T13:57:37.608Z",
+      "lastHitAt": "2026-04-21T13:57:49.117Z",
+      "hitCount": 3
+    },
+    {
+      "key": "-3.83251,-78.76084",
+      "address": "Avenida Iván Riofrío, Yantzaza, Zamora Chinchipe, 190550, Ecuador",
+      "provider": "nominatim",
+      "createdAt": "2026-04-21T13:58:01.307Z",
+      "updatedAt": "2026-04-21T13:58:01.307Z",
+      "lastHitAt": "2026-04-21T14:00:20.475Z",
+      "hitCount": 19
     }
   ]
 }

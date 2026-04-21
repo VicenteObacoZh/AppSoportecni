@@ -46,7 +46,28 @@
   const deviceCommandButton = document.getElementById('mapDeviceCommandButton');
   const deviceAddressText = document.getElementById('mapDeviceAddressText');
   const deviceHistoryButton = document.getElementById('mapDeviceHistoryButton');
+  const deviceInfoButton = document.getElementById('mapDeviceInfoButton');
   const deviceSensorsList = document.getElementById('mapDeviceSensorsList');
+  const infoModal = document.getElementById('mapInfoModal');
+  const infoModalBackdrop = document.getElementById('mapInfoModalBackdrop');
+  const infoModalClose = document.getElementById('mapInfoModalClose');
+  const infoTitle = document.getElementById('mapInfoTitle');
+  const infoDistance = document.getElementById('mapInfoDistance');
+  const infoMaxSpeed = document.getElementById('mapInfoMaxSpeed');
+  const infoFuel = document.getElementById('mapInfoFuel');
+  const infoAddressBtn = document.getElementById('mapInfoAddressBtn');
+  const infoAddress = document.getElementById('mapInfoAddress');
+  const infoRecent = document.getElementById('mapInfoRecent');
+  const infoStopDuration = document.getElementById('mapInfoStopDuration');
+  const infoDrivers = document.getElementById('mapInfoDrivers');
+  const infoSensorDoor = document.getElementById('mapInfoSensorDoor');
+  const infoSensorVibration = document.getElementById('mapInfoSensorVibration');
+  const infoSensorHours = document.getElementById('mapInfoSensorHours');
+  const infoSensorOdometer = document.getElementById('mapInfoSensorOdometer');
+  const infoFuelReportBtn = document.getElementById('mapInfoFuelReportBtn');
+  const infoActionHistory = document.getElementById('mapInfoActionHistory');
+  const infoActionCommand = document.getElementById('mapInfoActionCommand');
+  const infoActionReport = document.getElementById('mapInfoActionReport');
   const commandModal = document.getElementById('mapCommandModal');
   const commandModalBackdrop = document.getElementById('mapCommandModalBackdrop');
   const commandModalClose = document.getElementById('mapCommandModalClose');
@@ -92,6 +113,20 @@
   let pendingAddressByKey = new Map();
   let trailPolylineById = new Map();
   let movementHistoryById = new Map();
+
+  function syncSelectionActionButtons(hasSelectedDevice) {
+    const isVisible = Boolean(hasSelectedDevice);
+    const targetButtons = [locateButton, routesButton];
+
+    targetButtons.forEach((button) => {
+      if (!button) {
+        return;
+      }
+      button.hidden = !isVisible;
+      button.classList.toggle('mobile-map-action--hidden', !isVisible);
+      button.setAttribute('aria-hidden', isVisible ? 'false' : 'true');
+    });
+  }
 
   function escapeHtml(value) {
     return String(value ?? '')
@@ -801,7 +836,12 @@
       const nearest = findNearestDeviceAtLatLng(event?.latlng, 34);
       if (nearest) {
         selectDeviceFromMap(nearest);
+        return;
       }
+
+      // Tap sobre mapa vacio: limpiar seleccion para volver al estado inicial (7 botones).
+      apiClient?.clearSelectedDevice?.();
+      showDevicePanel(null);
     });
   }
 
@@ -945,6 +985,7 @@
 
   function showDevicePanel(device) {
     selectedDevice = device || null;
+    syncSelectionActionButtons(Boolean(selectedDevice));
     if (!devicePanel) {
       return;
     }
@@ -1000,6 +1041,146 @@
         }
       }
     });
+  }
+
+  function toNumberOrNull(value) {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : null;
+  }
+
+  function pickValue(source, keys, fallback = null) {
+    if (!source || !Array.isArray(keys)) {
+      return fallback;
+    }
+
+    for (const key of keys) {
+      const value = source?.[key];
+      if (value !== null && value !== undefined && value !== '') {
+        return value;
+      }
+    }
+
+    return fallback;
+  }
+
+  function formatDistanceKm(value) {
+    const num = toNumberOrNull(value);
+    if (num === null) {
+      return '-';
+    }
+    return `${num.toFixed(2)} km`;
+  }
+
+  function formatSpeedKph(value) {
+    const num = toNumberOrNull(value);
+    if (num === null) {
+      return '-';
+    }
+    return `${Math.round(num)} kph`;
+  }
+
+  function formatDurationCompact(value) {
+    const numeric = toNumberOrNull(value);
+    if (numeric === null) {
+      return '-';
+    }
+
+    if (numeric >= 3600) {
+      const hours = Math.floor(numeric / 3600);
+      const mins = Math.floor((numeric % 3600) / 60);
+      return `${hours}h ${mins}m`;
+    }
+
+    if (numeric >= 60) {
+      return `${Math.floor(numeric / 60)}m`;
+    }
+
+    return `${Math.floor(numeric)}s`;
+  }
+
+  async function openInfoModal() {
+    if (!infoModal) {
+      return;
+    }
+
+    if (!selectedDevice) {
+      window.alert('Primero selecciona una unidad en el mapa.');
+      return;
+    }
+
+    const device = selectedDevice;
+    const deviceName = device.vehicleName || device.name || `ID ${device.deviceId || '-'}`;
+
+    if (infoTitle) {
+      infoTitle.textContent = deviceName;
+    }
+
+    const distanceToday = pickValue(device, [
+      'distanceTodayKm', 'todayDistanceKm', 'dailyDistanceKm', 'distanceKmToday', 'distanceToday', 'distanceKm'
+    ]);
+    const maxSpeedToday = pickValue(device, [
+      'maxSpeedToday', 'maxSpeedKphToday', 'vMaxToday', 'speedMaxToday', 'speedMax'
+    ], device.speedKmh);
+    const fuelValue = pickValue(device, [
+      'fuel', 'fuelLevel', 'fuelPercent', 'combustible', 'fuelToday'
+    ], '-');
+    const recentConnection = pickValue(device, ['fixTime', 'deviceTime', 'serverTime']);
+    const stopDurationValue = pickValue(device, [
+      'stopDurationSeconds', 'stopDurationSec', 'stopDuration', 'parkingDurationSeconds'
+    ]);
+    const driverName = pickValue(device, ['driverName', 'driver', 'conductor'], '-');
+    const addressText = getAddressLabel(device.address, device);
+
+    if (infoDistance) {
+      infoDistance.textContent = formatDistanceKm(distanceToday);
+    }
+    if (infoMaxSpeed) {
+      infoMaxSpeed.textContent = formatSpeedKph(maxSpeedToday);
+    }
+    if (infoFuel) {
+      infoFuel.textContent = String(fuelValue || '-');
+    }
+    if (infoRecent) {
+      infoRecent.textContent = formatDateTime(recentConnection);
+    }
+    if (infoStopDuration) {
+      infoStopDuration.textContent = formatDurationCompact(stopDurationValue);
+    }
+    if (infoDrivers) {
+      infoDrivers.textContent = String(driverName || '-');
+    }
+    if (infoAddress) {
+      infoAddress.textContent = addressText;
+      infoAddress.hidden = true;
+    }
+
+    if (infoSensorDoor) {
+      infoSensorDoor.textContent = sensorValue(device, ['door', 'puerta', 'doorState'], '-');
+    }
+    if (infoSensorVibration) {
+      infoSensorVibration.textContent = sensorValue(device, ['vibration', 'vibracion'], '-');
+    }
+    if (infoSensorHours) {
+      infoSensorHours.textContent = sensorValue(device, ['hoursMotor', 'engineHours', 'horasMotor'], '-');
+    }
+    if (infoSensorOdometer) {
+      infoSensorOdometer.textContent = sensorValue(device, ['odometer', 'mileage', 'kilometraje'], '-');
+    }
+
+    resolveAddressNowIfNeeded(device).then((resolved) => {
+      if (resolved && infoAddress) {
+        infoAddress.textContent = resolved;
+      }
+    });
+
+    infoModal.hidden = false;
+  }
+
+  function closeInfoModal() {
+    if (!infoModal) {
+      return;
+    }
+    infoModal.hidden = true;
   }
 
   function openCommandModal() {
@@ -1925,17 +2106,18 @@
   function resolveSelectedDevice() {
     const currentUrl = new URL(window.location.href);
     const deviceId = currentUrl.searchParams.get('deviceId');
-    const from = currentUrl.searchParams.get('from');
     const fromStorage = apiClient?.getSelectedDevice?.();
 
     if (deviceId && fromStorage && String(fromStorage.deviceId) === String(deviceId)) {
       return fromStorage;
     }
 
-    if (from === 'devices' || from === 'map') {
-      return deviceId ? { deviceId } : fromStorage;
+    if (deviceId) {
+      return { deviceId };
     }
 
+    // Sin deviceId en URL siempre iniciamos sin seleccion.
+    apiClient?.clearSelectedDevice?.();
     return null;
   }
 
@@ -2033,6 +2215,7 @@
 
   selectedEvent = resolveSelectedEvent();
   selectedDevice = resolveSelectedDevice();
+  syncSelectionActionButtons(Boolean(selectedDevice && selectedDevice.deviceId));
 
   menuButton?.addEventListener('click', () => {
     const isOpen = sheet?.classList.contains('mobile-map-sheet--open');
@@ -2158,6 +2341,10 @@
     }
   });
 
+  deviceInfoButton?.addEventListener('click', () => {
+    openInfoModal();
+  });
+
   deviceCommandButton?.addEventListener('click', () => {
     openCommandModal();
   });
@@ -2169,6 +2356,38 @@
   commandModalBackdrop?.addEventListener('click', closeCommandModal);
   commandModalClose?.addEventListener('click', closeCommandModal);
   commandCancelButton?.addEventListener('click', closeCommandModal);
+
+  infoModalBackdrop?.addEventListener('click', closeInfoModal);
+  infoModalClose?.addEventListener('click', closeInfoModal);
+  infoAddressBtn?.addEventListener('click', () => {
+    if (!infoAddress) {
+      return;
+    }
+    infoAddress.hidden = !infoAddress.hidden;
+  });
+
+  infoFuelReportBtn?.addEventListener('click', () => {
+    window.alert('Informe diario de combustible: disponible en la siguiente iteracion.');
+  });
+
+  infoActionHistory?.addEventListener('click', () => {
+    if (!selectedDevice?.deviceId) {
+      return;
+    }
+    closeInfoModal();
+    window.location.href = `./routes.html?deviceId=${encodeURIComponent(String(selectedDevice.deviceId))}&from=map`;
+  });
+
+  infoActionCommand?.addEventListener('click', () => {
+    closeInfoModal();
+    openCommandModal();
+  });
+
+  infoActionReport?.addEventListener('click', () => {
+    closeInfoModal();
+    window.location.href = './alerts.html';
+  });
+
   commandSendButton?.addEventListener('click', async () => {
     if (commandSending) {
       return;

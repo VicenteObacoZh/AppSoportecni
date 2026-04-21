@@ -24,8 +24,116 @@
   const apiMessage = document.getElementById('apiMessage');
   const refreshDashboardButton = document.getElementById('refreshDashboardButton');
   const appShell = window.GpsRastreoShell;
+  let loginRetryButton = null;
   let liveMap = null;
   let liveMapMarkers = [];
+
+  function ensureLoginRetryButton() {
+    if (!loginForm) {
+      return null;
+    }
+
+    if (loginRetryButton && loginRetryButton.isConnected) {
+      return loginRetryButton;
+    }
+
+    loginRetryButton = document.createElement('button');
+    loginRetryButton.type = 'button';
+    loginRetryButton.className = 'pill pill--ghost auth-submit';
+    loginRetryButton.textContent = 'Reintentar conexion';
+    loginRetryButton.style.display = 'none';
+    loginRetryButton.addEventListener('click', async () => {
+      setLoginUiState('loading', 'Reintentando conexion con backend...');
+      try {
+        await apiClient.checkPlatform();
+        await syncPlatformStatus();
+        setLoginUiState('idle', 'Conexion recuperada. Intenta iniciar sesion nuevamente.');
+      } catch (error) {
+        await syncPlatformStatus();
+        setLoginUiState('network_error', apiClient?.getUserMessageFromError?.(error) || 'No se pudo conectar con el backend local.');
+      }
+    });
+
+    loginForm.appendChild(loginRetryButton);
+    return loginRetryButton;
+  }
+
+  function setLoginUiState(state, message) {
+    if (loginMessage) {
+      loginMessage.textContent = message || '';
+    }
+
+    const retryButton = ensureLoginRetryButton();
+    if (retryButton) {
+      retryButton.style.display = (state === 'network_error' || state === 'session_expired') ? '' : 'none';
+    }
+
+    if (integrationBanner) {
+      if (state === 'loading') {
+        integrationBanner.textContent = appConfig.mockMode
+          ? 'Validando flujo mock en backend local...'
+          : 'Conectando con backend y validando sesion...';
+      } else if (state === 'network_error') {
+        integrationBanner.textContent = 'No hay conexion con backend local. Puedes reintentar cuando el servicio este activo.';
+      } else if (state === 'session_expired') {
+        integrationBanner.textContent = 'La sesion anterior ya no es valida. Inicia sesion de nuevo para continuar.';
+      } else {
+        integrationBanner.textContent = appConfig.mockMode
+          ? 'Modo mock controlado por backend. El flujo usa el mismo contrato de login y sessionId.'
+          : 'Listo para autenticar contra el backend configurado.';
+      }
+    }
+  }
+
+  function setDashboardUiState(state, message) {
+    if (!liveBannerTitle || !liveBannerText) {
+      return;
+    }
+
+    if (state === 'loading') {
+      liveBannerTitle.textContent = 'Cargando datos operativos...';
+      liveBannerText.textContent = message || 'Consultando backend y validando sesion.';
+      if (refreshDashboardButton) {
+        refreshDashboardButton.disabled = true;
+      }
+      return;
+    }
+
+    if (state === 'network_error') {
+      liveBannerTitle.textContent = 'Sin conexion con backend';
+      liveBannerText.textContent = message || 'No se pudo conectar con backend local. Verifica servicio y red.';
+      if (refreshDashboardButton) {
+        refreshDashboardButton.disabled = false;
+        refreshDashboardButton.textContent = 'Reintentar';
+      }
+      return;
+    }
+
+    if (state === 'session_expired') {
+      liveBannerTitle.textContent = 'Sesion expirada';
+      liveBannerText.textContent = message || 'Tu sesion no es valida. Te redirigiremos al login.';
+      if (refreshDashboardButton) {
+        refreshDashboardButton.disabled = false;
+        refreshDashboardButton.textContent = 'Reintentar';
+      }
+      return;
+    }
+
+    if (refreshDashboardButton) {
+      refreshDashboardButton.disabled = false;
+      refreshDashboardButton.textContent = 'Reconectar panel';
+    }
+  }
+
+  function getUiErrorReason(error) {
+    if (apiClient?.isSessionError?.(error)) {
+      return 'session_expired';
+    }
+    if (apiClient?.isNetworkError?.(error)) {
+      return 'backend_unavailable';
+    }
+    return 'request_error';
+  }
 
   function syncSessionIdFromUrl() {
     if (!apiClient || typeof window === 'undefined') {
@@ -264,9 +372,12 @@
         ? `SessionId activa: ${session.id}. El backend tiene cookies para consultar el portal.${session.expiresAt ? ` Expira ${new Date(session.expiresAt).toLocaleString()}.` : ''}`
         : `SessionId activa: ${session.id}. La sesion esta en modo mock controlado por backend.${session.expiresAt ? ` Expira ${new Date(session.expiresAt).toLocaleString()}.` : ''}`;
       return true;
-    } catch {
-      sessionTitle.textContent = 'No fue posible validar la sesion';
-      sessionText.textContent = 'Revisa si el backend esta corriendo y si la sessionId sigue vigente.';
+    } catch (error) {
+      sessionTitle.textContent = apiClient?.isSessionError?.(error)
+        ? 'Sesion expirada'
+        : 'No fue posible validar la sesion';
+      sessionText.textContent = apiClient?.getUserMessageFromError?.(error) ||
+        'Revisa si el backend esta corriendo y si la sessionId sigue vigente.';
       return false;
     }
   }
@@ -275,6 +386,8 @@
     if (!kpiGrid || !apiClient) {
       return;
     }
+
+    setDashboardUiState('loading');
 
     try {
       const dashboard = await apiClient.getDashboard();
@@ -300,18 +413,19 @@
           : 'Conectado al backend real';
         liveBannerText.textContent = appConfig.mockMode
           ? 'La interfaz ya consume una abstraccion API. El siguiente paso es reemplazar los endpoints demo por endpoints reales.'
-          : 'La aplicacion esta usando datos reales desde el servicio configurado.';
+            : 'La aplicacion esta usando datos reales desde el servicio configurado.';
       }
+
+      setDashboardUiState('ready');
     } catch (error) {
-      if (liveBannerTitle && liveBannerText) {
-        if (error.message === 'SESSION_REQUIRED' || error.message === 'SESSION_EXPIRED') {
-          liveBannerTitle.textContent = 'Sesion requerida para datos reales';
-          liveBannerText.textContent = 'Haz login otra vez para crear una sessionId valida en el backend y volver a cargar el monitor real.';
-        } else {
-          liveBannerTitle.textContent = 'No fue posible cargar el panel';
-          liveBannerText.textContent = 'Revisa endpoints, proxy o credenciales de integracion antes de pasar a produccion.';
-        }
+      const reason = getUiErrorReason(error);
+      const message = apiClient?.getUserMessageFromError?.(error) || 'No fue posible cargar el panel.';
+      if (reason === 'session_expired') {
+        setDashboardUiState('session_expired', message);
+        return;
       }
+
+      setDashboardUiState('network_error', message);
     }
   }
 
@@ -331,12 +445,21 @@
             ? 'La plataforma respondio correctamente y devolvio la pantalla de acceso.'
             : 'La plataforma respondio, aunque la respuesta no coincide con la vista esperada.');
     } catch (error) {
-      apiStatus.textContent = 'Validacion desde navegador limitada';
-      apiMessage.textContent = 'La plataforma existe, pero el navegador puede bloquear la consulta directa por CORS. La integracion real se puede hacer con backend o proxy seguro.';
+      const reason = getUiErrorReason(error);
+      if (reason === 'backend_unavailable') {
+        apiStatus.textContent = 'Backend local no disponible';
+        apiMessage.textContent = apiClient?.getUserMessageFromError?.(error) || 'No se pudo conectar con el backend local.';
+        return;
+      }
+
+      apiStatus.textContent = 'Validacion no disponible';
+      apiMessage.textContent = apiClient?.getUserMessageFromError?.(error) || 'No se pudo validar el estado de plataforma.';
     }
   }
 
   if (loginForm && apiClient) {
+    setLoginUiState('idle', 'Ingresa con tu cuenta real del portal para crear la sesion del dashboard.');
+
     const loginReasonMessage = appShell?.readLoginMessageFromUrl?.();
     if (loginReasonMessage && loginMessage) {
       loginMessage.textContent = loginReasonMessage;
@@ -364,15 +487,7 @@
     loginForm.addEventListener('submit', (event) => {
       event.preventDefault();
 
-      if (loginMessage) {
-        loginMessage.textContent = 'Validando acceso con la capa de integracion actual...';
-      }
-
-      if (integrationBanner) {
-        integrationBanner.textContent = appConfig.mockMode
-          ? 'Modo mock controlado por backend. El flujo usa el mismo contrato de login y sessionId.'
-          : 'Conectando con el servicio configurado...';
-      }
+      setLoginUiState('loading', 'Validando acceso con la capa de integracion actual...');
 
       apiClient.login({
         email: loginForm.elements.email.value,
@@ -419,18 +534,22 @@
         const detailedMessage =
           validationMessages[0] ||
           fallbackByCode ||
+          apiClient?.getUserMessageFromError?.(error) ||
           backendMessage ||
           error?.message ||
           'No fue posible iniciar sesion. Revisa la integracion real.';
 
-        if (loginMessage) {
-          loginMessage.textContent = detailedMessage;
+        const reason = getUiErrorReason(error);
+        if (reason === 'backend_unavailable') {
+          setLoginUiState('network_error', detailedMessage);
+        } else if (reason === 'session_expired') {
+          setLoginUiState('session_expired', detailedMessage);
+        } else {
+          setLoginUiState('idle', detailedMessage);
         }
 
-        if (integrationBanner) {
-          integrationBanner.textContent = validationMessages.length > 1
-            ? validationMessages.join(' | ')
-            : detailedMessage;
+        if (integrationBanner && validationMessages.length > 1) {
+          integrationBanner.textContent = validationMessages.join(' | ');
         }
       });
     });
@@ -438,8 +557,39 @@
 
   if (refreshDashboardButton) {
     refreshDashboardButton.addEventListener('click', async () => {
+      setDashboardUiState('loading', 'Reintentando carga de panel...');
       await syncSessionInfo();
       await hydrateDashboard();
+    });
+  }
+
+  function attachRuntimeEventHandlers() {
+    if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') {
+      return;
+    }
+
+    window.addEventListener('gpsrastreo:network-error', (event) => {
+      const message = String(event?.detail?.message || '').trim() || 'No se pudo conectar con backend local.';
+
+      if (loginForm) {
+        setLoginUiState('network_error', message);
+      }
+
+      if (kpiGrid) {
+        setDashboardUiState('network_error', message);
+      }
+    });
+
+    window.addEventListener('gpsrastreo:session-expired', (event) => {
+      const message = String(event?.detail?.message || '').trim() || 'Tu sesion expiro. Vuelve a iniciar sesion.';
+
+      if (loginForm) {
+        setLoginUiState('session_expired', message);
+      }
+
+      if (kpiGrid) {
+        setDashboardUiState('session_expired', message);
+      }
     });
   }
 
@@ -450,5 +600,6 @@
     await syncPlatformStatus();
   }
 
+  attachRuntimeEventHandlers();
   bootDashboard();
 })();

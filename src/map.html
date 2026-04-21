@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ï»¿<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css?v=26" />
+  <link rel="stylesheet" href="./styles.css?v=27" />
 </head>
 <body class="dashboard-body dashboard-body--map">
   <div class="mobile-map-app">
@@ -159,9 +159,9 @@
               <span class="mobile-map-device-panel__action-fallback">&#10547;</span>
               <img src="./assets/icons/panel/icon_share_bold_white.png?v=1" alt="Compartir" onerror="this.style.display='none';this.previousElementSibling.style.display='grid'" />
             </button>
-            <button class="mobile-map-device-panel__action" type="button" id="mapDeviceHistoryButton" title="Histórico">
+            <button class="mobile-map-device-panel__action" type="button" id="mapDeviceHistoryButton" title="HistÃ³rico">
               <span class="mobile-map-device-panel__action-fallback">&#9654;</span>
-              <img src="./assets/icons/panel/icon_play_bold_white.png?v=1" alt="Histórico" onerror="this.style.display='none';this.previousElementSibling.style.display='grid'" />
+              <img src="./assets/icons/panel/icon_play_bold_white.png?v=1" alt="HistÃ³rico" onerror="this.style.display='none';this.previousElementSibling.style.display='grid'" />
             </button>
           </div>
         </div>
@@ -185,6 +185,57 @@
         <p class="mobile-map-device-panel__address-text" id="mapDeviceAddressText" hidden>Obteniendo direccion...</p>
       </section>
 
+      <section class="mobile-device-info-modal" id="mapInfoModal" hidden>
+        <div class="mobile-device-info-modal__backdrop" id="mapInfoModalBackdrop"></div>
+        <div class="mobile-device-info-modal__sheet" role="dialog" aria-modal="true" aria-labelledby="mapInfoTitle">
+          <header class="mobile-device-info-modal__head">
+            <button type="button" id="mapInfoModalClose" aria-label="Cerrar">&#8592;</button>
+            <h3 id="mapInfoTitle">Informacion del dispositivo</h3>
+          </header>
+
+          <div class="mobile-device-info-modal__body">
+            <section class="mobile-device-info-card">
+              <h4>Resumen del dia actual</h4>
+              <div class="mobile-device-info-card__rows">
+                <p><span>Distancia recorrida</span><strong id="mapInfoDistance">-</strong></p>
+                <p><span>Velocidad maxima</span><strong id="mapInfoMaxSpeed">-</strong></p>
+                <p><span>Combustible</span><strong id="mapInfoFuel">-</strong></p>
+              </div>
+            </section>
+
+            <section class="mobile-device-info-card">
+              <div class="mobile-device-info-card__top">
+                <strong>Direccion</strong>
+                <button type="button" id="mapInfoAddressBtn">Mostrar Direccion</button>
+              </div>
+              <p class="mobile-device-info-card__address" id="mapInfoAddress" hidden>Obteniendo direccion...</p>
+              <div class="mobile-device-info-card__rows">
+                <p><span>Conexion reciente</span><strong id="mapInfoRecent">-</strong></p>
+                <p><span>Duracion de la parada</span><strong id="mapInfoStopDuration">-</strong></p>
+                <p><span>Conductores</span><strong id="mapInfoDrivers">-</strong></p>
+              </div>
+            </section>
+
+            <section class="mobile-device-info-sensors">
+              <h4>Sensores</h4>
+              <div class="mobile-device-info-sensors__grid">
+                <article><span>Puerta</span><strong id="mapInfoSensorDoor">-</strong></article>
+                <article><span>Vibracion</span><strong id="mapInfoSensorVibration">-</strong></article>
+                <article><span>Horas de Motor</span><strong id="mapInfoSensorHours">-</strong></article>
+                <article><span>Kilometraje</span><strong id="mapInfoSensorOdometer">-</strong></article>
+              </div>
+            </section>
+
+            <button type="button" class="mobile-device-info-modal__fuel-btn" id="mapInfoFuelReportBtn">Informe diario de combustible</button>
+          </div>
+
+          <footer class="mobile-device-info-modal__footer">
+            <button type="button" id="mapInfoActionHistory">Historial</button>
+            <button type="button" id="mapInfoActionCommand">Comando</button>
+            <button type="button" id="mapInfoActionReport">Reporte</button>
+          </footer>
+        </div>
+      </section>
       <section class="mobile-command-modal" id="mapCommandModal" hidden>
         <div class="mobile-command-modal__backdrop" id="mapCommandModalBackdrop"></div>
         <div class="mobile-command-modal__card" role="dialog" aria-modal="true" aria-labelledby="mapCommandModalTitle">
@@ -243,7 +294,9 @@
   <script src="./api.js?v=4"></script>
   <script src="./app-shell.js?v=1"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="./map.js?v=30"></script>
+  <script src="./map.js?v=31"></script>
 </body>
 </html>
+
+
 

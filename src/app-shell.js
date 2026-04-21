@@ -1,5 +1,6 @@
 (function () {
   const apiClient = window.GpsRastreoApi;
+  let redirectInProgress = false;
 
   function getCurrentUrl() {
     try {
@@ -20,6 +21,9 @@
     }
     if (normalized === 'backend_unavailable') {
       return 'No se pudo conectar con el backend local.';
+    }
+    if (normalized === 'session_not_found') {
+      return 'No se encontro una sesion valida. Inicia sesion nuevamente.';
     }
 
     return '';
@@ -47,7 +51,16 @@
   }
 
   function redirectToLogin(reason = 'session_required') {
+    if (redirectInProgress) {
+      return;
+    }
+
+    redirectInProgress = true;
     navigate('./login.html', { reason });
+  }
+
+  function isLoginPage() {
+    return String(window.location.pathname || '').toLowerCase().endsWith('/login.html');
   }
 
   function initBottomNavFocusMode() {
@@ -128,24 +141,46 @@
       }
       return null;
     } catch (error) {
-      const isExpired = String(error?.message || '').includes('SESSION_EXPIRED') || error?.code === 'SESSION_EXPIRED';
+      const isExpired = Boolean(apiClient?.isSessionError?.(error));
+      const isNetwork = Boolean(apiClient?.isNetworkError?.(error));
       clearOperationalState();
 
       if (sessionTitleEl) {
-        sessionTitleEl.textContent = isExpired ? 'Sesion expirada' : 'No fue posible validar la sesion';
+        sessionTitleEl.textContent = isExpired
+          ? 'Sesion expirada'
+          : (isNetwork ? 'Sin conexion con backend' : 'No fue posible validar la sesion');
       }
       if (sessionTextEl) {
-        sessionTextEl.textContent = isExpired
-          ? 'Tu sesion del portal ya no es valida. Vuelve a iniciar sesion.'
-          : 'No se pudo validar la sesion con el backend.';
+        sessionTextEl.textContent = apiClient?.getUserMessageFromError?.(error) ||
+          (isExpired
+            ? 'Tu sesion del portal ya no es valida. Vuelve a iniciar sesion.'
+            : 'No se pudo validar la sesion con el backend.');
       }
 
-      onMissing?.(isExpired ? 'session_expired' : 'backend_unavailable', error);
+      onMissing?.(isExpired ? 'session_expired' : (isNetwork ? 'backend_unavailable' : 'session_required'), error);
       if (redirectOnMissing) {
-        redirectToLogin(isExpired ? 'session_expired' : 'backend_unavailable');
+        redirectToLogin(isExpired ? 'session_expired' : (isNetwork ? 'backend_unavailable' : 'session_required'));
       }
       return null;
     }
+  }
+
+  function attachGlobalAuthWatchers() {
+    if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') {
+      return;
+    }
+
+    window.addEventListener('gpsrastreo:session-expired', (event) => {
+      if (isLoginPage()) {
+        return;
+      }
+
+      const code = String(event?.detail?.code || '').toUpperCase();
+      const reason = code === 'SESSION_REQUIRED'
+        ? 'session_required'
+        : (code === 'SESSION_NOT_FOUND' ? 'session_not_found' : 'session_expired');
+      redirectToLogin(reason);
+    });
   }
 
   window.GpsRastreoShell = {
@@ -157,4 +192,5 @@
   };
 
   initBottomNavFocusMode();
+  attachGlobalAuthWatchers();
 })();

@@ -182,6 +182,14 @@ test('geofences endpoint returns normalized shapes in mock mode', async () => {
   assert.equal(typeof payload.data.summary.total, 'number');
 });
 
+test('live monitor endpoint validates missing sessionId', async () => {
+  const { status, payload } = await requestJson('/api/live/monitor/data');
+
+  assert.equal(status, 400);
+  assert.equal(payload.ok, false);
+  assert.equal(payload.code, 'SESSION_REQUIRED');
+});
+
 test('route endpoint validates required parameters', async () => {
   assert.ok(sessionId, 'Expected sessionId from previous login test.');
 
@@ -209,4 +217,26 @@ test('route endpoint returns normalized route points in mock mode', async () => 
   assert.ok(Array.isArray(payload.data.points));
   assert.ok(payload.data.points.length > 0);
   assert.equal(typeof payload.data.summary.total, 'number');
+});
+
+test('command endpoint sends mock response with valid session', async () => {
+  assert.ok(sessionId, 'Expected sessionId from previous login test.');
+
+  const { status, payload } = await requestJson('/api/live/monitor/command', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      sessionId,
+      deviceId: 1001,
+      command: 'engine_stop',
+      authorizationKey: '1234'
+    })
+  });
+
+  assert.equal(status, 200);
+  assert.equal(payload.ok, true);
+  assert.equal(payload.mode, 'mock');
+  assert.equal(payload.data.ok, true);
 });

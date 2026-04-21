@@ -62,6 +62,8 @@ Desde `C:\AppSoportecni\backend`:
 - el backend guarda las cookies reales del portal y crea una `sessionId` interna
 - `src/api.js` persiste esa `sessionId` y la reutiliza entre pantallas
 - si la sesion expira o el portal ya no acepta las cookies, el frontend limpia el estado operativo y vuelve a `login.html`
+- `src/api.js` ahora centraliza deteccion de `401/404/SESSION_*`, errores de red y emite eventos globales de estado (`session-expired`, `network-error`)
+- `src/runtime.js` consume esos eventos y aplica estados visuales minimos (`cargando`, `error de red`, `sesion expirada`, `reintentar`) sin cambiar contratos de UI
 
 Las pruebas actuales validan el contrato base de:
 
