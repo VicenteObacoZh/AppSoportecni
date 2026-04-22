@@ -74,7 +74,7 @@
       cardLabel: 'Geocercas',
       type: 'geofences',
       title: 'Reporte de Geocercas',
-      subtitle: 'Genera el detalle de entradas y salidas de geocercas del dispositivo.'
+      subtitle: 'Genera el detalle de alertas de geocercas del dispositivo según las novedades del portal.'
     },
     workhours: {
       cardLabel: 'Horas de trabajo',
@@ -705,7 +705,13 @@
         return false;
       }
 
-      window.open(safeUrl, '_blank', 'noopener,noreferrer');
+      const anchor = document.createElement('a');
+      anchor.href = safeUrl;
+      anchor.target = '_blank';
+      anchor.rel = 'noopener noreferrer';
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
       return true;
     } catch {
       return false;

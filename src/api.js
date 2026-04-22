@@ -23,6 +23,21 @@
     return String(value || '').trim().replace(/\/$/, '');
   }
 
+  function isLoopbackBaseUrl(value) {
+    const normalized = normalizeBaseUrl(value);
+    if (!normalized) {
+      return false;
+    }
+
+    try {
+      const parsed = new URL(normalized);
+      const host = String(parsed.hostname || '').toLowerCase();
+      return host === 'localhost' || host === '127.0.0.1';
+    } catch {
+      return false;
+    }
+  }
+
   function getBackendBaseUrls() {
     const candidates = [];
     const configuredCandidates = Array.isArray(config.backendBaseUrlCandidates)
@@ -42,6 +57,23 @@
     }
 
     return [...new Set(candidates)];
+  }
+
+  function resolveReportDownloadBaseUrl() {
+    const candidates = getBackendBaseUrls();
+    const primary = candidates[0] || '';
+    const isNativeCapacitor = Boolean(
+      window.Capacitor?.isNativePlatform?.() ||
+      window.CapacitorAndroid ||
+      window.webkit?.messageHandlers?.bridge
+    );
+
+    if (!isNativeCapacitor) {
+      return primary;
+    }
+
+    const preferred = candidates.find((item) => !isLoopbackBaseUrl(item));
+    return preferred || primary;
   }
 
   function buildUrl(path, baseUrl) {
@@ -570,7 +602,7 @@
       stopSpeedKmh: String(reportRequest?.stopSpeedKmh ?? 1)
     });
 
-    const baseUrl = getBackendBaseUrls()[0];
+    const baseUrl = resolveReportDownloadBaseUrl();
     return buildUrl(`${config.endpoints.liveDownloadReport || '/live/reports/download'}?${query.toString()}`, baseUrl);
   }
 
