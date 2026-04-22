@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GpsRastreo | Acceso Operativo</title>
-  <meta name="description" content="Pantalla de acceso demo para GpsRastreo." />
+  <title>GpsRastreo | Acceso operativo</title>
+  <meta name="description" content="Pantalla de acceso operativo para GpsRastreo." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -20,30 +20,30 @@
 
       <div class="auth-panel__top">
         <div>
-          <h2 class="auth-panel__subtitle">Inicio de Sesion</h2>
+          <h2 class="auth-panel__subtitle">Inicio de sesión</h2>
         </div>
       </div>
 
       <form class="auth-form" id="loginForm">
         <label class="field">
-          <span>Correo electronico</span>
+          <span>Correo electrónico</span>
           <input type="email" name="email" placeholder="operaciones@gpsrastreo.com" autocomplete="username" />
         </label>
         <label class="field">
-          <span>Contrasena</span>
+          <span>Contraseña</span>
           <input type="password" name="password" placeholder="********" autocomplete="current-password" />
         </label>
         <div class="auth-form__meta">
           <label class="checkbox">
             <input type="checkbox" id="rememberCredentials" checked />
-            <span>Recordar este equipo</span>
+            <span>Recordar correo en este equipo</span>
           </label>
           <a class="text-link" href="https://rastreo.soportecni.com" target="_blank" rel="noreferrer">Ir a la plataforma real</a>
         </div>
         <button class="pill pill--primary auth-submit" type="submit">Entrar al dashboard</button>
-        <p class="form-note" id="loginMessage">Ingresa con tu cuenta real del portal para crear la sesion del dashboard.</p>
+        <p class="form-note" id="loginMessage">Ingresa con tu cuenta real del portal para crear la sesión del dashboard.</p>
         <div class="integration-banner" id="integrationBanner">
-          El frontend usa siempre el backend proxy local. Si el backend esta en modo mock o live, la UI mantiene el mismo contrato.
+          La app usa el backend proxy configurado. Si el backend está en modo mock o live, la UI mantiene el mismo contrato.
         </div>
       </form>
     </section>

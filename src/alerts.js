@@ -128,7 +128,7 @@
             <small>${escapeHtml(formatDateTime(eventItem.eventTime))}</small>
           </div>
           <div class="mobile-event-card__meta">
-            <span>${Math.round(Number(eventItem.speed || 0))} kph</span>
+            <span>${Math.round(Number(eventItem.speed || 0))} km/h</span>
             <strong>&#8250;</strong>
           </div>
         </button>

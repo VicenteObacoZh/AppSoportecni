@@ -148,15 +148,21 @@
           </div>
         </header>
 
-        <label class="mobile-device-report-request-modal__field">
+        <div class="mobile-device-report-request-modal__field">
           <span>Desde</span>
-          <input type="datetime-local" id="deviceReportRequestFrom" />
-        </label>
+          <div class="mobile-device-report-request-modal__field-row">
+            <input type="text" id="deviceReportRequestFromDate" inputmode="numeric" placeholder="22/04/2026" aria-label="Fecha inicial" />
+            <input type="text" id="deviceReportRequestFromTime" inputmode="numeric" placeholder="08:30" aria-label="Hora inicial" />
+          </div>
+        </div>
 
-        <label class="mobile-device-report-request-modal__field">
+        <div class="mobile-device-report-request-modal__field">
           <span>Hasta</span>
-          <input type="datetime-local" id="deviceReportRequestTo" />
-        </label>
+          <div class="mobile-device-report-request-modal__field-row">
+            <input type="text" id="deviceReportRequestToDate" inputmode="numeric" placeholder="22/04/2026" aria-label="Fecha final" />
+            <input type="text" id="deviceReportRequestToTime" inputmode="numeric" placeholder="12:30" aria-label="Hora final" />
+          </div>
+        </div>
 
         <div class="mobile-device-report-request-modal__footer">
           <button type="button" class="mobile-device-report-request-modal__cancel" id="deviceReportRequestCancel">Cancelar</button>

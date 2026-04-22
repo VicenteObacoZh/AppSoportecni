@@ -169,7 +169,7 @@
   }
 
   function formatSpeed(speed) {
-    return `${Math.round(Number(speed || 0))} kph`;
+    return `${Math.round(Number(speed || 0))} km/h`;
   }
 
   function formatDateTime(value) {
@@ -1366,7 +1366,7 @@
     if (num === null) {
       return '-';
     }
-    return `${Math.round(num)} kph`;
+    return `${Math.round(num)} km/h`;
   }
 
   function formatDurationCompact(value) {

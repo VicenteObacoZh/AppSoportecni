@@ -14,16 +14,16 @@
     const normalized = String(reason || '').trim().toLowerCase();
 
     if (normalized === 'session_expired') {
-      return 'Tu sesion expiro. Vuelve a iniciar sesion para seguir operando.';
+      return 'Tu sesión expiró. Vuelve a iniciar sesión para seguir operando.';
     }
     if (normalized === 'session_required') {
-      return 'Necesitas iniciar sesion para continuar.';
+      return 'Necesitas iniciar sesión para continuar.';
     }
     if (normalized === 'backend_unavailable') {
       return 'No se pudo conectar con el backend local.';
     }
     if (normalized === 'session_not_found') {
-      return 'No se encontro una sesion valida. Inicia sesion nuevamente.';
+      return 'No se encontró una sesión válida. Inicia sesión nuevamente.';
     }
 
     return '';
@@ -129,10 +129,10 @@
 
       clearOperationalState();
       if (sessionTitleEl) {
-        sessionTitleEl.textContent = 'Sin sesion activa';
+        sessionTitleEl.textContent = 'Sin sesión activa';
       }
       if (sessionTextEl) {
-        sessionTextEl.textContent = 'Debes iniciar sesion otra vez para continuar.';
+        sessionTextEl.textContent = 'Debes iniciar sesión otra vez para continuar.';
       }
 
       onMissing?.('session_required');
@@ -147,14 +147,14 @@
 
       if (sessionTitleEl) {
         sessionTitleEl.textContent = isExpired
-          ? 'Sesion expirada'
-          : (isNetwork ? 'Sin conexion con backend' : 'No fue posible validar la sesion');
+          ? 'Sesión expirada'
+          : (isNetwork ? 'Sin conexión con backend' : 'No fue posible validar la sesión');
       }
       if (sessionTextEl) {
         sessionTextEl.textContent = apiClient?.getUserMessageFromError?.(error) ||
           (isExpired
-            ? 'Tu sesion del portal ya no es valida. Vuelve a iniciar sesion.'
-            : 'No se pudo validar la sesion con el backend.');
+            ? 'Tu sesión del portal ya no es válida. Vuelve a iniciar sesión.'
+            : 'No se pudo validar la sesión con el backend.');
       }
 
       onMissing?.(isExpired ? 'session_expired' : (isNetwork ? 'backend_unavailable' : 'session_required'), error);

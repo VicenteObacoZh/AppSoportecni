@@ -19,8 +19,10 @@
   const deviceReportRequestAccept = document.getElementById('deviceReportRequestAccept');
   const deviceReportRequestTitle = document.getElementById('deviceReportRequestTitle');
   const deviceReportRequestSubtitle = document.getElementById('deviceReportRequestSubtitle');
-  const deviceReportRequestFrom = document.getElementById('deviceReportRequestFrom');
-  const deviceReportRequestTo = document.getElementById('deviceReportRequestTo');
+  const deviceReportRequestFromDate = document.getElementById('deviceReportRequestFromDate');
+  const deviceReportRequestFromTime = document.getElementById('deviceReportRequestFromTime');
+  const deviceReportRequestToDate = document.getElementById('deviceReportRequestToDate');
+  const deviceReportRequestToTime = document.getElementById('deviceReportRequestToTime');
   const deviceEditModal = document.getElementById('deviceEditModal');
   const deviceEditBackdrop = document.getElementById('deviceEditBackdrop');
   const deviceEditCancel = document.getElementById('deviceEditCancel');
@@ -80,7 +82,7 @@
   }
 
   function formatSpeed(speed) {
-    return `${Math.round(Number(speed || 0))} kph`;
+    return `${Math.round(Number(speed || 0))} km/h`;
   }
 
   function normalizeStatusText(value) {
@@ -228,7 +230,7 @@
   function getStatusTone(device) {
     const explicitColor = resolveExplicitColor(device);
     if (explicitColor === 'gray') {
-      return { key: 'offline', label: 'Sin senal', color: 'gray' };
+      return { key: 'offline', label: 'Sin señal', color: 'gray' };
     }
     if (explicitColor === 'red') {
       return { key: 'stopped', label: 'Detenido', color: 'red' };
@@ -262,7 +264,7 @@
     ].map((value) => String(value || '').toLowerCase()).join(' | ');
 
     if (statusHint.includes('sin se') || statusHint.includes('offline')) {
-      return { key: 'offline', label: 'Sin senal', color: 'gray' };
+      return { key: 'offline', label: 'Sin señal', color: 'gray' };
     }
     if (
       statusHint.includes('detenido') ||
@@ -295,7 +297,7 @@
       : Number.POSITIVE_INFINITY;
 
     if (!hasLocation || ageHours > 24) {
-      return { key: 'offline', label: 'Sin senal', color: 'gray' };
+      return { key: 'offline', label: 'Sin señal', color: 'gray' };
     }
     if (speed > 3) {
       return { key: 'moving', label: 'Movimiento', color: 'green' };
@@ -336,7 +338,7 @@
       return `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
     }
 
-    return 'Obteniendo direccion...';
+    return 'Obteniendo dirección...';
   }
 
   function hasAddressText(device) {
@@ -435,7 +437,7 @@
         <strong>Reposo: ${idle}</strong>
       </article>
       <article class="mobile-devices-kpi">
-        <strong>Detenido / sin senal: ${stopped + offline}</strong>
+        <strong>Detenido / sin señal: ${stopped + offline}</strong>
       </article>
     `;
   }
@@ -479,7 +481,7 @@
             <div class="fleet-device-card__title">${title}</div>
           </div>
           <div class="fleet-device-card__meta">${status.label} | ${ts}</div>
-          <div class="fleet-device-card__meta">Direccion: ${address}</div>
+          <div class="fleet-device-card__meta">Dirección: ${address}</div>
         </div>
         <div class="fleet-device-card__speed">${formatSpeed(device.speedKmh)}</div>
       </article>
@@ -546,14 +548,52 @@
     }
   }
 
-  function formatDateTimeLocalValue(date) {
+  function formatDateInputValue(date) {
     const current = date instanceof Date ? date : new Date(date);
     if (Number.isNaN(current.getTime())) {
       return '';
     }
 
     const pad = (value) => String(value).padStart(2, '0');
-    return `${current.getFullYear()}-${pad(current.getMonth() + 1)}-${pad(current.getDate())}T${pad(current.getHours())}:${pad(current.getMinutes())}`;
+    return `${pad(current.getDate())}/${pad(current.getMonth() + 1)}/${current.getFullYear()}`;
+  }
+
+  function formatTimeInputValue(date) {
+    const current = date instanceof Date ? date : new Date(date);
+    if (Number.isNaN(current.getTime())) {
+      return '';
+    }
+
+    const pad = (value) => String(value).padStart(2, '0');
+    return `${pad(current.getHours())}:${pad(current.getMinutes())}`;
+  }
+
+  function parseReportDateTime(dateText, timeText) {
+    const dateMatch = String(dateText || '').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    const timeMatch = String(timeText || '').trim().match(/^(\d{1,2}):(\d{2})$/);
+    if (!dateMatch || !timeMatch) {
+      return null;
+    }
+
+    const day = Number(dateMatch[1]);
+    const month = Number(dateMatch[2]);
+    const year = Number(dateMatch[3]);
+    const hours = Number(timeMatch[1]);
+    const minutes = Number(timeMatch[2]);
+
+    const parsed = new Date(year, month - 1, day, hours, minutes, 0, 0);
+    if (
+      Number.isNaN(parsed.getTime()) ||
+      parsed.getFullYear() !== year ||
+      parsed.getMonth() !== month - 1 ||
+      parsed.getDate() !== day ||
+      parsed.getHours() !== hours ||
+      parsed.getMinutes() !== minutes
+    ) {
+      return null;
+    }
+
+    return parsed;
   }
 
   function getDefaultReportRange() {
@@ -562,8 +602,10 @@
     start.setHours(0, 0, 0, 0);
 
     return {
-      from: formatDateTimeLocalValue(start),
-      to: formatDateTimeLocalValue(now)
+      fromDate: formatDateInputValue(start),
+      fromTime: formatTimeInputValue(start),
+      toDate: formatDateInputValue(now),
+      toTime: formatTimeInputValue(now)
     };
   }
 
@@ -577,7 +619,13 @@
   }
 
   function openReportRequestModal(reportConfig) {
-    if (!deviceReportRequestModal || !deviceReportRequestFrom || !deviceReportRequestTo) {
+    if (
+      !deviceReportRequestModal ||
+      !deviceReportRequestFromDate ||
+      !deviceReportRequestFromTime ||
+      !deviceReportRequestToDate ||
+      !deviceReportRequestToTime
+    ) {
       return;
     }
 
@@ -585,8 +633,10 @@
     const range = getDefaultReportRange();
     deviceReportRequestTitle.textContent = reportConfig?.cardLabel || 'Generar reporte';
     deviceReportRequestSubtitle.textContent = reportConfig?.subtitle || 'Selecciona el rango para exportar el PDF.';
-    deviceReportRequestFrom.value = range.from;
-    deviceReportRequestTo.value = range.to;
+    deviceReportRequestFromDate.value = range.fromDate;
+    deviceReportRequestFromTime.value = range.fromTime;
+    deviceReportRequestToDate.value = range.toDate;
+    deviceReportRequestToTime.value = range.toTime;
     resetReportRequestSubmitState();
     deviceReportRequestModal.hidden = false;
   }
@@ -789,12 +839,12 @@
     }
 
     if (action === 'events') {
-      window.alert('El generador PDF de Eventos aun no esta disponible en la plataforma.');
+      window.alert('El generador PDF de Eventos aún no está disponible en la plataforma.');
       return;
     }
 
     if (action === 'geofences') {
-      window.alert('El generador PDF de Geocercas aun no esta disponible en la plataforma.');
+      window.alert('El generador PDF de Geocercas aún no está disponible en la plataforma.');
       return;
     }
 
@@ -807,16 +857,24 @@
 
   async function submitReportRequest() {
     const device = getActiveSheetDevice();
-    if (!device || !activeReportRequest || !deviceReportRequestFrom || !deviceReportRequestTo || !deviceReportRequestAccept) {
+    if (
+      !device ||
+      !activeReportRequest ||
+      !deviceReportRequestFromDate ||
+      !deviceReportRequestFromTime ||
+      !deviceReportRequestToDate ||
+      !deviceReportRequestToTime ||
+      !deviceReportRequestAccept
+    ) {
       closeReportRequestModal();
       return;
     }
 
-    const fromDate = new Date(deviceReportRequestFrom.value);
-    const toDate = new Date(deviceReportRequestTo.value);
+    const fromDate = parseReportDateTime(deviceReportRequestFromDate.value, deviceReportRequestFromTime.value);
+    const toDate = parseReportDateTime(deviceReportRequestToDate.value, deviceReportRequestToTime.value);
 
-    if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime()) || toDate <= fromDate) {
-      window.alert('Selecciona un rango valido para generar el reporte.');
+    if (!fromDate || !toDate || Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime()) || toDate <= fromDate) {
+      window.alert('Selecciona una fecha y hora válidas para generar el reporte.');
       return;
     }
 
@@ -952,7 +1010,7 @@
       });
 
       if (!session) {
-        companyList.innerHTML = '<div class="mobile-map-empty">Inicia sesion para ver la flota.</div>';
+        companyList.innerHTML = '<div class="mobile-map-empty">Inicia sesión para ver la flota.</div>';
         renderSummary([]);
         return;
       }

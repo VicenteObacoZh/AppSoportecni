@@ -167,9 +167,16 @@
         return null;
       }
 
+      if (Object.prototype.hasOwnProperty.call(parsed, 'password')) {
+        window.localStorage.setItem('gpsrastreo.savedCredentials', JSON.stringify({
+          email: String(parsed.email || ''),
+          remember: Boolean(parsed.remember)
+        }));
+      }
+
       return {
         email: String(parsed.email || ''),
-        password: String(parsed.password || ''),
+        password: '',
         remember: Boolean(parsed.remember)
       };
     } catch {
@@ -177,7 +184,7 @@
     }
   }
 
-  function saveCredentials(email, password, remember) {
+  function saveCredentials(email, _password, remember) {
     if (typeof window === 'undefined') {
       return;
     }
@@ -190,7 +197,6 @@
 
       window.localStorage.setItem('gpsrastreo.savedCredentials', JSON.stringify({
         email: String(email || ''),
-        password: String(password || ''),
         remember: true
       }));
     } catch {
@@ -458,7 +464,7 @@
   }
 
   if (loginForm && apiClient) {
-    setLoginUiState('idle', 'Ingresa con tu cuenta real del portal para crear la sesion del dashboard.');
+    setLoginUiState('idle', 'Ingresa con tu cuenta real del portal para crear la sesión del dashboard.');
 
     const loginReasonMessage = appShell?.readLoginMessageFromUrl?.();
     if (loginReasonMessage && loginMessage) {
@@ -469,9 +475,6 @@
     if (savedCredentials) {
       if (loginForm.elements.email) {
         loginForm.elements.email.value = savedCredentials.email;
-      }
-      if (loginForm.elements.password) {
-        loginForm.elements.password.value = savedCredentials.password;
       }
       if (rememberCredentials) {
         rememberCredentials.checked = savedCredentials.remember;
@@ -487,7 +490,7 @@
     loginForm.addEventListener('submit', (event) => {
       event.preventDefault();
 
-      setLoginUiState('loading', 'Validando acceso con la capa de integracion actual...');
+      setLoginUiState('loading', 'Validando acceso con la capa de integración actual...');
 
       apiClient.login({
         email: loginForm.elements.email.value,
@@ -500,7 +503,7 @@
         );
 
         if (loginMessage) {
-          loginMessage.textContent = 'Autenticacion completada. Redirigiendo al mapa operativo...';
+          loginMessage.textContent = 'Autenticación completada. Redirigiendo al mapa operativo...';
         }
 
         window.setTimeout(() => {

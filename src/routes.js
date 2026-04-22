@@ -104,7 +104,7 @@
   }
 
   function formatSpeed(value) {
-    return `${Math.round(Number(value || 0))} kph`;
+    return `${Math.round(Number(value || 0))} km/h`;
   }
 
   function formatDistanceKm(value) {
@@ -252,7 +252,7 @@
       <article class="mobile-routes-player__metric">
         <span aria-hidden="true">&#127937;</span>
         <div>
-          <strong>${Math.round(maxSpeed)} kph</strong>
+          <strong>${Math.round(maxSpeed)} km/h</strong>
           <small>Velocidad maxima</small>
         </div>
       </article>

@@ -4331,6 +4331,12 @@ img {
   outline: 0;
 }
 
+.mobile-device-report-request-modal__field-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 104px;
+  gap: 10px;
+}
+
 .mobile-device-report-request-modal__footer {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
