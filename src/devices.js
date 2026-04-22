@@ -70,6 +70,12 @@
       title: 'Reporte de Eventos',
       subtitle: 'Genera el detalle de eventos del dispositivo para el rango seleccionado.'
     },
+    geofences: {
+      cardLabel: 'Geocercas',
+      type: 'geofences',
+      title: 'Reporte de Geocercas',
+      subtitle: 'Genera el detalle de entradas y salidas de geocercas del dispositivo.'
+    },
     workhours: {
       cardLabel: 'Horas de trabajo',
       type: 'driveHours',
@@ -841,11 +847,6 @@
   function handleReportCard(action) {
     const device = getActiveSheetDevice();
     if (!device) {
-      return;
-    }
-
-    if (action === 'geofences') {
-      window.alert('El generador PDF de Geocercas aún no está disponible en la plataforma.');
       return;
     }
 
