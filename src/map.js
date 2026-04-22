@@ -45,6 +45,8 @@
   const deviceAddressButton = document.getElementById('mapDeviceAddressButton');
   const deviceCommandButton = document.getElementById('mapDeviceCommandButton');
   const deviceAddressText = document.getElementById('mapDeviceAddressText');
+  const deviceRouteButton = document.getElementById('mapDeviceRouteButton');
+  const deviceShareButton = document.getElementById('mapDeviceShareButton');
   const deviceHistoryButton = document.getElementById('mapDeviceHistoryButton');
   const deviceInfoButton = document.getElementById('mapDeviceInfoButton');
   const deviceSensorsList = document.getElementById('mapDeviceSensorsList');
@@ -68,6 +70,21 @@
   const infoActionHistory = document.getElementById('mapInfoActionHistory');
   const infoActionCommand = document.getElementById('mapInfoActionCommand');
   const infoActionReport = document.getElementById('mapInfoActionReport');
+  const shareModal = document.getElementById('mapShareModal');
+  const shareModalBackdrop = document.getElementById('mapShareModalBackdrop');
+  const shareCancelButton = document.getElementById('mapShareCancelButton');
+  const shareAcceptButton = document.getElementById('mapShareAcceptButton');
+  const shareMessage = document.getElementById('mapShareMessage');
+  const historyModal = document.getElementById('mapHistoryModal');
+  const historyModalBackdrop = document.getElementById('mapHistoryModalBackdrop');
+  const historyCancelButton = document.getElementById('mapHistoryCancelButton');
+  const historyAcceptButton = document.getElementById('mapHistoryAcceptButton');
+  const historyMessage = document.getElementById('mapHistoryMessage');
+  const historyCustomFields = document.getElementById('mapHistoryCustomFields');
+  const historyFromDate = document.getElementById('mapHistoryFromDate');
+  const historyFromTime = document.getElementById('mapHistoryFromTime');
+  const historyToDate = document.getElementById('mapHistoryToDate');
+  const historyToTime = document.getElementById('mapHistoryToTime');
   const commandModal = document.getElementById('mapCommandModal');
   const commandModalBackdrop = document.getElementById('mapCommandModalBackdrop');
   const commandModalClose = document.getElementById('mapCommandModalClose');
@@ -113,6 +130,20 @@
   let pendingAddressByKey = new Map();
   let trailPolylineById = new Map();
   let movementHistoryById = new Map();
+  let fuelReportByDeviceId = new Map();
+  let shareSending = false;
+  let historyOpening = false;
+  let pendingDeviceAction = '';
+  const pageUrl = new URL(window.location.href);
+
+  function buildReturnToDeviceSheetUrl(deviceId) {
+    const targetDeviceId = String(deviceId || selectedDevice?.deviceId || '').trim();
+    const params = new URLSearchParams();
+    if (targetDeviceId) {
+      params.set('openSheetDeviceId', targetDeviceId);
+    }
+    return `./devices.html${params.toString() ? `?${params.toString()}` : ''}`;
+  }
 
   function syncSelectionActionButtons(hasSelectedDevice) {
     const isVisible = Boolean(hasSelectedDevice);
@@ -152,6 +183,14 @@
     }
 
     return parsed.toLocaleString();
+  }
+
+  function updateMapLoadingOverlay(isVisible) {
+    if (!mapEmptyState) {
+      return;
+    }
+
+    mapEmptyState.style.display = isVisible ? '' : 'none';
   }
 
   function formatFixAge(value) {
@@ -410,9 +449,9 @@
 
     const rows = [
       { icon: '🔌', name: 'Encendido', value: statusLabel === 'Detenido' ? 'Apagado' : 'Encendido' },
-      { icon: '⏱', name: 'Horas Motor', value: sensorValue(device, ['hoursMotor', 'engineHours', 'horasMotor'], '-') },
+      { icon: '⏱', name: 'Horas Motor', value: formatEngineHours(pickValue(device, ['hoursMotor', 'engineHours', 'horasMotor', 'horasMotorInicial'])) },
       { icon: '📳', name: 'Vibracion', value: sensorValue(device, ['vibration', 'vibracion'], '-') },
-      { icon: '🛣', name: 'Kilometraje', value: sensorValue(device, ['odometer', 'mileage', 'kilometraje'], '-') },
+      { icon: '🛣', name: 'Kilometraje', value: formatOdometerKm(pickValue(device, ['odometer', 'mileage', 'kilometraje', 'odometroInicialKm'])) },
       { icon: '📶', name: 'Conectado', value: formatFixAge(device?.fixTime) === '--' ? 'Sin dato' : 'Conectado' },
       { icon: '🛰', name: 'Satelites', value: sensorValue(device, ['satellites', 'sats'], '-') }
     ];
@@ -1048,13 +1087,34 @@
     return Number.isFinite(num) ? num : null;
   }
 
+  function getValueByPath(source, path) {
+    if (!source || !path) {
+      return undefined;
+    }
+
+    const segments = String(path)
+      .split('.')
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    let current = source;
+    for (const segment of segments) {
+      if (current == null || typeof current !== 'object' || !(segment in current)) {
+        return undefined;
+      }
+      current = current[segment];
+    }
+
+    return current;
+  }
+
   function pickValue(source, keys, fallback = null) {
     if (!source || !Array.isArray(keys)) {
       return fallback;
     }
 
     for (const key of keys) {
-      const value = source?.[key];
+      const value = getValueByPath(source, key);
       if (value !== null && value !== undefined && value !== '') {
         return value;
       }
@@ -1063,12 +1123,242 @@
     return fallback;
   }
 
+  function formatCompactNumber(value, digits = 2) {
+    const numeric = toNumberOrNull(value);
+    if (numeric === null) {
+      return null;
+    }
+
+    return Number.isInteger(numeric) ? String(numeric) : numeric.toFixed(digits).replace(/\.?0+$/, '');
+  }
+
+  function extractFuelInfo(device) {
+    const rawFuel = pickValue(device, [
+      'fuelToday',
+      'fuel',
+      'combustible',
+      'fuelInfo',
+      'dailyFuel',
+      'fuelSummary',
+      'summary.fuel',
+      'summary.combustible',
+      'report.fuel',
+      'report.combustible'
+    ]);
+
+    const directConsumption = pickValue(device, [
+      'fuelConsumption',
+      'consumoCombustible',
+      'combustibleConsumido',
+      'consumo',
+      'fuel.consumption',
+      'fuelConsumptionToday',
+      'fuelToday.consumption',
+      'combustible.consumption',
+      'dailyFuel.consumption',
+      'fuelSummary.consumption',
+      'summary.fuelConsumption',
+      'report.fuelConsumption'
+    ]);
+
+    const directLevel = pickValue(device, [
+      'fuelLevel',
+      'fuelPercent',
+      'combustibleNivel',
+      'fuel.level',
+      'fuel.percent',
+      'combustible.level',
+      'dailyFuel.level',
+      'fuelSummary.level'
+    ]);
+
+    const unit = pickValue(device, [
+      'fuelUnit',
+      'fuel.unit',
+      'combustible.unit',
+      'dailyFuel.unit',
+      'fuelSummary.unit'
+    ]);
+
+    if (rawFuel && typeof rawFuel === 'object' && !Array.isArray(rawFuel)) {
+      const consumption = pickValue(rawFuel, [
+        'consumption', 'consumo', 'used', 'usedToday', 'value', 'amount', 'total'
+      ], directConsumption);
+      const level = pickValue(rawFuel, [
+        'level', 'percentage', 'percent', 'fuelLevel', 'fuelPercent'
+      ], directLevel);
+      const localUnit = pickValue(rawFuel, ['unit', 'unidad'], unit);
+
+      return {
+        raw: rawFuel,
+        consumption,
+        level,
+        unit: localUnit
+      };
+    }
+
+    return {
+      raw: rawFuel,
+      consumption: directConsumption,
+      level: directLevel,
+      unit
+    };
+  }
+
+  function formatFuelValue(device) {
+    const info = extractFuelInfo(device);
+
+    const consumptionText = formatCompactNumber(info.consumption);
+    if (consumptionText !== null) {
+      const unit = String(info.unit || '').trim() || 'L';
+      return `${consumptionText} ${unit}`;
+    }
+
+    const levelNumeric = toNumberOrNull(info.level);
+    if (levelNumeric !== null) {
+      return `${Math.round(levelNumeric)}%`;
+    }
+
+    if (info.raw !== null && info.raw !== undefined && info.raw !== '') {
+      if (typeof info.raw === 'object') {
+        const label = pickValue(info.raw, ['label', 'text', 'display']);
+        return label ? String(label) : '-';
+      }
+
+      return String(info.raw);
+    }
+
+    return '-';
+  }
+
+  function formatFuelReportValue(report) {
+    const liters = toNumberOrNull(report?.totalLiters);
+    const gallons = toNumberOrNull(report?.totalGallons);
+
+    if (liters === null && gallons === null) {
+      return '-';
+    }
+
+    const resolvedGallons = gallons ?? (liters === null ? null : liters * 0.264172);
+    if (liters !== null && resolvedGallons !== null) {
+      return `${formatCompactNumber(liters, 2)} L / ${formatCompactNumber(resolvedGallons, 2)} gal`;
+    }
+    if (liters !== null) {
+      return `${formatCompactNumber(liters, 2)} L`;
+    }
+
+    return `${formatCompactNumber(resolvedGallons, 2)} gal`;
+  }
+
+  function buildCurrentDayFuelRange(referenceValue) {
+    const parsed = referenceValue ? new Date(referenceValue) : new Date();
+    const base = Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+    const start = new Date(base.getFullYear(), base.getMonth(), base.getDate(), 0, 0, 0, 0);
+    const end = new Date(base.getFullYear(), base.getMonth(), base.getDate(), 23, 59, 59, 999);
+
+    return {
+      from: start.toISOString(),
+      to: end.toISOString()
+    };
+  }
+
+  function formatFuelReportMessage(device) {
+    const fuelReport = device?.fuelReportToday || fuelReportByDeviceId.get(String(device?.deviceId || ''));
+    if (fuelReport) {
+      const reportLines = [];
+      const reportFuelValue = formatFuelReportValue(fuelReport);
+
+      if (reportFuelValue !== '-') {
+        reportLines.push(`Combustible: ${reportFuelValue}`);
+      }
+      if (fuelReport.detail?.distanceKm != null) {
+        reportLines.push(`Distancia: ${formatDistanceKm(fuelReport.detail.distanceKm)}`);
+      }
+      if (fuelReport.detail?.averageSpeedKph != null) {
+        reportLines.push(`Velocidad promedio: ${formatSpeedKph(fuelReport.detail.averageSpeedKph)}`);
+      }
+      if (fuelReport.modeLabel) {
+        reportLines.push(`Modo: ${fuelReport.modeLabel}`);
+      }
+      if (fuelReport.rangeLabel) {
+        reportLines.push(`Rango: ${fuelReport.rangeLabel}`);
+      }
+
+      if (reportLines.length) {
+        return reportLines.join('\n');
+      }
+    }
+
+    const info = extractFuelInfo(device);
+    const lines = [];
+
+    const fuelValue = formatFuelValue(device);
+    if (fuelValue !== '-') {
+      lines.push(`Combustible: ${fuelValue}`);
+    }
+
+    const levelNumeric = toNumberOrNull(info.level);
+    if (levelNumeric !== null && !fuelValue.endsWith('%')) {
+      lines.push(`Nivel: ${Math.round(levelNumeric)}%`);
+    }
+
+    const extraDistance = pickValue(device, [
+      'distanceTodayKm', 'todayDistanceKm', 'dailyDistanceKm', 'distanceKmToday', 'distanceToday', 'distanceKm'
+    ]);
+    const distanceText = formatDistanceKm(extraDistance);
+    if (distanceText !== '-') {
+      lines.push(`Distancia: ${distanceText}`);
+    }
+
+    const odometerText = formatOdometerKm(pickValue(device, [
+      'odometer', 'mileage', 'kilometraje', 'odometroInicialKm'
+    ]));
+    if (odometerText !== '-') {
+      lines.push(`Kilometraje: ${odometerText}`);
+    }
+
+    const hoursText = formatEngineHours(pickValue(device, [
+      'hoursMotor', 'engineHours', 'horasMotor', 'horasMotorInicial'
+    ]));
+    if (hoursText !== '-') {
+      lines.push(`Horas motor: ${hoursText}`);
+    }
+
+    const vin = pickValue(device, ['chasisVin', 'vin', 'chassis', 'uniqueId']);
+    if (vin) {
+      lines.push(`Identificacion: ${vin}`);
+    }
+
+    const status = pickValue(device, ['estadoPortal', 'status', 'estado']);
+    if (status) {
+      lines.push(`Estado: ${status}`);
+    }
+
+    return lines.length ? lines.join('\n') : 'No hay datos de combustible disponibles para esta unidad.';
+  }
+
   function formatDistanceKm(value) {
     const num = toNumberOrNull(value);
     if (num === null) {
       return '-';
     }
     return `${num.toFixed(2)} km`;
+  }
+
+  function formatOdometerKm(value) {
+    const num = toNumberOrNull(value);
+    if (num === null) {
+      return '-';
+    }
+    return `${formatCompactNumber(num, 1)} km`;
+  }
+
+  function formatEngineHours(value) {
+    const num = toNumberOrNull(value);
+    if (num === null) {
+      return '-';
+    }
+    return `${formatCompactNumber(num, 1)} h`;
   }
 
   function formatSpeedKph(value) {
@@ -1109,7 +1399,9 @@
     }
 
     const device = selectedDevice;
+    const deviceKey = String(device.deviceId || '');
     const deviceName = device.vehicleName || device.name || `ID ${device.deviceId || '-'}`;
+    const cachedFuelReport = fuelReportByDeviceId.get(deviceKey) || device.fuelReportToday || null;
 
     if (infoTitle) {
       infoTitle.textContent = deviceName;
@@ -1121,9 +1413,6 @@
     const maxSpeedToday = pickValue(device, [
       'maxSpeedToday', 'maxSpeedKphToday', 'vMaxToday', 'speedMaxToday', 'speedMax'
     ], device.speedKmh);
-    const fuelValue = pickValue(device, [
-      'fuel', 'fuelLevel', 'fuelPercent', 'combustible', 'fuelToday'
-    ], '-');
     const recentConnection = pickValue(device, ['fixTime', 'deviceTime', 'serverTime']);
     const stopDurationValue = pickValue(device, [
       'stopDurationSeconds', 'stopDurationSec', 'stopDuration', 'parkingDurationSeconds'
@@ -1132,13 +1421,15 @@
     const addressText = getAddressLabel(device.address, device);
 
     if (infoDistance) {
-      infoDistance.textContent = formatDistanceKm(distanceToday);
+      infoDistance.textContent = cachedFuelReport?.detail?.distanceKm != null
+        ? formatDistanceKm(cachedFuelReport.detail.distanceKm)
+        : formatDistanceKm(distanceToday);
     }
     if (infoMaxSpeed) {
       infoMaxSpeed.textContent = formatSpeedKph(maxSpeedToday);
     }
     if (infoFuel) {
-      infoFuel.textContent = String(fuelValue || '-');
+      infoFuel.textContent = cachedFuelReport ? formatFuelReportValue(cachedFuelReport) : formatFuelValue(device);
     }
     if (infoRecent) {
       infoRecent.textContent = formatDateTime(recentConnection);
@@ -1161,10 +1452,14 @@
       infoSensorVibration.textContent = sensorValue(device, ['vibration', 'vibracion'], '-');
     }
     if (infoSensorHours) {
-      infoSensorHours.textContent = sensorValue(device, ['hoursMotor', 'engineHours', 'horasMotor'], '-');
+      infoSensorHours.textContent = formatEngineHours(
+        pickValue(device, ['hoursMotor', 'engineHours', 'horasMotor', 'horasMotorInicial'])
+      );
     }
     if (infoSensorOdometer) {
-      infoSensorOdometer.textContent = sensorValue(device, ['odometer', 'mileage', 'kilometraje'], '-');
+      infoSensorOdometer.textContent = formatOdometerKm(
+        pickValue(device, ['odometer', 'mileage', 'kilometraje', 'odometroInicialKm'])
+      );
     }
 
     resolveAddressNowIfNeeded(device).then((resolved) => {
@@ -1174,6 +1469,42 @@
     });
 
     infoModal.hidden = false;
+
+    if (!apiClient || !deviceKey) {
+      return;
+    }
+
+    const deviceId = Number(device.deviceId);
+    if (!Number.isFinite(deviceId) || deviceId <= 0) {
+      return;
+    }
+
+    if (infoFuel && !cachedFuelReport) {
+      infoFuel.textContent = 'Cargando...';
+    }
+
+    const range = buildCurrentDayFuelRange(device.fixTime || device.deviceTime || device.serverTime);
+
+    try {
+      const fuelReport = await apiClient.getFuelConsumptionReport(deviceId, range.from, range.to);
+      if (!selectedDevice || String(selectedDevice.deviceId || '') !== deviceKey || !fuelReport) {
+        return;
+      }
+
+      fuelReportByDeviceId.set(deviceKey, fuelReport);
+      selectedDevice.fuelReportToday = fuelReport;
+
+      if (infoFuel) {
+        infoFuel.textContent = formatFuelReportValue(fuelReport);
+      }
+      if (infoDistance && fuelReport.detail?.distanceKm != null) {
+        infoDistance.textContent = formatDistanceKm(fuelReport.detail.distanceKm);
+      }
+    } catch {
+      if (selectedDevice && String(selectedDevice.deviceId || '') === deviceKey && infoFuel) {
+        infoFuel.textContent = formatFuelValue(device);
+      }
+    }
   }
 
   function closeInfoModal() {
@@ -1863,10 +2194,6 @@
 
     const withLocation = devices.filter((item) => Number.isFinite(Number(item?.lat)) && Number.isFinite(Number(item?.lon)));
 
-    if (mapEmptyState) {
-      mapEmptyState.style.display = withLocation.length > 0 ? 'none' : '';
-    }
-
     if (!withLocation.length) {
       clearMapMarkers();
       clearDetailedMarkers();
@@ -1940,6 +2267,206 @@
 
     const url = `https://www.google.com/maps?q=&layer=c&cbll=${safeLat},${safeLon}`;
     window.open(url, '_blank', 'noopener,noreferrer');
+  }
+
+  function openExternalMapLocation(lat, lon, label = '') {
+    const safeLat = Number(lat);
+    const safeLon = Number(lon);
+    if (!Number.isFinite(safeLat) || !Number.isFinite(safeLon)) {
+      return;
+    }
+
+    const safeLabel = encodeURIComponent(String(label || `${safeLat},${safeLon}`).trim());
+    const coordinateText = `${safeLat},${safeLon}`;
+    const geoUrl = `geo:${coordinateText}?q=${coordinateText}(${safeLabel})`;
+    const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(coordinateText)}`;
+    const isNativeCapacitor = Boolean(
+      window.Capacitor?.isNativePlatform?.() ||
+      window.CapacitorAndroid ||
+      window.webkit?.messageHandlers?.bridge
+    );
+
+    if (isNativeCapacitor) {
+      window.location.href = geoUrl;
+      window.setTimeout(() => {
+        window.open(googleMapsUrl, '_blank', 'noopener,noreferrer');
+      }, 600);
+      return;
+    }
+
+    window.open(googleMapsUrl, '_blank', 'noopener,noreferrer');
+  }
+
+  function openShareModal() {
+    if (!shareModal) {
+      return;
+    }
+    if (shareMessage) {
+      shareMessage.textContent = '';
+    }
+    shareModal.hidden = false;
+  }
+
+  function closeShareModal() {
+    if (!shareModal) {
+      return;
+    }
+    shareModal.hidden = true;
+    shareSending = false;
+    if (shareAcceptButton) {
+      shareAcceptButton.disabled = false;
+      shareAcceptButton.textContent = 'Aceptar';
+    }
+  }
+
+  function formatDateInputValue(date) {
+    const parsed = date instanceof Date ? date : new Date(date);
+    const safe = Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+    const pad = (value) => String(value).padStart(2, '0');
+    return `${safe.getFullYear()}-${pad(safe.getMonth() + 1)}-${pad(safe.getDate())}`;
+  }
+
+  function formatTimeInputValue(date) {
+    const parsed = date instanceof Date ? date : new Date(date);
+    const safe = Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+    const pad = (value) => String(value).padStart(2, '0');
+    return `${pad(safe.getHours())}:${pad(safe.getMinutes())}`;
+  }
+
+  function getSelectedHistoryRange() {
+    const checked = document.querySelector('input[name="historyRange"]:checked');
+    return String(checked?.value || 'today');
+  }
+
+  function syncHistoryCustomFields() {
+    if (!historyCustomFields) {
+      return;
+    }
+    historyCustomFields.hidden = getSelectedHistoryRange() !== 'custom';
+  }
+
+  function openHistoryModal() {
+    if (!historyModal) {
+      return;
+    }
+
+    const now = new Date();
+    if (historyFromDate) {
+      historyFromDate.value = formatDateInputValue(now);
+    }
+    if (historyToDate) {
+      historyToDate.value = formatDateInputValue(now);
+    }
+    if (historyFromTime) {
+      historyFromTime.value = '00:00';
+    }
+    if (historyToTime) {
+      historyToTime.value = formatTimeInputValue(now);
+    }
+    if (historyMessage) {
+      historyMessage.textContent = '';
+    }
+    const defaultRadio = document.querySelector('input[name="historyRange"][value="today"]');
+    if (defaultRadio) {
+      defaultRadio.checked = true;
+    }
+    syncHistoryCustomFields();
+    historyModal.hidden = false;
+  }
+
+  function closeHistoryModal() {
+    if (!historyModal) {
+      return;
+    }
+    historyModal.hidden = true;
+    historyOpening = false;
+    if (historyAcceptButton) {
+      historyAcceptButton.disabled = false;
+      historyAcceptButton.textContent = 'Aceptar';
+    }
+  }
+
+  function buildHistoryRangeSelection() {
+    const now = new Date();
+    const preset = getSelectedHistoryRange();
+    let from = new Date(now);
+    let to = new Date(now);
+
+    if (preset === 'today') {
+      from.setHours(0, 0, 0, 0);
+      to.setHours(23, 59, 59, 999);
+    } else if (preset === 'yesterday') {
+      from.setDate(from.getDate() - 1);
+      from.setHours(0, 0, 0, 0);
+      to = new Date(from);
+      to.setHours(23, 59, 59, 999);
+    } else if (preset === 'week') {
+      const day = from.getDay();
+      const diff = day === 0 ? 6 : day - 1;
+      from.setDate(from.getDate() - diff);
+      from.setHours(0, 0, 0, 0);
+      to.setHours(23, 59, 59, 999);
+    } else {
+      const fromValue = `${historyFromDate?.value || ''}T${historyFromTime?.value || '00:00'}`;
+      const toValue = `${historyToDate?.value || ''}T${historyToTime?.value || '23:59'}`;
+      from = new Date(fromValue);
+      to = new Date(toValue);
+      if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+        throw new Error('Debes ingresar fecha y hora inicial y final validas.');
+      }
+    }
+
+    if (from.getTime() > to.getTime()) {
+      throw new Error('La fecha inicial no puede ser mayor que la fecha final.');
+    }
+
+    return {
+      from: from.toISOString(),
+      to: to.toISOString()
+    };
+  }
+
+  function openHistoryPlayback() {
+    if (!selectedDevice?.deviceId) {
+      return;
+    }
+
+    closeInfoModal();
+    openHistoryModal();
+  }
+
+  function getSelectedShareDurationMinutes() {
+    const checked = document.querySelector('input[name="shareDuration"]:checked');
+    const numeric = Number(checked?.value || 10);
+    return Number.isFinite(numeric) && numeric > 0 ? numeric : 10;
+  }
+
+  function sendShareToWhatsapp(shareUrl, deviceName, durationMinutes) {
+    const safeUrl = String(shareUrl || '').trim();
+    if (!safeUrl) {
+      throw new Error('No se pudo generar el enlace compartido.');
+    }
+
+    const message = [
+      `Monitoreo temporal de ${deviceName || 'la unidad'}`,
+      `Disponible por ${durationMinutes} min`,
+      safeUrl
+    ].join('\n');
+
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+
+    if (navigator.share) {
+      navigator.share({
+        title: `Monitoreo de ${deviceName || 'unidad'}`,
+        text: message,
+        url: safeUrl
+      }).catch(() => {
+        window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+      });
+      return;
+    }
+
+    window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
   }
 
   function openUserCurrentLocation() {
@@ -2106,6 +2633,7 @@
   function resolveSelectedDevice() {
     const currentUrl = new URL(window.location.href);
     const deviceId = currentUrl.searchParams.get('deviceId');
+    pendingDeviceAction = String(currentUrl.searchParams.get('action') || '').trim().toLowerCase();
     const fromStorage = apiClient?.getSelectedDevice?.();
 
     if (deviceId && fromStorage && String(fromStorage.deviceId) === String(deviceId)) {
@@ -2135,17 +2663,45 @@
     liveMap.setView([lat, lon], 16);
   }
 
+  function consumePendingDeviceAction() {
+    const action = pendingDeviceAction;
+    pendingDeviceAction = '';
+
+    if (!action || !selectedDevice?.deviceId) {
+      return;
+    }
+
+    if (action === 'info') {
+      openInfoModal();
+      return;
+    }
+
+    if (action === 'command') {
+      openCommandModal();
+      return;
+    }
+
+    if (action === 'geofences') {
+      geofencesVisible = true;
+      syncGeofencesControls();
+      renderGeofences();
+    }
+  }
+
   async function loadMapPage(options = {}) {
     const preserveViewport = Boolean(options.preserveViewport);
     if (!apiClient) {
       return;
     }
 
+    updateMapLoadingOverlay(true);
+
     try {
       const session = await appShell?.requireSession?.({
         redirectOnMissing: true
       });
       if (!session) {
+        updateMapLoadingOverlay(false);
         currentDevices = [];
         currentCompanies = [];
         currentAlertSummary = null;
@@ -2175,6 +2731,7 @@
       renderMap(filteredDevices);
       renderGeofences();
       applyEventFocusState();
+      updateMapLoadingOverlay(false);
 
       if (selectedEvent) {
         showDevicePanel(null);
@@ -2187,6 +2744,7 @@
           if (liveMap && Number.isFinite(Number(device.lat)) && Number.isFinite(Number(device.lon))) {
             liveMap.setView([Number(device.lat), Number(device.lon)], 16);
           }
+          consumePendingDeviceAction();
         }
       } else if (!preserveViewport && !hasInitializedViewport && currentDevices.length > 0 && liveMap) {
         showDevicePanel(null);
@@ -2199,6 +2757,7 @@
         }
       }
     } catch (_error) {
+      updateMapLoadingOverlay(false);
       currentDevices = [];
       currentCompanies = [];
       currentAlertSummary = null;
@@ -2311,10 +2870,19 @@
   });
 
   routesButton?.addEventListener('click', () => {
-    openCommandModal();
+    openHistoryPlayback();
   });
 
   backButton?.addEventListener('click', () => {
+    const returnTo = String(pageUrl.searchParams.get('returnTo') || '').trim().toLowerCase();
+    const from = String(pageUrl.searchParams.get('from') || '').trim().toLowerCase();
+
+    if (returnTo === 'device-sheet' || from === 'devices') {
+      apiClient?.clearSelectedEvent?.();
+      window.location.href = buildReturnToDeviceSheetUrl(pageUrl.searchParams.get('deviceId'));
+      return;
+    }
+
     apiClient?.clearSelectedEvent?.();
     window.location.href = './alerts.html';
   });
@@ -2345,6 +2913,130 @@
     openInfoModal();
   });
 
+  deviceRouteButton?.addEventListener('click', () => {
+    if (!selectedDevice) {
+      return;
+    }
+
+    const lat = Number(selectedDevice.lat);
+    const lon = Number(selectedDevice.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      window.alert('La unidad seleccionada no tiene coordenadas disponibles.');
+      return;
+    }
+
+    openExternalMapLocation(lat, lon, selectedDevice.vehicleName || selectedDevice.name || 'Ubicacion');
+  });
+
+  deviceShareButton?.addEventListener('click', () => {
+    if (!selectedDevice?.deviceId) {
+      return;
+    }
+
+    openShareModal();
+  });
+
+  deviceHistoryButton?.addEventListener('click', () => {
+    openHistoryPlayback();
+  });
+
+  shareModalBackdrop?.addEventListener('click', closeShareModal);
+  shareCancelButton?.addEventListener('click', closeShareModal);
+  shareAcceptButton?.addEventListener('click', async () => {
+    if (shareSending || !selectedDevice?.deviceId || !apiClient) {
+      return;
+    }
+
+    shareSending = true;
+    if (shareAcceptButton) {
+      shareAcceptButton.disabled = true;
+      shareAcceptButton.textContent = 'Generando...';
+    }
+    if (shareMessage) {
+      shareMessage.textContent = 'Creando enlace temporal...';
+    }
+
+    try {
+      const durationMinutes = getSelectedShareDurationMinutes();
+      const payload = await apiClient.createShareLink({
+        deviceId: Number(selectedDevice.deviceId),
+        deviceName: selectedDevice.vehicleName || selectedDevice.name || 'Unidad',
+        durationMinutes
+      });
+
+      if (!payload?.shareUrl) {
+        throw new Error('No se pudo obtener el enlace compartido.');
+      }
+
+      if (shareMessage) {
+        shareMessage.textContent = 'Abriendo WhatsApp...';
+      }
+
+      sendShareToWhatsapp(
+        payload.shareUrl,
+        selectedDevice.vehicleName || selectedDevice.name || 'Unidad',
+        durationMinutes
+      );
+      closeShareModal();
+    } catch (error) {
+      if (shareMessage) {
+        shareMessage.textContent = error?.userMessage || error?.message || 'No se pudo crear el enlace compartido.';
+      }
+      shareSending = false;
+      if (shareAcceptButton) {
+        shareAcceptButton.disabled = false;
+        shareAcceptButton.textContent = 'Aceptar';
+      }
+    }
+  });
+
+  historyModalBackdrop?.addEventListener('click', closeHistoryModal);
+  historyCancelButton?.addEventListener('click', closeHistoryModal);
+  document.querySelectorAll('input[name="historyRange"]').forEach((input) => {
+    input.addEventListener('change', syncHistoryCustomFields);
+  });
+  historyAcceptButton?.addEventListener('click', () => {
+    if (historyOpening || !selectedDevice?.deviceId || !apiClient) {
+      return;
+    }
+
+    historyOpening = true;
+    if (historyAcceptButton) {
+      historyAcceptButton.disabled = true;
+      historyAcceptButton.textContent = 'Abriendo...';
+    }
+    if (historyMessage) {
+      historyMessage.textContent = '';
+    }
+
+    try {
+      const range = buildHistoryRangeSelection();
+      apiClient?.storeRouteContext?.({
+        deviceId: String(selectedDevice.deviceId),
+        from: range.from,
+        to: range.to
+      });
+      closeHistoryModal();
+      const params = new URLSearchParams({
+        deviceId: String(selectedDevice.deviceId),
+        from: 'map'
+      });
+      if (String(pageUrl.searchParams.get('returnTo') || '').trim().toLowerCase() === 'device-sheet') {
+        params.set('returnTo', 'device-sheet');
+      }
+      window.location.href = `./routes.html?${params.toString()}`;
+    } catch (error) {
+      if (historyMessage) {
+        historyMessage.textContent = error?.message || 'No se pudo preparar el historial.';
+      }
+      historyOpening = false;
+      if (historyAcceptButton) {
+        historyAcceptButton.disabled = false;
+        historyAcceptButton.textContent = 'Aceptar';
+      }
+    }
+  });
+
   deviceCommandButton?.addEventListener('click', () => {
     openCommandModal();
   });
@@ -2367,15 +3059,18 @@
   });
 
   infoFuelReportBtn?.addEventListener('click', () => {
-    window.alert('Informe diario de combustible: disponible en la siguiente iteracion.');
+    if (!selectedDevice) {
+      return;
+    }
+
+    window.alert(formatFuelReportMessage(selectedDevice));
   });
 
   infoActionHistory?.addEventListener('click', () => {
     if (!selectedDevice?.deviceId) {
       return;
     }
-    closeInfoModal();
-    window.location.href = `./routes.html?deviceId=${encodeURIComponent(String(selectedDevice.deviceId))}&from=map`;
+    openHistoryPlayback();
   });
 
   infoActionCommand?.addEventListener('click', () => {

@@ -3,139 +3,131 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GpsRastreo | Rutas</title>
-  <meta name="description" content="Vista movil de rutas e historicos para GpsRastreo." />
+  <title>GpsRastreo | Reproduccion de historial</title>
+  <meta name="description" content="Vista movil de reproduccion de historial para GpsRastreo." />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="./styles.css?v=28" />
 </head>
-<body class="dashboard-body dashboard-body--routes-mobile">
-  <div class="mobile-routes-app">
-    <header class="mobile-routes-topbar">
-      <div>
-        <p class="eyebrow">Historico operativo</p>
-        <h1>Rutas</h1>
+<body class="dashboard-body dashboard-body--routes-mobile dashboard-body--history-player">
+  <div class="mobile-routes-player">
+    <header class="mobile-routes-player__header">
+      <button type="button" class="mobile-routes-player__icon-btn" id="routeBackButton" aria-label="Volver">
+        <span aria-hidden="true">&#8592;</span>
+      </button>
+
+      <div class="mobile-routes-player__title">
+        <h1 id="routeDeviceTitle">Reproduccion</h1>
       </div>
-      <button class="mobile-routes-action" id="loadRouteButton" type="button">Consultar</button>
+
+      <div class="mobile-routes-player__actions">
+        <button type="button" class="mobile-routes-player__icon-btn" id="routeFiltersButton" aria-label="Cambiar rango">
+          <span aria-hidden="true">&#128196;</span>
+        </button>
+        <button type="button" class="mobile-routes-player__icon-btn" id="loadRouteButton" aria-label="Consultar historial">
+          <span aria-hidden="true">&#9201;</span>
+        </button>
+      </div>
     </header>
 
-    <main class="mobile-routes-main">
-      <section class="mobile-routes-filters">
+    <main class="mobile-routes-player__main">
+      <section class="mobile-routes-player__map-stage">
+        <div id="routeMap" class="mobile-routes-player__map"></div>
+        <div class="map-empty-state map-empty-state--overlay" id="routeMapEmptyState">
+          <div class="loading-indicator loading-indicator--overlay" aria-label="Procesando">
+            <div class="loading-indicator__spinner" aria-hidden="true"></div>
+          </div>
+        </div>
+
+        <aside class="mobile-routes-player__sheet">
+          <div class="mobile-routes-player__grabber"></div>
+
+          <section class="mobile-routes-player__playback">
+            <div class="mobile-routes-player__playback-top">
+              <button type="button" class="mobile-routes-player__play-btn" id="routePlayButton" aria-label="Reproducir">
+                <span aria-hidden="true">&#10074;&#10074;</span>
+              </button>
+              <input type="range" id="routePlaybackSlider" min="0" max="0" value="0" step="1" />
+            </div>
+
+            <div class="mobile-routes-player__status-line">
+              <span aria-hidden="true">&#128338;</span>
+              <strong>Ultima actualizacion:</strong>
+              <span id="routeCurrentTime">--</span>
+            </div>
+
+            <div class="mobile-routes-player__status-line">
+              <span aria-hidden="true">&#128663;</span>
+              <strong>Velocidad:</strong>
+              <span id="routeCurrentSpeed">0 kph</span>
+            </div>
+
+            <div class="mobile-routes-player__summary" id="routeSummary"></div>
+          </section>
+
+          <section class="mobile-routes-player__timeline">
+            <div class="mobile-routes-player__timeline-head">
+              <strong>Eventos del recorrido</strong>
+              <span id="routeTimelineCount">Sin puntos cargados</span>
+            </div>
+            <div class="mobile-routes-player__points" id="routePointsList"></div>
+          </section>
+        </aside>
+      </section>
+    </main>
+  </div>
+
+  <div class="mobile-routes-player__hidden-controls" aria-hidden="true">
+    <div id="routePlaybackState">Carga una ruta para iniciar</div>
+    <span id="routeSignalPill">Rango listo</span>
+    <select id="routeSpeedSelect">
+      <option value="0.5">0.5x</option>
+      <option value="1" selected>1x</option>
+      <option value="2">2x</option>
+      <option value="4">4x</option>
+    </select>
+  </div>
+
+  <div class="mobile-routes-filter-modal" id="routeFiltersPanel" hidden>
+    <div class="mobile-routes-filter-modal__backdrop" id="routeFiltersBackdrop"></div>
+    <div class="mobile-routes-filter-modal__card">
+      <div class="mobile-routes-filter-modal__head">
+        <h3>Seleccionar rango</h3>
+        <button type="button" id="routeCloseFiltersButton" aria-label="Cerrar">&#10005;</button>
+      </div>
+
+      <div class="mobile-routes-filter-modal__body">
         <label class="field">
           <span>Dispositivo</span>
           <select id="routeDeviceSelect"></select>
         </label>
 
-        <div class="mobile-routes-presets">
-          <button type="button" class="mobile-routes-preset" data-route-preset="1h">Ultima 1h</button>
-          <button type="button" class="mobile-routes-preset" data-route-preset="4h">Ultimas 4h</button>
-          <button type="button" class="mobile-routes-preset" data-route-preset="today">Hoy</button>
-          <button type="button" class="mobile-routes-preset" data-route-preset="yesterday">Ayer</button>
+        <div class="mobile-routes-player__preset-grid">
+          <button type="button" class="mobile-routes-player__preset" data-route-preset="1h">Ultima 1h</button>
+          <button type="button" class="mobile-routes-player__preset" data-route-preset="4h">Ultimas 4h</button>
+          <button type="button" class="mobile-routes-player__preset" data-route-preset="today">Hoy</button>
+          <button type="button" class="mobile-routes-player__preset" data-route-preset="yesterday">Ayer</button>
         </div>
 
-        <label class="field">
-          <span>Desde</span>
-          <input type="datetime-local" id="routeFrom" />
-        </label>
+        <div class="mobile-routes-player__date-grid">
+          <label class="field">
+            <span>Desde</span>
+            <input type="datetime-local" id="routeFrom" />
+          </label>
 
-        <label class="field">
-          <span>Hasta</span>
-          <input type="datetime-local" id="routeTo" />
-        </label>
-      </section>
-
-      <section class="mobile-routes-summary" id="routeSummary"></section>
-
-      <section class="mobile-routes-playback-card">
-        <div class="mobile-routes-points-card__top">
-          <p class="eyebrow">Playback</p>
-          <h3>Recorrido paso a paso</h3>
-        </div>
-
-        <div class="mobile-routes-playback-controls">
-          <button type="button" class="mobile-routes-control mobile-routes-control--primary" id="routePlayButton">Reproducir</button>
-          <button type="button" class="mobile-routes-control" id="routePauseButton">Pausar</button>
-          <button type="button" class="mobile-routes-control" id="routeRestartButton">Reiniciar</button>
-          <label class="mobile-routes-speed">
-            <span>Velocidad</span>
-            <select id="routeSpeedSelect">
-              <option value="0.5">0.5x</option>
-              <option value="1" selected>1x</option>
-              <option value="2">2x</option>
-              <option value="4">4x</option>
-            </select>
+          <label class="field">
+            <span>Hasta</span>
+            <input type="datetime-local" id="routeTo" />
           </label>
         </div>
+      </div>
 
-        <div class="mobile-routes-current">
-          <div class="mobile-routes-current__status" id="routePlaybackState">Carga una ruta para iniciar</div>
-          <div class="mobile-routes-current__grid">
-            <article>
-              <span>Hora</span>
-              <strong id="routeCurrentTime">--</strong>
-            </article>
-            <article>
-              <span>Velocidad</span>
-              <strong id="routeCurrentSpeed">0 km/h</strong>
-            </article>
-            <article>
-              <span>Posicion</span>
-              <strong id="routeCurrentPosition">Sin coordenadas</strong>
-            </article>
-            <article>
-              <span>Direccion</span>
-              <strong id="routeCurrentAddress">Direccion no disponible para este punto.</strong>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section class="mobile-routes-map-card">
-        <div class="mobile-routes-map-card__top">
-          <div>
-            <p class="eyebrow">Trazado historico</p>
-            <h3>Ruta del dispositivo seleccionado</h3>
-          </div>
-          <span class="signal-pill" id="routeSignalPill">Rango listo</span>
-        </div>
-        <div class="mobile-routes-map-wrap">
-          <div id="routeMap" class="mobile-routes-map"></div>
-          <div class="map-empty-state map-empty-state--overlay" id="routeMapEmptyState">
-            Selecciona una unidad y pulsa "Consultar".
-          </div>
-        </div>
-      </section>
-
-      <section class="mobile-routes-points-card">
-        <div class="mobile-routes-points-card__top">
-          <p class="eyebrow">Bitacora</p>
-          <h3>Timeline del recorrido</h3>
-          <span class="mobile-routes-timeline-count" id="routeTimelineCount">Sin puntos cargados</span>
-        </div>
-        <div class="mobile-routes-points" id="routePointsList"></div>
-      </section>
-    </main>
-
-    <nav class="mobile-bottom-nav">
-      <a class="mobile-bottom-nav__item" href="./devices.html" aria-label="Dispositivos">
-        <span class="mobile-bottom-nav__icon">&#128663;</span>
-        <span>Dispositivos</span>
-      </a>
-      <a class="mobile-bottom-nav__item" href="./alerts.html" aria-label="Eventos">
-        <span class="mobile-bottom-nav__icon">&#128276;</span>
-        <span>Eventos</span>
-      </a>
-      <a class="mobile-bottom-nav__item" href="./map.html" aria-label="Mapa">
-        <span class="mobile-bottom-nav__icon">&#128506;</span>
-        <span>Mapa</span>
-      </a>
-      <a class="mobile-bottom-nav__item" href="./settings.html" aria-label="Configuraciones">
-        <span class="mobile-bottom-nav__icon">&#128736;</span>
-        <span>Configuraciones</span>
-      </a>
-    </nav>
+      <div class="mobile-routes-filter-modal__footer">
+        <button type="button" id="routeApplyFiltersButton">Aceptar</button>
+      </div>
+    </div>
   </div>
 
   <script src="./config.js?v=3"></script>
@@ -143,6 +135,6 @@
   <script src="./api.js?v=3"></script>
   <script src="./app-shell.js?v=1"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="./routes.js?v=3"></script>
+  <script src="./routes.js?v=4"></script>
 </body>
 </html>

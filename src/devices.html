@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="./styles.css?v=28" />
 </head>
 <body class="dashboard-body dashboard-body--devices-mobile">
   <div class="mobile-devices-app">
@@ -32,13 +32,17 @@
       </div>
 
       <section class="mobile-devices-list" id="devicesCompanyList">
-        <div class="mobile-map-empty">Cargando flota...</div>
+        <div class="mobile-map-empty mobile-map-empty--loading">
+          <div class="loading-indicator loading-indicator--light" aria-label="Procesando">
+            <div class="loading-indicator__spinner" aria-hidden="true"></div>
+          </div>
+        </div>
       </section>
     </main>
 
     <nav class="mobile-bottom-nav">
       <a class="mobile-bottom-nav__item mobile-bottom-nav__item--active" href="./devices.html" aria-label="Dispositivos">
-        <span class="mobile-bottom-nav__icon">&#128663;</span>
+        <span class="mobile-bottom-nav__icon"><img class="mobile-bottom-nav__icon-img" src="./assets/device-actions/DeviceInf.png" alt="" /></span>
         <span>Dispositivos</span>
       </a>
       <a class="mobile-bottom-nav__item" href="./alerts.html" aria-label="Eventos">
@@ -54,12 +58,105 @@
         <span>Configuraciones</span>
       </a>
     </nav>
+
+    <div class="mobile-device-actions-sheet" id="deviceActionsSheet" hidden>
+      <div class="mobile-device-actions-sheet__backdrop" id="deviceActionsSheetBackdrop"></div>
+      <div class="mobile-device-actions-sheet__panel">
+        <button type="button" class="mobile-device-actions-sheet__grabber" id="deviceActionsSheetClose" aria-label="Cerrar panel"></button>
+
+        <div class="mobile-device-actions-sheet__head">
+          <h3 id="deviceActionsSheetTitle">Unidad</h3>
+          <button type="button" class="mobile-device-actions-sheet__share" aria-label="Compartir">
+            <img src="./assets/device-actions/compartir.png" alt="" />
+          </button>
+        </div>
+
+        <div class="mobile-device-actions-sheet__grid">
+          <button type="button" class="mobile-device-actions-sheet__item" data-device-sheet-action="location">
+            <img src="./assets/device-actions/ubicacion_actual.png" alt="" />
+            <span>Ubicacion actual</span>
+          </button>
+          <button type="button" class="mobile-device-actions-sheet__item" data-device-sheet-action="info">
+            <img src="./assets/device-actions/DeviceInf.png" alt="" />
+            <span>Informacion</span>
+          </button>
+          <button type="button" class="mobile-device-actions-sheet__item" data-device-sheet-action="playback">
+            <img src="./assets/device-actions/reproduccion.png" alt="" />
+            <span>Reproduccion</span>
+          </button>
+          <button type="button" class="mobile-device-actions-sheet__item" data-device-sheet-action="geofence">
+            <img src="./assets/device-actions/geocerca.png" alt="" />
+            <span>Geocerca</span>
+          </button>
+          <button type="button" class="mobile-device-actions-sheet__item" data-device-sheet-action="report">
+            <img src="./assets/device-actions/reporte.png" alt="" />
+            <span>Reporte</span>
+          </button>
+          <button type="button" class="mobile-device-actions-sheet__item" data-device-sheet-action="command">
+            <img src="./assets/device-actions/comando.png" alt="" />
+            <span>Comando especial</span>
+          </button>
+          <button type="button" class="mobile-device-actions-sheet__item" data-device-sheet-action="edit">
+            <img src="./assets/device-actions/editar_dispositivo.png" alt="" />
+            <span>Editar dispositivo</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="mobile-device-reports-modal" id="deviceReportsModal" hidden>
+      <div class="mobile-device-reports-modal__backdrop" id="deviceReportsBackdrop"></div>
+      <div class="mobile-device-reports-modal__panel">
+        <header class="mobile-device-reports-modal__head">
+          <button type="button" class="mobile-device-reports-modal__back" id="deviceReportsBack" aria-label="Volver">&#8592;</button>
+          <h3>Panel de informes</h3>
+        </header>
+
+        <div class="mobile-device-reports-modal__grid">
+          <button type="button" class="mobile-device-reports-modal__card" data-report-card="information">
+            <span>Informacion</span>
+            <img src="./assets/device-actions/informacion.png" alt="" />
+          </button>
+          <button type="button" class="mobile-device-reports-modal__card" data-report-card="routes">
+            <span>Recorridos</span>
+            <img src="./assets/device-actions/recorridos.png" alt="" />
+          </button>
+          <button type="button" class="mobile-device-reports-modal__card" data-report-card="events">
+            <span>Eventos</span>
+            <img src="./assets/device-actions/eventos.png" alt="" />
+          </button>
+          <button type="button" class="mobile-device-reports-modal__card" data-report-card="geofences">
+            <span>Geocercas</span>
+            <img src="./assets/device-actions/geocercas.png" alt="" />
+          </button>
+          <button type="button" class="mobile-device-reports-modal__card" data-report-card="workhours">
+            <span>Horas de trabajo</span>
+            <img src="./assets/device-actions/horas_de_trabajo.png" alt="" />
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="mobile-device-edit-modal" id="deviceEditModal" hidden>
+      <div class="mobile-device-edit-modal__backdrop" id="deviceEditBackdrop"></div>
+      <div class="mobile-device-edit-modal__card">
+        <h3>Nombre de Dispositivo</h3>
+        <label class="mobile-device-edit-modal__field">
+          <span>Nombre</span>
+          <input type="text" id="deviceEditNameInput" />
+        </label>
+        <div class="mobile-device-edit-modal__footer">
+          <button type="button" class="mobile-device-edit-modal__cancel" id="deviceEditCancel">Cancelar</button>
+          <button type="button" class="mobile-device-edit-modal__accept" id="deviceEditAccept">Aceptar</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="./config.js?v=3"></script>
   <script src="./mock-data.js?v=3"></script>
-  <script src="./api.js?v=3"></script>
+  <script src="./api.js?v=5"></script>
   <script src="./app-shell.js?v=1"></script>
-  <script src="./devices.js?v=3"></script>
+  <script src="./devices.js?v=4"></script>
 </body>
 </html>

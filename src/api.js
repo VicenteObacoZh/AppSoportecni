@@ -300,6 +300,9 @@
           ...options
         });
       } catch (error) {
+        if (error?.name === 'AbortError') {
+          throw error;
+        }
         lastNetworkError = { error, requestUrl };
         continue;
       }
@@ -389,6 +392,18 @@
     };
   }
 
+  async function getFuelConsumptionReportBySession(sessionId, deviceId, from, to) {
+    const query = new URLSearchParams({
+      sessionId,
+      deviceId: String(deviceId),
+      from,
+      to
+    });
+
+    const payload = await request(`${config.endpoints.liveFuelConsumptionReport || '/live/reports/fuel-consumption'}?${query.toString()}`);
+    return payload?.data || null;
+  }
+
   async function reverseGeocode(lat, lon) {
     const query = new URLSearchParams({
       lat: String(lat),
@@ -410,6 +425,35 @@
     });
 
     return payload?.data || payload || null;
+  }
+
+  async function updateDeviceMetaBySession(sessionId, { deviceId, vehicleName, uniqueId, signal }) {
+    const payload = await request(config.endpoints.liveMonitorDeviceMeta || '/live/monitor/device-meta', {
+      method: 'POST',
+      signal,
+      body: JSON.stringify({
+        sessionId,
+        deviceId,
+        vehicleName,
+        uniqueId
+      })
+    });
+
+    return payload?.data || payload || null;
+  }
+
+  async function createShareLinkBySession(sessionId, { deviceId, deviceName, durationMinutes }) {
+    const payload = await request(config.endpoints.liveShareLink || '/live/share-link', {
+      method: 'POST',
+      body: JSON.stringify({
+        sessionId,
+        deviceId,
+        deviceName,
+        durationMinutes
+      })
+    });
+
+    return payload?.data || null;
   }
 
   window.GpsRastreoApi = {
@@ -574,6 +618,31 @@
       }
     },
 
+    async updateDeviceName(deviceId, vehicleName, uniqueId, signal) {
+      const sessionId = ensureSessionId();
+
+      try {
+        return await updateDeviceMetaBySession(sessionId, {
+          deviceId,
+          vehicleName,
+          uniqueId,
+          signal
+        });
+      } catch (error) {
+        if (error?.name === 'AbortError') {
+          const aborted = new Error('Operacion cancelada.');
+          aborted.code = 'REQUEST_ABORTED';
+          aborted.userMessage = 'Operacion cancelada.';
+          throw aborted;
+        }
+        throw handleClientError(error, {
+          context: 'device-meta-update',
+          emit: true,
+          clearOnSession: true
+        });
+      }
+    },
+
     async getRecentEvents(limit = 30) {
       const sessionId = ensureSessionId();
 
@@ -609,6 +678,34 @@
         }
 
         throw handled;
+      }
+    },
+
+    async getFuelConsumptionReport(deviceId, from, to) {
+      const sessionId = ensureSessionId();
+
+      try {
+        return await getFuelConsumptionReportBySession(sessionId, deviceId, from, to);
+      } catch (error) {
+        throw handleClientError(error, {
+          context: 'fuel-consumption-report',
+          emit: true,
+          clearOnSession: true
+        });
+      }
+    },
+
+    async createShareLink(shareData) {
+      const sessionId = ensureSessionId();
+
+      try {
+        return await createShareLinkBySession(sessionId, shareData || {});
+      } catch (error) {
+        throw handleClientError(error, {
+          context: 'share-link',
+          emit: true,
+          clearOnSession: true
+        });
       }
     },
 

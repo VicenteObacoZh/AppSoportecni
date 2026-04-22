@@ -96,8 +96,11 @@
       liveAlertsList: '/live/alerts/list',
       liveMonitorRoute: '/live/monitor/route',
       liveMonitorCommand: '/live/monitor/command',
+      liveMonitorDeviceMeta: '/live/monitor/device-meta',
       liveEventsRecent: '/live/monitor/events/recent',
-      liveGeofences: '/live/monitor/geofences'
+      liveGeofences: '/live/monitor/geofences',
+      liveFuelConsumptionReport: '/live/reports/fuel-consumption',
+      liveShareLink: '/live/share-link'
     }
   };
 })();

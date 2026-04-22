@@ -5,6 +5,19 @@
   const companyList = document.getElementById('devicesCompanyList');
   const summary = document.getElementById('devicesSummary');
   const filterButtons = Array.from(document.querySelectorAll('[data-device-filter]'));
+  const deviceActionsSheet = document.getElementById('deviceActionsSheet');
+  const deviceActionsSheetBackdrop = document.getElementById('deviceActionsSheetBackdrop');
+  const deviceActionsSheetClose = document.getElementById('deviceActionsSheetClose');
+  const deviceActionsSheetTitle = document.getElementById('deviceActionsSheetTitle');
+  const deviceReportsModal = document.getElementById('deviceReportsModal');
+  const deviceReportsBackdrop = document.getElementById('deviceReportsBackdrop');
+  const deviceReportsBack = document.getElementById('deviceReportsBack');
+  const deviceEditModal = document.getElementById('deviceEditModal');
+  const deviceEditBackdrop = document.getElementById('deviceEditBackdrop');
+  const deviceEditCancel = document.getElementById('deviceEditCancel');
+  const deviceEditAccept = document.getElementById('deviceEditAccept');
+  const deviceEditNameInput = document.getElementById('deviceEditNameInput');
+  const currentUrl = new URL(window.location.href);
 
   let currentDevices = [];
   let groupedCompanies = [];
@@ -13,6 +26,18 @@
   let geocodeRefreshTimer = null;
   let geocodeRefreshAttempts = 0;
   const MAX_GEOCODE_REFRESH_ATTEMPTS = 6;
+  let activeSheetDeviceId = '';
+  let deviceRenameAbortController = null;
+
+  function createLoadingMarkup() {
+    return `
+      <div class="mobile-map-empty mobile-map-empty--loading">
+        <div class="loading-indicator loading-indicator--light" aria-label="Procesando">
+          <div class="loading-indicator__spinner" aria-hidden="true"></div>
+        </div>
+      </div>
+    `;
+  }
 
   function escapeHtml(value) {
     return String(value ?? '')
@@ -413,7 +438,7 @@
     const address = escapeHtml(getAddressLabel(device));
 
     return `
-      <article class="fleet-device-card fleet-device-card--${status.color}">
+      <article class="fleet-device-card fleet-device-card--${status.color}" data-device-sheet-id="${escapeHtml(device.deviceId)}" tabindex="0" role="button" aria-label="Abrir acciones de ${title}">
         <div class="fleet-device-card__arrow-strip">
           <img src="${arrowUrl}" alt="estado" onerror="this.style.display='none'" />
         </div>
@@ -424,14 +449,239 @@
           </div>
           <div class="fleet-device-card__meta">${status.label} | ${ts}</div>
           <div class="fleet-device-card__meta">Direccion: ${address}</div>
-          <div class="fleet-device-card__actions">
-            <button type="button" class="fleet-device-card__action" data-device-action="map" data-device-id="${escapeHtml(device.deviceId)}">Ver mapa</button>
-            <button type="button" class="fleet-device-card__action" data-device-action="route" data-device-id="${escapeHtml(device.deviceId)}">Historico</button>
-          </div>
         </div>
         <div class="fleet-device-card__speed">${formatSpeed(device.speedKmh)}</div>
       </article>
     `;
+  }
+
+  function openDeviceActionsSheet(device) {
+    if (!deviceActionsSheet || !deviceActionsSheetTitle) {
+      return;
+    }
+
+    activeSheetDeviceId = String(device?.deviceId || '');
+    deviceActionsSheetTitle.textContent = String(device?.vehicleName || device?.name || 'Unidad');
+    deviceActionsSheet.hidden = false;
+  }
+
+  function restoreRequestedDeviceSheet() {
+    const requestedDeviceId = String(currentUrl.searchParams.get('openSheetDeviceId') || '').trim();
+    if (!requestedDeviceId) {
+      return;
+    }
+
+    const device = currentDevices.find((item) => String(item.deviceId) === requestedDeviceId);
+    if (!device) {
+      return;
+    }
+
+    const deviceCompany = String(device.groupName || device.companyName || '').trim();
+    if (deviceCompany) {
+      expandedCompany = deviceCompany;
+      renderCompanies();
+    }
+
+    openDeviceActionsSheet(device);
+    currentUrl.searchParams.delete('openSheetDeviceId');
+    window.history.replaceState({}, document.title, currentUrl.pathname + (currentUrl.search ? currentUrl.search : ''));
+  }
+
+  function closeDeviceActionsSheet() {
+    if (!deviceActionsSheet) {
+      return;
+    }
+
+    deviceActionsSheet.hidden = true;
+  }
+
+  function getActiveSheetDevice() {
+    if (!activeSheetDeviceId) {
+      return null;
+    }
+
+    return currentDevices.find((item) => String(item.deviceId) === activeSheetDeviceId) || null;
+  }
+
+  function openReportsModal() {
+    if (deviceReportsModal) {
+      deviceReportsModal.hidden = false;
+    }
+  }
+
+  function closeReportsModal() {
+    if (deviceReportsModal) {
+      deviceReportsModal.hidden = true;
+    }
+  }
+
+  function openEditModal(device) {
+    if (!deviceEditModal || !deviceEditNameInput) {
+      return;
+    }
+
+    deviceEditNameInput.value = String(device?.vehicleName || device?.name || '');
+    deviceEditModal.hidden = false;
+  }
+
+  function closeEditModal() {
+    if (deviceEditModal) {
+      deviceEditModal.hidden = true;
+    }
+  }
+
+  function resetEditSubmitState() {
+    if (!deviceEditAccept) {
+      return;
+    }
+
+    deviceEditAccept.disabled = false;
+    deviceEditAccept.textContent = 'Aceptar';
+  }
+
+  function applyUpdatedDeviceName(device, nextName) {
+    if (!device || !nextName) {
+      return;
+    }
+
+    device.vehicleName = nextName;
+    device.name = nextName;
+
+    const selectedDevice = apiClient?.getSelectedDevice?.();
+    if (selectedDevice && String(selectedDevice.deviceId) === String(device.deviceId)) {
+      selectedDevice.vehicleName = nextName;
+      selectedDevice.name = nextName;
+      apiClient?.storeSelectedDevice?.(selectedDevice);
+    }
+
+    buildGroups(currentDevices);
+    renderCompanies();
+    if (deviceActionsSheetTitle) {
+      deviceActionsSheetTitle.textContent = nextName;
+    }
+  }
+
+  function navigateToMap(device, action = '') {
+    if (!device?.deviceId) {
+      return;
+    }
+
+    apiClient?.storeSelectedDevice?.(device);
+    const params = new URLSearchParams({
+      deviceId: String(device.deviceId),
+      from: 'devices',
+      returnTo: 'device-sheet'
+    });
+
+    if (action) {
+      params.set('action', action);
+    }
+
+    window.location.href = `./map.html?${params.toString()}`;
+  }
+
+  function navigateToRoutes(device) {
+    if (!device?.deviceId) {
+      return;
+    }
+
+    const now = new Date();
+    const before = new Date(now.getTime() - (4 * 60 * 60 * 1000));
+    apiClient?.storeSelectedDevice?.(device);
+    apiClient?.storeRouteContext?.({
+      deviceId: String(device.deviceId),
+      from: before.toISOString(),
+      to: now.toISOString()
+    });
+    const params = new URLSearchParams({
+      deviceId: String(device.deviceId),
+      from: 'devices',
+      returnTo: 'device-sheet'
+    });
+    window.location.href = `./routes.html?${params.toString()}`;
+  }
+
+  function handleSheetAction(action) {
+    const device = getActiveSheetDevice();
+    if (!device) {
+      return;
+    }
+
+    if (action === 'location') {
+      closeDeviceActionsSheet();
+      navigateToMap(device, 'location');
+      return;
+    }
+
+    if (action === 'info') {
+      closeDeviceActionsSheet();
+      navigateToMap(device, 'info');
+      return;
+    }
+
+    if (action === 'playback') {
+      closeDeviceActionsSheet();
+      navigateToRoutes(device);
+      return;
+    }
+
+    if (action === 'geofence') {
+      closeDeviceActionsSheet();
+      navigateToMap(device, 'geofences');
+      return;
+    }
+
+    if (action === 'report') {
+      openReportsModal();
+      return;
+    }
+
+    if (action === 'command') {
+      closeDeviceActionsSheet();
+      navigateToMap(device, 'command');
+      return;
+    }
+
+    if (action === 'edit') {
+      openEditModal(device);
+    }
+  }
+
+  function handleReportCard(action) {
+    const device = getActiveSheetDevice();
+    if (!device) {
+      return;
+    }
+
+    closeReportsModal();
+
+    if (action === 'information') {
+      closeDeviceActionsSheet();
+      navigateToMap(device, 'info');
+      return;
+    }
+
+    if (action === 'routes') {
+      closeDeviceActionsSheet();
+      navigateToRoutes(device);
+      return;
+    }
+
+    if (action === 'events') {
+      closeDeviceActionsSheet();
+      window.location.href = './alerts.html';
+      return;
+    }
+
+    if (action === 'geofences') {
+      closeDeviceActionsSheet();
+      navigateToMap(device, 'geofences');
+      return;
+    }
+
+    if (action === 'workhours') {
+      window.alert('La vista de Horas de trabajo quedara conectada en el siguiente paso.');
+    }
   }
 
   function renderCompanies() {
@@ -471,6 +721,27 @@
       });
     });
 
+    companyList.querySelectorAll('[data-device-sheet-id]').forEach((card) => {
+      const openSheet = () => {
+        const deviceId = String(card.getAttribute('data-device-sheet-id') || '');
+        const device = currentDevices.find((item) => String(item.deviceId) === deviceId);
+        if (!device) {
+          return;
+        }
+
+        apiClient?.storeSelectedDevice?.(device);
+        openDeviceActionsSheet(device);
+      };
+
+      card.addEventListener('click', openSheet);
+      card.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          openSheet();
+        }
+      });
+    });
+
     companyList.querySelectorAll('[data-device-action]').forEach((button) => {
       button.addEventListener('click', (event) => {
         event.stopPropagation();
@@ -501,6 +772,7 @@
 
   async function loadDevices() {
     if (!apiClient) return;
+    companyList.innerHTML = createLoadingMarkup();
 
     try {
       const session = await appShell?.requireSession?.({
@@ -521,6 +793,7 @@
         expandedCompany = groupedCompanies[0].name;
       }
       renderCompanies();
+      restoreRequestedDeviceSheet();
       scheduleGeocodeRefreshIfNeeded(currentDevices);
     } catch (_error) {
       companyList.innerHTML = '<div class="mobile-map-empty">No fue posible cargar los dispositivos.</div>';
@@ -537,6 +810,71 @@
   });
 
   searchInput?.addEventListener('input', renderCompanies);
+  deviceActionsSheetBackdrop?.addEventListener('click', closeDeviceActionsSheet);
+  deviceActionsSheetClose?.addEventListener('click', closeDeviceActionsSheet);
+  deviceActionsSheet?.querySelectorAll('[data-device-sheet-action]').forEach((button) => {
+    button.addEventListener('click', () => {
+      handleSheetAction(button.getAttribute('data-device-sheet-action') || '');
+    });
+  });
+  deviceReportsBackdrop?.addEventListener('click', closeReportsModal);
+  deviceReportsBack?.addEventListener('click', closeReportsModal);
+  deviceReportsModal?.querySelectorAll('[data-report-card]').forEach((button) => {
+    button.addEventListener('click', () => {
+      handleReportCard(button.getAttribute('data-report-card') || '');
+    });
+  });
+  deviceEditBackdrop?.addEventListener('click', () => {
+    deviceRenameAbortController?.abort();
+    deviceRenameAbortController = null;
+    resetEditSubmitState();
+    closeEditModal();
+  });
+  deviceEditCancel?.addEventListener('click', () => {
+    deviceRenameAbortController?.abort();
+    deviceRenameAbortController = null;
+    resetEditSubmitState();
+    closeEditModal();
+  });
+  deviceEditAccept?.addEventListener('click', () => {
+    const device = getActiveSheetDevice();
+    if (!device || !deviceEditNameInput) {
+      closeEditModal();
+      return;
+    }
+
+    const nextName = String(deviceEditNameInput.value || '').trim();
+    if (!nextName || nextName === String(device.vehicleName || device.name || '').trim()) {
+      closeEditModal();
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      deviceRenameAbortController?.abort();
+    }, 15000);
+    deviceRenameAbortController = new AbortController();
+    closeEditModal();
+
+    Promise.resolve(
+      apiClient?.updateDeviceName?.(
+        device.deviceId,
+        nextName,
+        device.uniqueId || '',
+        deviceRenameAbortController.signal
+      )
+    )
+      .then(() => {
+        applyUpdatedDeviceName(device, nextName);
+      })
+      .catch(() => {
+        // El apiClient ya emite el mensaje centralizado de error.
+      })
+      .finally(() => {
+        window.clearTimeout(timeoutId);
+        deviceRenameAbortController = null;
+        resetEditSubmitState();
+      });
+  });
 
   loadDevices();
 })();

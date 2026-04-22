@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css?v=27" />
+  <link rel="stylesheet" href="./styles.css?v=28" />
 </head>
 <body class="dashboard-body dashboard-body--map">
   <div class="mobile-map-app">
@@ -18,7 +18,9 @@
       <div class="mobile-map-topbar__title">
         <h1 id="mapHeaderTitle">Mapa</h1>
       </div>
-      <div class="mobile-map-topbar__status" aria-hidden="true">&#128663;</div>
+      <div class="mobile-map-topbar__status" aria-hidden="true">
+        <img src="./assets/device-actions/DeviceInf.png" alt="" />
+      </div>
       <div class="mobile-map-counters">
         <span class="mobile-map-counter mobile-map-counter--green" id="mapMovingCount">0</span>
         <span class="mobile-map-counter mobile-map-counter--orange" id="mapLocationCount">0</span>
@@ -28,9 +30,11 @@
 
     <main class="mobile-map-stage">
       <div id="pageLiveMap" class="mobile-map-canvas"></div>
-      <div class="map-empty-state map-empty-state--overlay" id="pageMapEmptyState">
-        Esperando unidades reales para pintar el mapa.
-      </div>
+        <div class="map-empty-state map-empty-state--overlay" id="pageMapEmptyState">
+          <div class="loading-indicator loading-indicator--overlay" aria-label="Procesando">
+            <div class="loading-indicator__spinner" aria-hidden="true"></div>
+          </div>
+        </div>
 
       <button class="mobile-map-menu-button" type="button" id="mobileMapMenuButton" aria-label="Abrir panel lateral" aria-expanded="false">
         &#9776;
@@ -236,6 +240,64 @@
           </footer>
         </div>
       </section>
+
+      <section class="mobile-share-modal" id="mapShareModal" hidden>
+        <div class="mobile-share-modal__backdrop" id="mapShareModalBackdrop"></div>
+        <div class="mobile-share-modal__card" role="dialog" aria-modal="true" aria-labelledby="mapShareModalTitle">
+          <header class="mobile-share-modal__head">
+            <h3 id="mapShareModalTitle">Compartir monitoreo</h3>
+          </header>
+          <div class="mobile-share-modal__body">
+            <p class="mobile-share-modal__subtitle">Selecciona el tiempo durante el cual el enlace podra monitorear la unidad sin login.</p>
+            <div class="mobile-share-modal__options" id="mapShareDurationOptions">
+              <label><input type="radio" name="shareDuration" value="10" checked /> <span>10 min</span></label>
+              <label><input type="radio" name="shareDuration" value="15" /> <span>15 min</span></label>
+              <label><input type="radio" name="shareDuration" value="30" /> <span>30 min</span></label>
+              <label><input type="radio" name="shareDuration" value="60" /> <span>60 min</span></label>
+              <label><input type="radio" name="shareDuration" value="120" /> <span>120 min</span></label>
+              <label><input type="radio" name="shareDuration" value="180" /> <span>180 min</span></label>
+            </div>
+            <p class="mobile-share-modal__message" id="mapShareMessage"></p>
+          </div>
+          <footer class="mobile-share-modal__footer">
+            <button type="button" class="mobile-share-modal__cancel" id="mapShareCancelButton">Cancelar</button>
+            <button type="button" class="mobile-share-modal__accept" id="mapShareAcceptButton">Aceptar</button>
+          </footer>
+        </div>
+      </section>
+
+      <section class="mobile-share-modal" id="mapHistoryModal" hidden>
+        <div class="mobile-share-modal__backdrop" id="mapHistoryModalBackdrop"></div>
+        <div class="mobile-share-modal__card" role="dialog" aria-modal="true" aria-labelledby="mapHistoryModalTitle">
+          <header class="mobile-share-modal__head">
+            <h3 id="mapHistoryModalTitle">Seleccionar historial</h3>
+          </header>
+          <div class="mobile-share-modal__body">
+            <div class="mobile-share-modal__options" id="mapHistoryRangeOptions">
+              <label><input type="radio" name="historyRange" value="today" checked /> <span>Hoy</span></label>
+              <label><input type="radio" name="historyRange" value="yesterday" /> <span>Ayer</span></label>
+              <label><input type="radio" name="historyRange" value="week" /> <span>Semana Actual</span></label>
+              <label><input type="radio" name="historyRange" value="custom" /> <span>Personalizado</span></label>
+            </div>
+
+            <div class="mobile-history-modal__custom" id="mapHistoryCustomFields" hidden>
+              <div class="mobile-history-modal__grid">
+                <input type="date" id="mapHistoryFromDate" />
+                <input type="time" id="mapHistoryFromTime" />
+                <input type="date" id="mapHistoryToDate" />
+                <input type="time" id="mapHistoryToTime" />
+              </div>
+            </div>
+
+            <p class="mobile-share-modal__message" id="mapHistoryMessage"></p>
+          </div>
+          <footer class="mobile-share-modal__footer">
+            <button type="button" class="mobile-share-modal__cancel" id="mapHistoryCancelButton">Cancelar</button>
+            <button type="button" class="mobile-share-modal__accept" id="mapHistoryAcceptButton">Aceptar</button>
+          </footer>
+        </div>
+      </section>
+
       <section class="mobile-command-modal" id="mapCommandModal" hidden>
         <div class="mobile-command-modal__backdrop" id="mapCommandModalBackdrop"></div>
         <div class="mobile-command-modal__card" role="dialog" aria-modal="true" aria-labelledby="mapCommandModalTitle">
@@ -271,7 +333,7 @@
 
     <nav class="mobile-bottom-nav">
       <a class="mobile-bottom-nav__item" href="./devices.html">
-        <span class="mobile-bottom-nav__icon">&#128663;</span>
+        <span class="mobile-bottom-nav__icon"><img class="mobile-bottom-nav__icon-img" src="./assets/device-actions/DeviceInf.png" alt="" /></span>
         <span>Dispositivos</span>
       </a>
       <a class="mobile-bottom-nav__item" href="./alerts.html">
@@ -291,10 +353,10 @@
 
   <script src="./config.js?v=4"></script>
   <script src="./mock-data.js?v=3"></script>
-  <script src="./api.js?v=4"></script>
+  <script src="./api.js?v=5"></script>
   <script src="./app-shell.js?v=1"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="./map.js?v=31"></script>
+  <script src="./map.js?v=32"></script>
 </body>
 </html>
 

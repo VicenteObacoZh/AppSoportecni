@@ -5,6 +5,7 @@ const healthRoutes = require('./routes/health');
 const authRoutes = require('./routes/auth');
 const dashboardRoutes = require('./routes/dashboard');
 const liveRoutes = require('./routes/live');
+const publicRoutes = require('./routes/public');
 
 function createApp() {
   const app = express();
@@ -26,6 +27,8 @@ function createApp() {
   app.use('/api/auth', authRoutes);
   app.use('/api/dashboard', dashboardRoutes);
   app.use('/api/live', liveRoutes);
+  app.use('/api/public', publicRoutes);
+  app.use('/share', publicRoutes);
 
   app.use((err, _req, res, _next) => {
     res.status(500).json({

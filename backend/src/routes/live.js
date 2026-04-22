@@ -1,9 +1,16 @@
 const express = require('express');
 const mockData = require('../data/mockDashboard');
 const { getSession, updateSession } = require('../services/sessionStore');
-const { fetchPlatform, sendMonitorCommand } = require('../services/platformClient');
+const {
+  fetchPlatform,
+  sendMonitorCommand,
+  saveMonitorMeta,
+  fetchConfigurationDeviceMeta,
+  saveConfigurationDevice
+} = require('../services/platformClient');
 const config = require('../config');
 const geocodeCacheService = require('../services/geocodeCacheService');
+const { createShareToken } = require('../services/shareTokenStore');
 
 const router = express.Router();
 
@@ -146,6 +153,341 @@ function respondSessionNotFound(res) {
     code: 'SESSION_NOT_FOUND',
     message: 'Sesion valida no encontrada.'
   });
+}
+
+function hasLiveCookies(session) {
+  return Array.isArray(session?.cookies) && session.cookies.length > 0;
+}
+
+function looksLikePortalLogin(text) {
+  return (
+    String(text || '').includes('Iniciar sesi') ||
+    String(text || '').includes('class="login-form"') ||
+    String(text || '').includes('placeholder="Correo electr')
+  );
+}
+
+function extractHtmlTitle(html) {
+  const match = String(html || '').match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  return match?.[1] ? String(match[1]).replace(/\s+/g, ' ').trim() : null;
+}
+
+function extractInterestingSnippets(html, terms = []) {
+  const source = String(html || '');
+  const snippets = [];
+
+  terms
+    .map((item) => String(item || '').trim())
+    .filter(Boolean)
+    .forEach((term) => {
+      const index = source.toLowerCase().indexOf(term.toLowerCase());
+      if (index < 0) {
+        return;
+      }
+
+      const start = Math.max(0, index - 160);
+      const end = Math.min(source.length, index + 220);
+      const snippet = source
+        .slice(start, end)
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      snippets.push({
+        term,
+        snippet
+      });
+    });
+
+  return snippets;
+}
+
+function extractMatchingLinks(html, terms = []) {
+  const source = String(html || '');
+  const matches = [];
+  const regex = /<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+  let found;
+
+  while ((found = regex.exec(source)) !== null) {
+    const href = String(found[1] || '').trim();
+    const text = String(found[2] || '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const combined = `${href} ${text}`.toLowerCase();
+
+    if (terms.some((term) => combined.includes(String(term || '').trim().toLowerCase()))) {
+      matches.push({ href, text });
+    }
+  }
+
+  return matches.slice(0, 20);
+}
+
+function extractRequestVerificationToken(html) {
+  const source = String(html || '');
+  const patterns = [
+    /<input[^>]*name=["']__RequestVerificationToken["'][^>]*value=["']([^"']+)["'][^>]*>/i,
+    /<input[^>]*value=["']([^"']+)["'][^>]*name=["']__RequestVerificationToken["'][^>]*>/i
+  ];
+
+  for (const pattern of patterns) {
+    const match = source.match(pattern);
+    if (match?.[1]) {
+      return match[1];
+    }
+  }
+
+  return null;
+}
+
+function stripHtml(value) {
+  return String(value || '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function toDecimalOrNull(value) {
+  const normalized = String(value || '').trim().replace(',', '.');
+  const numeric = Number(normalized);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function parseFuelReportHtml(html) {
+  const source = String(html || '');
+  const totalMatch = source.match(/Total estimado:\s*([\d.,]+)\s*gal\s*\(([\d.,]+)\s*L\)/i);
+  const distanceMatch = source.match(/Distancia total:\s*([\d.,]+)\s*km/i);
+  const rangeMatch = source.match(/Rango:\s*([^<\r\n]+)/i);
+  const modeMatch = source.match(/Modo:\s*([^<\r\n]+)/i);
+
+  const rowMatches = [...source.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)];
+  let detail = null;
+
+  for (const rowMatch of rowMatches) {
+    const cellMatches = [...String(rowMatch[1] || '').matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi)];
+    const cells = cellMatches.map((item) => stripHtml(item[1]));
+
+    if (cells.length >= 10 && !/dispositivo/i.test(cells[0])) {
+      detail = {
+        deviceName: cells[0] || null,
+        distanceKm: toDecimalOrNull(cells[1]),
+        engineHours: toDecimalOrNull(cells[2]),
+        movingHours: toDecimalOrNull(cells[3]),
+        idleHours: toDecimalOrNull(cells[4]),
+        averageSpeedKph: toDecimalOrNull(cells[5]),
+        maxSpeedKph: toDecimalOrNull(cells[6]),
+        speedFactor: toDecimalOrNull(cells[7]),
+        litersByDistance: toDecimalOrNull(cells[8]),
+        estimatedLiters: toDecimalOrNull(cells[9])
+      };
+      break;
+    }
+  }
+
+  const totalGallons = toDecimalOrNull(totalMatch?.[1]);
+  const totalLiters = toDecimalOrNull(totalMatch?.[2]);
+
+  return {
+    totalGallons,
+    totalLiters,
+    totalDistanceKm: toDecimalOrNull(distanceMatch?.[1]),
+    rangeLabel: rangeMatch?.[1] ? String(rangeMatch[1]).trim() : null,
+    modeLabel: modeMatch?.[1] ? String(modeMatch[1]).trim() : null,
+    detail,
+    html
+  };
+}
+
+function findNestedValue(source, matcher) {
+  if (source == null) {
+    return undefined;
+  }
+
+  if (Array.isArray(source)) {
+    for (const item of source) {
+      const found = findNestedValue(item, matcher);
+      if (found !== undefined) {
+        return found;
+      }
+    }
+    return undefined;
+  }
+
+  if (typeof source !== 'object') {
+    return undefined;
+  }
+
+  for (const [key, value] of Object.entries(source)) {
+    if (matcher(key, value)) {
+      return value;
+    }
+
+    const found = findNestedValue(value, matcher);
+    if (found !== undefined) {
+      return found;
+    }
+  }
+
+  return undefined;
+}
+
+function findNestedArray(source, keyCandidates = []) {
+  const lowered = keyCandidates.map((item) => String(item || '').toLowerCase());
+  return findNestedValue(source, (key, value) => (
+    Array.isArray(value) &&
+    lowered.includes(String(key || '').toLowerCase())
+  ));
+}
+
+function firstNumberFromObject(source, keyCandidates = []) {
+  const lowered = keyCandidates.map((item) => String(item || '').toLowerCase());
+  const direct = findNestedValue(source, (key, value) => (
+    lowered.includes(String(key || '').toLowerCase()) &&
+    toDecimalOrNull(value) !== null
+  ));
+
+  return toDecimalOrNull(direct);
+}
+
+function firstTextFromObject(source, keyCandidates = []) {
+  const lowered = keyCandidates.map((item) => String(item || '').toLowerCase());
+  const direct = findNestedValue(source, (key, value) => (
+    lowered.includes(String(key || '').toLowerCase()) &&
+    String(value || '').trim().length > 0
+  ));
+
+  return direct ? String(direct).trim() : null;
+}
+
+function normalizeFuelReportJson(payload) {
+  const topLevelTotalLiters = firstNumberFromObject(payload, ['totalLiters', 'litros', 'liters', 'estimatedLiters']);
+  const topLevelTotalGallons = firstNumberFromObject(payload, ['totalGallons', 'galones', 'gallons', 'estimatedGallons']);
+  const topLevelDistanceKm = firstNumberFromObject(payload, ['totalDistanceKm', 'distanciaTotalKm', 'distanceKm', 'distanciaTotal']);
+  const rows =
+    (Array.isArray(payload) ? payload : null) ||
+    findNestedArray(payload, ['items', 'rows', 'data', 'reportRows', 'details', 'detalle', 'devices']) ||
+    [];
+
+  let detail = null;
+  if (Array.isArray(rows)) {
+    const candidate = rows.find((item) => item && typeof item === 'object') || null;
+    if (candidate) {
+      detail = {
+        deviceName: firstTextFromObject(candidate, ['deviceName', 'dispositivo', 'name', 'vehicleName']),
+        distanceKm: firstNumberFromObject(candidate, ['distanceKm', 'distKm', 'distanciaKm', 'distance', 'dist']),
+        engineHours: firstNumberFromObject(candidate, ['engineHours', 'horasMotor', 'hoursMotor']),
+        movingHours: firstNumberFromObject(candidate, ['movingHours', 'horasMov', 'hoursMov']),
+        idleHours: firstNumberFromObject(candidate, ['idleHours', 'horasRalenti', 'hoursIdle']),
+        averageSpeedKph: firstNumberFromObject(candidate, ['averageSpeedKph', 'avgSpeedKmh', 'velProm', 'speedAvg']),
+        maxSpeedKph: firstNumberFromObject(candidate, ['maxSpeedKph', 'avgSpeedKmh', 'velMax', 'speedMax']),
+        speedFactor: firstNumberFromObject(candidate, ['speedFactor', 'factorVel', 'velocityFactor']),
+        litersByDistance: firstNumberFromObject(candidate, ['litersByDistance', 'litrosPorKm', 'litersPerKm', 'litersByKm']),
+        estimatedLiters: firstNumberFromObject(candidate, ['estimatedLiters', 'litrosEstimados', 'fuelLiters', 'liters', 'litersEstimated'])
+      };
+    }
+  }
+
+  const detailEstimatedLiters = toDecimalOrNull(detail?.estimatedLiters);
+  const detailDistanceKm = toDecimalOrNull(detail?.distanceKm);
+  const fallbackTotalLiters =
+    (topLevelTotalLiters != null && topLevelTotalLiters > 0 ? topLevelTotalLiters : null) ??
+    detailEstimatedLiters;
+  const fallbackTotalGallons =
+    (topLevelTotalGallons != null && topLevelTotalGallons > 0 ? topLevelTotalGallons : null) ??
+    (fallbackTotalLiters == null ? null : Number(fallbackTotalLiters) * 0.264172);
+  const fallbackDistanceKm =
+    (topLevelDistanceKm != null && topLevelDistanceKm > 0 ? topLevelDistanceKm : null) ??
+    detailDistanceKm;
+
+  return {
+    totalGallons: fallbackTotalGallons,
+    totalLiters: fallbackTotalLiters,
+    totalDistanceKm: fallbackDistanceKm,
+    rangeLabel: firstTextFromObject(payload, ['rangeLabel', 'rango', 'range']),
+    modeLabel: firstTextFromObject(payload, ['modeLabel', 'modo', 'mode']),
+    detail,
+    json: payload
+  };
+}
+
+async function fetchFuelConsumptionReport(session, { deviceId, from, to }) {
+  const reportPage = await fetchPlatform('/Reportes/Reportes', {
+    headers: {
+      Cookie: session.cookies.join('; ')
+    }
+  });
+
+  if (looksLikePortalLogin(reportPage.text)) {
+    return {
+      ok: false,
+      code: 'SESSION_EXPIRED',
+      message: 'La sesion del portal expiro o ya no es valida para generar reportes.'
+    };
+  }
+
+  const token = extractRequestVerificationToken(reportPage.text);
+  if (!token) {
+    return {
+      ok: false,
+      code: 'REPORT_TOKEN_MISSING',
+      message: 'No fue posible extraer el token de reportes.'
+    };
+  }
+
+  const payload = {
+    type: 'fuelConsumption',
+    format: 'JSON',
+    title: 'Reporte Consumo de Combustible',
+    from,
+    to,
+    deviceIds: [Number(deviceId)],
+    stopMinMinutes: 3,
+    stopSpeedKmh: 1,
+    speedLimitKmh: null,
+    fuelMode: 'hybrid',
+    fuelLitersPer100Km: 12,
+    fuelLitersPerEngineHour: 2.5,
+    emails: ''
+  };
+
+  const generated = await fetchPlatform('/Reportes/Reportes?handler=Generate', {
+    method: 'POST',
+    headers: {
+      Cookie: session.cookies.join('; '),
+      'Content-Type': 'application/json',
+      Accept: '*/*',
+      RequestVerificationToken: token
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (looksLikePortalLogin(generated.text)) {
+    return {
+      ok: false,
+      code: 'SESSION_EXPIRED',
+      message: 'La sesion del portal expiro o ya no es valida para generar el reporte.'
+    };
+  }
+
+  const parsedJson = (() => {
+    try {
+      return JSON.parse(generated.text);
+    } catch {
+      return null;
+    }
+  })();
+
+  return {
+    ok: true,
+    payload,
+    report: parsedJson
+      ? normalizeFuelReportJson(parsedJson)
+      : parseFuelReportHtml(generated.text)
+  };
 }
 
 function buildMonitorSummary(payload) {
@@ -433,10 +775,6 @@ function buildMockGeofencesSummary() {
   return normalizeGeofences(mockData.geofences || []);
 }
 
-function hasLiveCookies(session) {
-  return Array.isArray(session?.cookies) && session.cookies.length > 0;
-}
-
 async function resolveLiveGeofences(cookies = []) {
   const cookieHeader = cookies.join('; ');
   const platformBase = String(config.platformBaseUrl || '').replace(/\/$/, '');
@@ -548,6 +886,176 @@ async function resolveLiveGeofences(cookies = []) {
     error: lastError
   };
 }
+
+router.get('/platform/page', async (req, res) => {
+  const sessionId = String(req.query.sessionId || '').trim();
+  const path = String(req.query.path || '').trim();
+  const termList = String(req.query.terms || 'combustible,fuel,reporte,L/100km,gal')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (!sessionId || !path) {
+    return res.status(400).json({
+      ok: false,
+      code: 'PLATFORM_PAGE_PARAMETERS_REQUIRED',
+      message: 'sessionId y path son obligatorios.'
+    });
+  }
+
+  const session = getSession(sessionId);
+  if (!session) {
+    return respondSessionNotFound(res);
+  }
+
+  if (!hasLiveCookies(session)) {
+    return respondSessionNotFound(res);
+  }
+
+  try {
+    const result = await fetchPlatform(path, {
+      headers: {
+        Cookie: session.cookies.join('; ')
+      }
+    });
+
+    if (looksLikePortalLogin(result.text)) {
+      return res.status(401).json({
+        ok: false,
+        code: 'SESSION_EXPIRED',
+        message: 'La sesion del portal expiro o ya no es valida.'
+      });
+    }
+
+    return res.json({
+      ok: true,
+      mode: session.mode,
+      data: {
+        path,
+        status: result.status,
+        title: extractHtmlTitle(result.text),
+        links: extractMatchingLinks(result.text, termList),
+        snippets: extractInterestingSnippets(result.text, termList),
+        preview: String(result.text || '').slice(0, 3000)
+      }
+    });
+  } catch (error) {
+    return res.status(502).json({
+      ok: false,
+      code: 'PLATFORM_PAGE_ERROR',
+      message: error?.message || 'No se pudo consultar la pagina del portal.'
+    });
+  }
+});
+
+router.get('/reports/fuel-consumption', async (req, res) => {
+  const sessionId = String(req.query.sessionId || '').trim();
+  const deviceId = String(req.query.deviceId || '').trim();
+  const from = String(req.query.from || '').trim();
+  const to = String(req.query.to || '').trim();
+
+  if (!sessionId || !deviceId || !from || !to) {
+    return res.status(400).json({
+      ok: false,
+      code: 'FUEL_REPORT_PARAMETERS_REQUIRED',
+      message: 'sessionId, deviceId, from y to son obligatorios.'
+    });
+  }
+
+  const session = getSession(sessionId);
+  if (!session) {
+    return respondSessionNotFound(res);
+  }
+
+  if (!hasLiveCookies(session)) {
+    return respondSessionNotFound(res);
+  }
+
+  try {
+    const resolved = await fetchFuelConsumptionReport(session, { deviceId, from, to });
+    if (!resolved.ok) {
+      return res.status(resolved.code === 'SESSION_EXPIRED' ? 401 : 502).json({
+        ok: false,
+        code: resolved.code || 'FUEL_REPORT_ERROR',
+        message: resolved.message || 'No se pudo generar el reporte de combustible.'
+      });
+    }
+
+    return res.json({
+      ok: true,
+      mode: session.mode,
+      data: resolved.report
+    });
+  } catch (error) {
+    return res.status(502).json({
+      ok: false,
+      code: 'FUEL_REPORT_PROXY_ERROR',
+      message: error?.message || 'No se pudo generar el reporte de combustible.'
+    });
+  }
+});
+
+router.post('/share-link', async (req, res) => {
+  const sessionId = String(req.body?.sessionId || '').trim();
+  const rawDeviceId = req.body?.deviceId;
+  const durationMinutes = Number(req.body?.durationMinutes || 0);
+  const deviceName = String(req.body?.deviceName || '').trim();
+
+  if (!sessionId) {
+    return respondMissingSessionId(res);
+  }
+
+  const deviceId = Number(rawDeviceId);
+  if (!Number.isFinite(deviceId) || deviceId <= 0) {
+    return res.status(400).json({
+      ok: false,
+      code: 'INVALID_DEVICE_ID',
+      message: 'deviceId es obligatorio y debe ser numerico.'
+    });
+  }
+
+  if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) {
+    return res.status(400).json({
+      ok: false,
+      code: 'INVALID_DURATION',
+      message: 'durationMinutes debe ser mayor que cero.'
+    });
+  }
+
+  const session = getSession(sessionId);
+  if (!session) {
+    return respondSessionNotFound(res);
+  }
+
+  if (!hasLiveCookies(session)) {
+    return respondSessionNotFound(res);
+  }
+
+  const token = createShareToken({
+    sessionId,
+    deviceId,
+    deviceName: deviceName || null,
+    durationMinutes
+  });
+
+  const baseFromConfig = String(config.publicShareBaseUrl || '').trim().replace(/\/$/, '');
+  const baseFromRequest = `${req.protocol}://${req.get('host')}`;
+  const shareBaseUrl = baseFromConfig || baseFromRequest;
+  const shareUrl = `${shareBaseUrl}/share/${encodeURIComponent(token.token)}`;
+
+  return res.json({
+    ok: true,
+    mode: session.mode,
+    data: {
+      token: token.token,
+      shareUrl,
+      expiresAt: token.expiresAt,
+      durationMinutes: token.durationMinutes,
+      deviceId: token.deviceId,
+      deviceName: token.deviceName
+    }
+  });
+});
 
 function normalizeCommand(commandRaw) {
   const command = String(commandRaw || '').trim().toLowerCase();
@@ -998,6 +1506,174 @@ router.post('/monitor/command', async (req, res) => {
       ok: false,
       code: 'COMMAND_PROXY_ERROR',
       message: error?.message || 'No se pudo enviar el comando al portal.'
+    });
+  }
+});
+
+router.post('/monitor/device-meta', async (req, res) => {
+  const sessionId = String(req.body?.sessionId || '').trim();
+  const rawDeviceId = req.body?.deviceId;
+  const vehicleName = String(req.body?.vehicleName || '').trim();
+  const uniqueId = String(req.body?.uniqueId || '').trim();
+
+  if (!sessionId) {
+    return respondMissingSessionId(res);
+  }
+
+  const deviceId = Number(rawDeviceId);
+  if (!Number.isFinite(deviceId) || deviceId <= 0) {
+    return res.status(400).json({
+      ok: false,
+      code: 'INVALID_DEVICE_ID',
+      message: 'deviceId es obligatorio y debe ser numerico.'
+    });
+  }
+
+  if (!vehicleName) {
+    return res.status(400).json({
+      ok: false,
+      code: 'INVALID_VEHICLE_NAME',
+      message: 'vehicleName es obligatorio.'
+    });
+  }
+
+  const session = getSession(sessionId);
+  if (!session) {
+    return respondSessionNotFound(res);
+  }
+
+  if (session.mode === 'mock') {
+    return res.json({
+      ok: true,
+      mode: 'mock',
+      data: {
+        ok: true,
+        vehicleName
+      }
+    });
+  }
+
+  if (!hasLiveCookies(session)) {
+    return respondSessionNotFound(res);
+  }
+
+  try {
+    const metaResult = await fetchConfigurationDeviceMeta({
+      deviceId,
+      cookies: session.cookies
+    });
+
+    if (Array.isArray(metaResult.cookies) && metaResult.cookies.length > 0) {
+      updateSession(sessionId, { cookies: metaResult.cookies });
+    }
+
+    if (metaResult.isLoginScreen) {
+      return res.status(401).json({
+        ok: false,
+        code: 'SESSION_EXPIRED',
+        message: 'La sesion del portal expiro o ya no es valida para editar el dispositivo.'
+      });
+    }
+
+    const meta = metaResult.payload?.meta || null;
+    const imei = String(meta?.imei || uniqueId || '').trim();
+    let configurationSaved = false;
+    let configurationResult = null;
+
+    if (meta && imei) {
+      configurationResult = await saveConfigurationDevice({
+        payload: {
+          deviceId,
+          companyId: Number.isFinite(Number(meta?.empresaId)) ? Number(meta.empresaId) : null,
+          activo: Boolean(meta?.activo ?? true),
+          nombre: vehicleName,
+          imei,
+          numeroSim: meta?.numeroSim ?? null,
+          modeloDispositivo: meta?.modeloDispositivo ?? null,
+          chasisVin: meta?.chasisVin ?? null,
+          conductor: meta?.conductor ?? null,
+          correo: meta?.correo ?? null,
+          movil: meta?.movil ?? null,
+          notas: meta?.notas ?? null,
+          odometroInicialKm: meta?.odometroInicialKm ?? null,
+          horasMotorInicial: meta?.horasMotorInicial ?? null
+        },
+        cookies: metaResult.cookies || session.cookies
+      });
+
+      if (Array.isArray(configurationResult.cookies) && configurationResult.cookies.length > 0) {
+        updateSession(sessionId, { cookies: configurationResult.cookies });
+      }
+
+      if (configurationResult.isLoginScreen) {
+        return res.status(401).json({
+          ok: false,
+          code: 'SESSION_EXPIRED',
+          message: 'La sesion del portal expiro o ya no es valida para editar el dispositivo.'
+        });
+      }
+
+      configurationSaved =
+        configurationResult.ok === true &&
+        (!configurationResult.payload || typeof configurationResult.payload !== 'object' || configurationResult.payload.ok === true);
+    }
+
+    const monitorResult = await saveMonitorMeta({
+      deviceId,
+      vehicleName,
+      cookies:
+        configurationResult?.cookies ||
+        metaResult.cookies ||
+        session.cookies
+    });
+
+    if (Array.isArray(monitorResult.cookies) && monitorResult.cookies.length > 0) {
+      updateSession(sessionId, { cookies: monitorResult.cookies });
+    }
+
+    if (monitorResult.isLoginScreen) {
+      return res.status(401).json({
+        ok: false,
+        code: 'SESSION_EXPIRED',
+        message: 'La sesion del portal expiro o ya no es valida para editar el dispositivo.'
+      });
+    }
+
+    const monitorSaved =
+      monitorResult.ok === true &&
+      (!monitorResult.payload || typeof monitorResult.payload !== 'object' || monitorResult.payload.ok === true);
+
+    if (!configurationSaved && !monitorSaved) {
+      return res.status(502).json({
+        ok: false,
+        code: 'DEVICE_META_REJECTED',
+        message: 'La plataforma no confirmo la actualizacion del dispositivo.',
+        data: {
+          configurationStatus: configurationResult?.status || null,
+          configurationPayload: configurationResult?.payload || null,
+          monitorStatus: monitorResult?.status || null,
+          monitorPayload: monitorResult?.payload || null
+        }
+      });
+    }
+
+    return res.json({
+      ok: true,
+      mode: session.mode,
+      data: {
+        ok: true,
+        vehicleName,
+        imei,
+        savedInConfiguration: configurationSaved,
+        savedInMonitor: monitorSaved,
+        platform: configurationResult?.payload || monitorResult?.payload || null
+      }
+    });
+  } catch (error) {
+    return res.status(502).json({
+      ok: false,
+      code: 'DEVICE_META_PROXY_ERROR',
+      message: error?.message || 'No se pudo actualizar el dispositivo en el portal.'
     });
   }
 });
