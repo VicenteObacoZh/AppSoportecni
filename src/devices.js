@@ -64,6 +64,12 @@
       title: 'Reporte Recorridos y paradas',
       subtitle: 'Genera el detalle de movimientos y paradas para el rango seleccionado.'
     },
+    events: {
+      cardLabel: 'Eventos',
+      type: 'events',
+      title: 'Reporte de Eventos',
+      subtitle: 'Genera el detalle de eventos del dispositivo para el rango seleccionado.'
+    },
     workhours: {
       cardLabel: 'Horas de trabajo',
       type: 'driveHours',
@@ -835,11 +841,6 @@
   function handleReportCard(action) {
     const device = getActiveSheetDevice();
     if (!device) {
-      return;
-    }
-
-    if (action === 'events') {
-      window.alert('El generador PDF de Eventos aún no está disponible en la plataforma.');
       return;
     }
 
