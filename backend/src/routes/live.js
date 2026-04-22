@@ -240,6 +240,64 @@ function extractRequestVerificationToken(html) {
   return null;
 }
 
+function getSetCookieHeaders(response) {
+  if (typeof response.headers.getSetCookie === 'function') {
+    return response.headers.getSetCookie();
+  }
+
+  const single = response.headers.get('set-cookie');
+  return single ? [single] : [];
+}
+
+function normalizeCookies(setCookieHeaders) {
+  return (setCookieHeaders || [])
+    .map((item) => String(item || '').split(';')[0].trim())
+    .filter(Boolean);
+}
+
+function mergeCookies(...cookieLists) {
+  return [...new Set(cookieLists.flat().filter(Boolean))];
+}
+
+function buildPlatformUrl(path = '/') {
+  const baseUrl = String(config.platformBaseUrl || '').replace(/\/$/, '');
+  return `${baseUrl}${path.startsWith('/') ? path : `/${path}`}`;
+}
+
+async function fetchPlatformBinary(path = '/', options = {}) {
+  const response = await fetch(buildPlatformUrl(path), {
+    method: options.method || 'GET',
+    redirect: 'manual',
+    headers: {
+      'User-Agent': 'GpsRastreo-Backend/0.1',
+      ...(options.headers || {})
+    },
+    body: options.body
+  });
+
+  const body = Buffer.from(await response.arrayBuffer());
+  const contentType = String(response.headers.get('content-type') || '');
+
+  return {
+    ok: response.ok,
+    status: response.status,
+    body,
+    text: body.toString('utf8'),
+    contentType,
+    location: response.headers.get('location'),
+    cookies: normalizeCookies(getSetCookieHeaders(response))
+  };
+}
+
+function safeReportFileName(title, fallback = 'reporte') {
+  const normalized = String(title || fallback)
+    .trim()
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')
+    .replace(/\s+/g, ' ');
+
+  return normalized || fallback;
+}
+
 function stripHtml(value) {
   return String(value || '')
     .replace(/<[^>]+>/g, ' ')
@@ -487,6 +545,100 @@ async function fetchFuelConsumptionReport(session, { deviceId, from, to }) {
     report: parsedJson
       ? normalizeFuelReportJson(parsedJson)
       : parseFuelReportHtml(generated.text)
+  };
+}
+
+async function generatePlatformReport(session, reportPayload = {}) {
+  const reportPage = await fetchPlatform('/Reportes/Reportes', {
+    headers: {
+      Cookie: session.cookies.join('; ')
+    }
+  });
+
+  if (looksLikePortalLogin(reportPage.text)) {
+    return {
+      ok: false,
+      code: 'SESSION_EXPIRED',
+      message: 'La sesion del portal expiro o ya no es valida para generar reportes.'
+    };
+  }
+
+  const token = extractRequestVerificationToken(reportPage.text);
+  if (!token) {
+    return {
+      ok: false,
+      code: 'REPORT_TOKEN_MISSING',
+      message: 'No fue posible extraer el token del modulo de reportes.'
+    };
+  }
+
+  const mergedCookies = mergeCookies(session.cookies, reportPage.cookies);
+  const generated = await fetchPlatformBinary('/Reportes/Reportes?handler=Generate', {
+    method: 'POST',
+    headers: {
+      Cookie: mergedCookies.join('; '),
+      'Content-Type': 'application/json',
+      Accept: 'application/pdf,application/json,text/html,*/*',
+      RequestVerificationToken: token
+    },
+    body: JSON.stringify(reportPayload)
+  });
+
+  if (looksLikePortalLogin(generated.text)) {
+    return {
+      ok: false,
+      code: 'SESSION_EXPIRED',
+      message: 'La sesion del portal expiro o ya no es valida para generar el reporte.'
+    };
+  }
+
+  let parsedJson = null;
+  if (generated.contentType.toLowerCase().includes('application/json')) {
+    try {
+      parsedJson = JSON.parse(generated.text);
+    } catch {
+      parsedJson = null;
+    }
+  }
+
+  return {
+    ok: generated.ok,
+    status: generated.status,
+    contentType: generated.contentType,
+    body: generated.body,
+    text: generated.text,
+    json: parsedJson,
+    cookies: mergeCookies(mergedCookies, generated.cookies)
+  };
+}
+
+function buildReportPayloadFromRequest(source = {}) {
+  const type = String(source?.type || '').trim();
+  const format = String(source?.format || 'PDF').trim().toUpperCase();
+  const title = String(source?.title || 'Reporte').trim();
+  const from = String(source?.from || '').trim();
+  const to = String(source?.to || '').trim();
+  const rawDeviceIds = Array.isArray(source?.deviceIds)
+    ? source.deviceIds
+    : (source?.deviceId != null ? [source.deviceId] : []);
+  const deviceIds = rawDeviceIds
+    .map((item) => Number(item))
+    .filter((item) => Number.isFinite(item) && item > 0);
+
+  return {
+    type,
+    format,
+    title,
+    from,
+    to,
+    deviceIds,
+    stopMinMinutes: Number(source?.stopMinMinutes || 3),
+    stopSpeedKmh: Number(source?.stopSpeedKmh || 1),
+    speedLimitKmh: source?.speedLimitKmh ?? null,
+    fuelMode: source?.fuelMode ?? null,
+    fuelLitersPer100Km: source?.fuelLitersPer100Km ?? null,
+    fuelLitersPerEngineHour: source?.fuelLitersPerEngineHour ?? null,
+    emails: String(source?.emails || '')
   };
 }
 
@@ -992,6 +1144,120 @@ router.get('/reports/fuel-consumption', async (req, res) => {
       code: 'FUEL_REPORT_PROXY_ERROR',
       message: error?.message || 'No se pudo generar el reporte de combustible.'
     });
+  }
+});
+
+router.post('/reports/generate', async (req, res) => {
+  const sessionId = String(req.body?.sessionId || '').trim();
+  const payload = buildReportPayloadFromRequest(req.body || {});
+  const {
+    type,
+    format,
+    title,
+    from,
+    to,
+    deviceIds
+  } = payload;
+
+  if (!sessionId || !type || !from || !to || !deviceIds.length) {
+    return res.status(400).json({
+      ok: false,
+      code: 'REPORT_PARAMETERS_REQUIRED',
+      message: 'sessionId, type, from, to y deviceIds son obligatorios.'
+    });
+  }
+
+  const session = getSession(sessionId);
+  if (!session) {
+    return respondSessionNotFound(res);
+  }
+
+  if (!hasLiveCookies(session)) {
+    return respondSessionNotFound(res);
+  }
+
+  try {
+    const generated = await generatePlatformReport(session, payload);
+    if (!generated.ok) {
+      return res.status(generated.code === 'SESSION_EXPIRED' ? 401 : (generated.status || 502)).json({
+        ok: false,
+        code: generated.code || 'REPORT_GENERATION_FAILED',
+        message: generated.message || generated.json?.error || generated.json?.message || 'No se pudo generar el reporte.'
+      });
+    }
+
+    const contentType = String(generated.contentType || '').toLowerCase();
+    if (contentType.includes('application/pdf')) {
+      const fileName = `${safeReportFileName(title, 'reporte')}.pdf`;
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+      return res.send(generated.body);
+    }
+
+    if (generated.json) {
+      return res.status(200).json({
+        ok: true,
+        mode: session.mode,
+        data: generated.json
+      });
+    }
+
+    return res.status(502).json({
+      ok: false,
+      code: 'UNSUPPORTED_REPORT_RESPONSE',
+      message: 'El portal devolvio un formato inesperado al generar el reporte.'
+    });
+  } catch (error) {
+    return res.status(502).json({
+      ok: false,
+      code: 'REPORT_PROXY_ERROR',
+      message: error?.message || 'No se pudo generar el reporte.'
+    });
+  }
+});
+
+router.get('/reports/download', async (req, res) => {
+  const sessionId = String(req.query.sessionId || '').trim();
+  const payload = buildReportPayloadFromRequest({
+    ...req.query,
+    deviceId: req.query.deviceId,
+    deviceIds: req.query.deviceId ? [req.query.deviceId] : []
+  });
+  const {
+    type,
+    title,
+    from,
+    to,
+    deviceIds
+  } = payload;
+
+  if (!sessionId || !type || !from || !to || !deviceIds.length) {
+    return res.status(400).send('sessionId, type, from, to y deviceId son obligatorios.');
+  }
+
+  const session = getSession(sessionId);
+  if (!session || !hasLiveCookies(session)) {
+    return res.status(401).send('La sesion ya no es valida para generar el reporte.');
+  }
+
+  try {
+    const generated = await generatePlatformReport(session, payload);
+    if (!generated.ok) {
+      return res.status(generated.code === 'SESSION_EXPIRED' ? 401 : (generated.status || 502))
+        .send(generated.message || generated.json?.error || generated.json?.message || 'No se pudo generar el reporte.');
+    }
+
+    const contentType = String(generated.contentType || '').toLowerCase();
+    if (!contentType.includes('application/pdf')) {
+      return res.status(502).send('El portal no devolvio un PDF para este reporte.');
+    }
+
+    const fileName = `${safeReportFileName(title, 'reporte')}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+    return res.send(generated.body);
+  } catch (error) {
+    return res.status(502).send(error?.message || 'No se pudo generar el reporte.');
   }
 });
 

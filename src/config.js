@@ -100,6 +100,8 @@
       liveEventsRecent: '/live/monitor/events/recent',
       liveGeofences: '/live/monitor/geofences',
       liveFuelConsumptionReport: '/live/reports/fuel-consumption',
+      liveGenerateReport: '/live/reports/generate',
+      liveDownloadReport: '/live/reports/download',
       liveShareLink: '/live/share-link'
     }
   };

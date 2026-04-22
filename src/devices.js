@@ -12,6 +12,15 @@
   const deviceReportsModal = document.getElementById('deviceReportsModal');
   const deviceReportsBackdrop = document.getElementById('deviceReportsBackdrop');
   const deviceReportsBack = document.getElementById('deviceReportsBack');
+  const deviceReportRequestModal = document.getElementById('deviceReportRequestModal');
+  const deviceReportRequestBackdrop = document.getElementById('deviceReportRequestBackdrop');
+  const deviceReportRequestBack = document.getElementById('deviceReportRequestBack');
+  const deviceReportRequestCancel = document.getElementById('deviceReportRequestCancel');
+  const deviceReportRequestAccept = document.getElementById('deviceReportRequestAccept');
+  const deviceReportRequestTitle = document.getElementById('deviceReportRequestTitle');
+  const deviceReportRequestSubtitle = document.getElementById('deviceReportRequestSubtitle');
+  const deviceReportRequestFrom = document.getElementById('deviceReportRequestFrom');
+  const deviceReportRequestTo = document.getElementById('deviceReportRequestTo');
   const deviceEditModal = document.getElementById('deviceEditModal');
   const deviceEditBackdrop = document.getElementById('deviceEditBackdrop');
   const deviceEditCancel = document.getElementById('deviceEditCancel');
@@ -28,6 +37,7 @@
   const MAX_GEOCODE_REFRESH_ATTEMPTS = 6;
   let activeSheetDeviceId = '';
   let deviceRenameAbortController = null;
+  let activeReportRequest = null;
 
   function createLoadingMarkup() {
     return `
@@ -38,6 +48,27 @@
       </div>
     `;
   }
+
+  const REPORT_CARD_CONFIG = {
+    information: {
+      cardLabel: 'Información',
+      type: 'general',
+      title: 'Reporte General',
+      subtitle: 'Genera el resumen general del dispositivo con el formato corporativo.'
+    },
+    routes: {
+      cardLabel: 'Recorridos',
+      type: 'routeStops',
+      title: 'Reporte Recorridos y paradas',
+      subtitle: 'Genera el detalle de movimientos y paradas para el rango seleccionado.'
+    },
+    workhours: {
+      cardLabel: 'Horas de trabajo',
+      type: 'driveHours',
+      title: 'Horas de trabajo',
+      subtitle: 'Genera el reporte diario de horas de manejo del dispositivo.'
+    }
+  };
 
   function escapeHtml(value) {
     return String(value ?? '')
@@ -515,6 +546,110 @@
     }
   }
 
+  function formatDateTimeLocalValue(date) {
+    const current = date instanceof Date ? date : new Date(date);
+    if (Number.isNaN(current.getTime())) {
+      return '';
+    }
+
+    const pad = (value) => String(value).padStart(2, '0');
+    return `${current.getFullYear()}-${pad(current.getMonth() + 1)}-${pad(current.getDate())}T${pad(current.getHours())}:${pad(current.getMinutes())}`;
+  }
+
+  function getDefaultReportRange() {
+    const now = new Date();
+    const start = new Date(now);
+    start.setHours(0, 0, 0, 0);
+
+    return {
+      from: formatDateTimeLocalValue(start),
+      to: formatDateTimeLocalValue(now)
+    };
+  }
+
+  function resetReportRequestSubmitState() {
+    if (!deviceReportRequestAccept) {
+      return;
+    }
+
+    deviceReportRequestAccept.disabled = false;
+    deviceReportRequestAccept.textContent = 'Generar PDF';
+  }
+
+  function openReportRequestModal(reportConfig) {
+    if (!deviceReportRequestModal || !deviceReportRequestFrom || !deviceReportRequestTo) {
+      return;
+    }
+
+    activeReportRequest = reportConfig || null;
+    const range = getDefaultReportRange();
+    deviceReportRequestTitle.textContent = reportConfig?.cardLabel || 'Generar reporte';
+    deviceReportRequestSubtitle.textContent = reportConfig?.subtitle || 'Selecciona el rango para exportar el PDF.';
+    deviceReportRequestFrom.value = range.from;
+    deviceReportRequestTo.value = range.to;
+    resetReportRequestSubmitState();
+    deviceReportRequestModal.hidden = false;
+  }
+
+  function closeReportRequestModal(options = {}) {
+    if (deviceReportRequestModal) {
+      deviceReportRequestModal.hidden = true;
+    }
+
+    if (!options.keepContext) {
+      activeReportRequest = null;
+    }
+  }
+
+  function reopenReportsModal() {
+    closeReportRequestModal({ keepContext: true });
+    openReportsModal();
+  }
+
+  function openBlobReport(result, fallbackName) {
+    if (!result?.blob) {
+      return;
+    }
+
+    const objectUrl = window.URL.createObjectURL(result.blob);
+    const anchor = document.createElement('a');
+    anchor.href = objectUrl;
+    anchor.target = '_blank';
+    anchor.rel = 'noopener';
+    anchor.download = result.fileName || fallbackName || 'reporte.pdf';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+
+    window.setTimeout(() => {
+      window.URL.revokeObjectURL(objectUrl);
+    }, 60000);
+  }
+
+  function openNativeReportUrl(url) {
+    const safeUrl = String(url || '').trim();
+    if (!safeUrl) {
+      return false;
+    }
+
+    try {
+      const isNativeCapacitor = Boolean(
+        window.Capacitor?.isNativePlatform?.() ||
+        window.CapacitorAndroid ||
+        window.webkit?.messageHandlers?.bridge
+      );
+
+      if (!isNativeCapacitor) {
+        return false;
+      }
+
+      window.open(safeUrl, '_blank', 'noopener,noreferrer');
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   function openEditModal(device) {
     if (!deviceEditModal || !deviceEditNameInput) {
       return;
@@ -653,34 +788,71 @@
       return;
     }
 
-    closeReportsModal();
-
-    if (action === 'information') {
-      closeDeviceActionsSheet();
-      navigateToMap(device, 'info');
-      return;
-    }
-
-    if (action === 'routes') {
-      closeDeviceActionsSheet();
-      navigateToRoutes(device);
-      return;
-    }
-
     if (action === 'events') {
-      closeDeviceActionsSheet();
-      window.location.href = './alerts.html';
+      window.alert('El generador PDF de Eventos aun no esta disponible en la plataforma.');
       return;
     }
 
     if (action === 'geofences') {
-      closeDeviceActionsSheet();
-      navigateToMap(device, 'geofences');
+      window.alert('El generador PDF de Geocercas aun no esta disponible en la plataforma.');
       return;
     }
 
-    if (action === 'workhours') {
-      window.alert('La vista de Horas de trabajo quedara conectada en el siguiente paso.');
+    const reportConfig = REPORT_CARD_CONFIG[action];
+    if (reportConfig) {
+      closeReportsModal();
+      openReportRequestModal(reportConfig);
+    }
+  }
+
+  async function submitReportRequest() {
+    const device = getActiveSheetDevice();
+    if (!device || !activeReportRequest || !deviceReportRequestFrom || !deviceReportRequestTo || !deviceReportRequestAccept) {
+      closeReportRequestModal();
+      return;
+    }
+
+    const fromDate = new Date(deviceReportRequestFrom.value);
+    const toDate = new Date(deviceReportRequestTo.value);
+
+    if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime()) || toDate <= fromDate) {
+      window.alert('Selecciona un rango valido para generar el reporte.');
+      return;
+    }
+
+    deviceReportRequestAccept.disabled = true;
+    deviceReportRequestAccept.textContent = 'Generando...';
+
+    try {
+      const reportRequest = {
+        type: activeReportRequest.type,
+        format: 'PDF',
+        title: activeReportRequest.title,
+        from: fromDate.toISOString(),
+        to: toDate.toISOString(),
+        deviceIds: [Number(device.deviceId)],
+        stopMinMinutes: 3,
+        stopSpeedKmh: 1,
+        emails: ''
+      };
+
+      const nativeUrl = apiClient?.buildReportDownloadUrl?.(reportRequest);
+      const openedNatively = openNativeReportUrl(nativeUrl);
+
+      if (!openedNatively) {
+        const result = await apiClient?.generateReport?.(reportRequest);
+        if (!result?.blob) {
+          throw new Error('La plataforma no devolvio el PDF del reporte.');
+        }
+        openBlobReport(result, `${activeReportRequest.title || 'reporte'}.pdf`);
+      }
+
+      closeReportRequestModal();
+      closeDeviceActionsSheet();
+      activeReportRequest = null;
+    } catch (error) {
+      window.alert(error?.userMessage || error?.message || 'No fue posible generar el reporte.');
+      resetReportRequestSubmitState();
     }
   }
 
@@ -824,6 +996,10 @@
       handleReportCard(button.getAttribute('data-report-card') || '');
     });
   });
+  deviceReportRequestBackdrop?.addEventListener('click', reopenReportsModal);
+  deviceReportRequestBack?.addEventListener('click', reopenReportsModal);
+  deviceReportRequestCancel?.addEventListener('click', reopenReportsModal);
+  deviceReportRequestAccept?.addEventListener('click', submitReportRequest);
   deviceEditBackdrop?.addEventListener('click', () => {
     deviceRenameAbortController?.abort();
     deviceRenameAbortController = null;

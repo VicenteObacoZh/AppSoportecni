@@ -340,6 +340,90 @@
     return requestJson(path, options);
   }
 
+  function parseFileNameFromDisposition(disposition) {
+    const source = String(disposition || '');
+    const utfMatch = source.match(/filename\*=UTF-8''([^;]+)/i);
+    if (utfMatch?.[1]) {
+      try {
+        return decodeURIComponent(utfMatch[1]);
+      } catch {
+        return utfMatch[1];
+      }
+    }
+
+    const basicMatch = source.match(/filename="?([^";]+)"?/i);
+    return basicMatch?.[1] ? basicMatch[1].trim() : null;
+  }
+
+  async function requestBinary(path, options) {
+    const backendBaseUrls = getBackendBaseUrls();
+    let lastNetworkError = null;
+
+    for (const baseUrl of backendBaseUrls) {
+      const requestUrl = buildUrl(path, baseUrl);
+      let response;
+
+      try {
+        response = await fetch(requestUrl, {
+          method: 'GET',
+          mode: config.requestMode || 'cors',
+          ...options
+        });
+      } catch (error) {
+        if (error?.name === 'AbortError') {
+          throw error;
+        }
+        lastNetworkError = { error, requestUrl };
+        continue;
+      }
+
+      const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+      if (!response.ok) {
+        let payload = null;
+        if (contentType.includes('application/json')) {
+          try {
+            payload = await response.json();
+          } catch {
+            payload = null;
+          }
+        } else {
+          try {
+            payload = await response.text();
+          } catch {
+            payload = null;
+          }
+        }
+
+        const error = new Error(
+          String(payload?.message || payload?.error || payload || `HTTP ${response.status}`)
+        );
+        error.status = response.status;
+        error.payload = payload;
+        error.code = payload?.code || '';
+        error.context = 'http';
+        throw error;
+      }
+
+      config.backendBaseUrl = baseUrl;
+      return {
+        blob: await response.blob(),
+        contentType,
+        fileName: parseFileNameFromDisposition(response.headers.get('content-disposition')),
+        status: response.status
+      };
+    }
+
+    if (lastNetworkError) {
+      const networkError = new Error(`No se pudo conectar con ${lastNetworkError.requestUrl}. ${lastNetworkError.error?.message || 'Revisa backend y red local.'}`);
+      networkError.code = 'BACKEND_UNAVAILABLE';
+      networkError.cause = lastNetworkError.error;
+      networkError.context = 'network';
+      throw networkError;
+    }
+
+    throw new Error('No hay backendBaseUrl configurado para la aplicacion.');
+  }
+
   async function getLiveAlerts(sessionId, options = {}) {
     const { allowSessionMiss = false } = options;
     try {
@@ -454,6 +538,40 @@
     });
 
     return payload?.data || null;
+  }
+
+  async function generateReportBySession(sessionId, reportRequest = {}) {
+    return requestBinary(config.endpoints.liveGenerateReport || '/live/reports/generate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        sessionId,
+        ...reportRequest
+      })
+    });
+  }
+
+  function buildReportDownloadUrlBySession(sessionId, reportRequest = {}) {
+    const query = new URLSearchParams({
+      sessionId,
+      type: String(reportRequest?.type || ''),
+      format: String(reportRequest?.format || 'PDF'),
+      title: String(reportRequest?.title || 'Reporte'),
+      from: String(reportRequest?.from || ''),
+      to: String(reportRequest?.to || ''),
+      deviceId: String(
+        Array.isArray(reportRequest?.deviceIds)
+          ? reportRequest.deviceIds[0]
+          : (reportRequest?.deviceId || '')
+      ),
+      stopMinMinutes: String(reportRequest?.stopMinMinutes ?? 3),
+      stopSpeedKmh: String(reportRequest?.stopSpeedKmh ?? 1)
+    });
+
+    const baseUrl = getBackendBaseUrls()[0];
+    return buildUrl(`${config.endpoints.liveDownloadReport || '/live/reports/download'}?${query.toString()}`, baseUrl);
   }
 
   window.GpsRastreoApi = {
@@ -707,6 +825,25 @@
           clearOnSession: true
         });
       }
+    },
+
+    async generateReport(reportRequest) {
+      const sessionId = ensureSessionId();
+
+      try {
+        return await generateReportBySession(sessionId, reportRequest || {});
+      } catch (error) {
+        throw handleClientError(error, {
+          context: 'report-generate',
+          emit: true,
+          clearOnSession: true
+        });
+      }
+    },
+
+    buildReportDownloadUrl(reportRequest) {
+      const sessionId = ensureSessionId();
+      return buildReportDownloadUrlBySession(sessionId, reportRequest || {});
     },
 
     async reverseGeocode(lat, lon) {
