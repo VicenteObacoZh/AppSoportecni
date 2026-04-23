@@ -67,13 +67,19 @@
 
   function resolveBackendBaseUrlCandidates() {
     const primary = resolveBackendBaseUrl();
-    const candidates = [primary];
+    const configuredBaseUrl = readConfiguredBaseUrl();
+    const candidates = [];
 
-    if (typeof window !== 'undefined') {
+    if (configuredBaseUrl) {
+      candidates.push(primary);
+    } else if (typeof window !== 'undefined') {
       const isAndroid = Boolean(window.CapacitorAndroid) || /Android/i.test(window.navigator?.userAgent || '');
       if (isAndroid) {
         candidates.push('http://10.0.2.2:4100/api');
       }
+      candidates.push(primary);
+    } else {
+      candidates.push(primary);
     }
 
     return [...new Set(candidates.map((item) => normalizeBaseUrl(item)).filter(Boolean))];

@@ -927,6 +927,369 @@ function buildMockGeofencesSummary() {
   return normalizeGeofences(mockData.geofences || []);
 }
 
+function isLocalCompositeReportType(type) {
+  const normalized = String(type || '').trim().toLowerCase();
+  return normalized === 'events' || normalized === 'geofences';
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function formatReportDate(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return String(value || '-');
+  }
+
+  return new Intl.DateTimeFormat('es-CO', {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  }).format(date);
+}
+
+async function loadRecentEventsForSession(session, limit = 120) {
+  if (!session) {
+    return {
+      ok: false,
+      status: 404,
+      code: 'SESSION_NOT_FOUND',
+      message: 'Sesion valida no encontrada.'
+    };
+  }
+
+  if (session.mode === 'mock') {
+    return {
+      ok: true,
+      data: buildMockEventsSummary(limit)
+    };
+  }
+
+  if (!hasLiveCookies(session)) {
+    return {
+      ok: false,
+      status: 404,
+      code: 'SESSION_NOT_FOUND',
+      message: 'Sesion valida no encontrada.'
+    };
+  }
+
+  try {
+    const result = await fetchPlatform('/Monitoreo/Monitor?handler=Events', {
+      headers: {
+        Cookie: session.cookies.join('; ')
+      }
+    });
+
+    let payload;
+    try {
+      payload = JSON.parse(result.text);
+    } catch {
+      const looksLikeLogin = looksLikePortalLogin(result.text);
+      return {
+        ok: false,
+        status: 401,
+        code: looksLikeLogin ? 'SESSION_EXPIRED' : 'INVALID_EVENTS_RESPONSE',
+        message: looksLikeLogin
+          ? 'La sesion del portal expiro o ya no es valida para consultar eventos.'
+          : 'El modulo de eventos respondio con un contenido inesperado.'
+      };
+    }
+
+    const data = normalizeRecentEvents(payload, limit);
+    await fillMissingAddresses(data.items);
+
+    return {
+      ok: true,
+      data
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 502,
+      code: 'EVENTS_PROXY_ERROR',
+      message: error?.message || 'No se pudieron cargar eventos.'
+    };
+  }
+}
+
+async function loadGeofencesForSession(session) {
+  if (!session) {
+    return {
+      ok: false,
+      status: 404,
+      code: 'SESSION_NOT_FOUND',
+      message: 'Sesion valida no encontrada.'
+    };
+  }
+
+  if (session.mode === 'mock') {
+    return {
+      ok: true,
+      data: buildMockGeofencesSummary()
+    };
+  }
+
+  if (!hasLiveCookies(session)) {
+    return {
+      ok: false,
+      status: 404,
+      code: 'SESSION_NOT_FOUND',
+      message: 'Sesion valida no encontrada.'
+    };
+  }
+
+  try {
+    const resolved = await resolveLiveGeofences(session.cookies);
+    if (!resolved.ok) {
+      return {
+        ok: false,
+        status: resolved.code === 'SESSION_EXPIRED' ? 401 : 502,
+        code: resolved.code || 'GEOFENCES_ERROR',
+        message: resolved.message || 'No se pudieron cargar geocercas.'
+      };
+    }
+
+    return {
+      ok: true,
+      data: normalizeGeofences(resolved.payload)
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 502,
+      code: 'GEOFENCES_PROXY_ERROR',
+      message: error?.message || 'No se pudieron cargar geocercas.'
+    };
+  }
+}
+
+function buildLocalHtmlReportDocument({
+  title,
+  subtitle,
+  generatedAt,
+  details = [],
+  headers = [],
+  rows = [],
+  emptyMessage = 'Sin datos disponibles para este reporte.'
+}) {
+  const detailMarkup = details
+    .filter((item) => String(item?.label || '').trim())
+    .map((item) => `
+      <div class="meta-card">
+        <span>${escapeHtml(item.label)}</span>
+        <strong>${escapeHtml(item.value || '-')}</strong>
+      </div>
+    `)
+    .join('');
+
+  const tableHeaderMarkup = headers
+    .map((header) => `<th>${escapeHtml(header)}</th>`)
+    .join('');
+
+  const tableBodyMarkup = rows.length
+    ? rows.map((row) => `
+        <tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>
+      `).join('')
+    : `<tr><td colspan="${Math.max(headers.length, 1)}">${escapeHtml(emptyMessage)}</td></tr>`;
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${escapeHtml(title)}</title>
+  <style>
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: #eef4fb;
+      color: #10233f;
+      padding: 24px;
+    }
+    .sheet {
+      max-width: 1080px;
+      margin: 0 auto;
+      background: #ffffff;
+      border-radius: 20px;
+      padding: 28px;
+      box-shadow: 0 18px 40px rgba(13, 35, 67, 0.12);
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+      color: #0f3b74;
+    }
+    .subtitle {
+      margin: 0 0 22px;
+      font-size: 14px;
+      color: #48617f;
+    }
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-bottom: 22px;
+    }
+    .meta-card {
+      padding: 14px 16px;
+      border-radius: 14px;
+      background: #f4f8fd;
+      border: 1px solid #d8e6f5;
+    }
+    .meta-card span {
+      display: block;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #59738f;
+      margin-bottom: 6px;
+    }
+    .meta-card strong {
+      font-size: 14px;
+      color: #10233f;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 14px;
+      border: 1px solid #d8e6f5;
+    }
+    thead {
+      background: #0f3b74;
+      color: #ffffff;
+    }
+    th, td {
+      padding: 12px 14px;
+      text-align: left;
+      vertical-align: top;
+      font-size: 13px;
+      border-bottom: 1px solid #e6eef7;
+    }
+    tbody tr:nth-child(even) {
+      background: #f9fbfe;
+    }
+  </style>
+</head>
+<body>
+  <div class="sheet">
+    <h1>${escapeHtml(title)}</h1>
+    <p class="subtitle">${escapeHtml(subtitle)} Generado: ${escapeHtml(generatedAt)}</p>
+    <section class="meta-grid">${detailMarkup}</section>
+    <table>
+      <thead><tr>${tableHeaderMarkup}</tr></thead>
+      <tbody>${tableBodyMarkup}</tbody>
+    </table>
+  </div>
+</body>
+</html>`;
+}
+
+async function generateLocalCompositeReport(session, reportPayload = {}) {
+  const type = String(reportPayload?.type || '').trim().toLowerCase();
+  const title = String(reportPayload?.title || 'Reporte').trim() || 'Reporte';
+  const from = String(reportPayload?.from || '').trim();
+  const to = String(reportPayload?.to || '').trim();
+  const selectedDeviceId = Number(Array.isArray(reportPayload?.deviceIds) ? reportPayload.deviceIds[0] : null);
+
+  if (type === 'events') {
+    const resolved = await loadRecentEventsForSession(session, 250);
+    if (!resolved.ok) {
+      return resolved;
+    }
+
+    const filteredItems = (resolved.data?.items || []).filter((item) => {
+      const matchesDevice = Number.isFinite(selectedDeviceId)
+        ? String(item.deviceId || '') === String(selectedDeviceId)
+        : true;
+      const eventTime = new Date(item.eventTime || '').getTime();
+      const matchesFrom = from ? eventTime >= new Date(from).getTime() : true;
+      const matchesTo = to ? eventTime <= new Date(to).getTime() : true;
+      return matchesDevice && matchesFrom && matchesTo;
+    });
+
+    const html = buildLocalHtmlReportDocument({
+      title,
+      subtitle: 'Resumen operativo basado en el feed reciente de eventos disponible en el portal.',
+      generatedAt: formatReportDate(new Date().toISOString()),
+      details: [
+        { label: 'Tipo', value: 'Eventos' },
+        { label: 'Desde', value: formatReportDate(from) },
+        { label: 'Hasta', value: formatReportDate(to) },
+        { label: 'Total', value: String(filteredItems.length) }
+      ],
+      headers: ['Fecha', 'Unidad', 'Evento', 'Velocidad', 'Ubicacion'],
+      rows: filteredItems.map((item) => [
+        formatReportDate(item.eventTime),
+        item.vehicleName || 'Unidad',
+        item.eventType || 'Evento',
+        `${Math.round(Number(item.speed || 0))} km/h`,
+        item.address || `${Number(item.latitude).toFixed(5)}, ${Number(item.longitude).toFixed(5)}`
+      ]),
+      emptyMessage: 'No hay eventos recientes para el rango y dispositivo seleccionados.'
+    });
+
+    return {
+      ok: true,
+      status: 200,
+      contentType: 'text/html; charset=utf-8',
+      body: Buffer.from(html, 'utf8')
+    };
+  }
+
+  if (type === 'geofences') {
+    const resolved = await loadGeofencesForSession(session);
+    if (!resolved.ok) {
+      return resolved;
+    }
+
+    const geofences = resolved.data?.items || [];
+    const html = buildLocalHtmlReportDocument({
+      title,
+      subtitle: 'Inventario operativo de geocercas disponible para la sesion activa.',
+      generatedAt: formatReportDate(new Date().toISOString()),
+      details: [
+        { label: 'Tipo', value: 'Geocercas' },
+        { label: 'Desde', value: formatReportDate(from) },
+        { label: 'Hasta', value: formatReportDate(to) },
+        { label: 'Total', value: String(geofences.length) }
+      ],
+      headers: ['Nombre', 'Tipo', 'Centro o vertices', 'Radio'],
+      rows: geofences.map((item) => [
+        item.name || 'Geocerca',
+        item.type === 'polygon' ? 'Poligono' : 'Circular',
+        item.type === 'polygon'
+          ? `${item.points.length} vertices`
+          : `${Number(item.centerLat).toFixed(5)}, ${Number(item.centerLon).toFixed(5)}`,
+        item.type === 'polygon' ? '-' : `${Math.round(Number(item.radiusMeters || 0))} m`
+      ]),
+      emptyMessage: 'No hay geocercas disponibles en la sesion activa.'
+    });
+
+    return {
+      ok: true,
+      status: 200,
+      contentType: 'text/html; charset=utf-8',
+      body: Buffer.from(html, 'utf8')
+    };
+  }
+
+  return {
+    ok: false,
+    status: 400,
+    code: 'LOCAL_REPORT_TYPE_UNSUPPORTED',
+    message: 'El tipo de reporte local solicitado no esta soportado.'
+  };
+}
+
 async function resolveLiveGeofences(cookies = []) {
   const cookieHeader = cookies.join('; ');
   const platformBase = String(config.platformBaseUrl || '').replace(/\/$/, '');
@@ -1177,7 +1540,9 @@ router.post('/reports/generate', async (req, res) => {
   }
 
   try {
-    const generated = await generatePlatformReport(session, payload);
+    const generated = isLocalCompositeReportType(type)
+      ? await generateLocalCompositeReport(session, payload)
+      : await generatePlatformReport(session, payload);
     if (!generated.ok) {
       return res.status(generated.code === 'SESSION_EXPIRED' ? 401 : (generated.status || 502)).json({
         ok: false,
@@ -1190,6 +1555,13 @@ router.post('/reports/generate', async (req, res) => {
     if (contentType.includes('application/pdf')) {
       const fileName = `${safeReportFileName(title, 'reporte')}.pdf`;
       res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+      return res.send(generated.body);
+    }
+
+    if (contentType.includes('text/html')) {
+      const fileName = `${safeReportFileName(title, 'reporte')}.html`;
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
       return res.send(generated.body);
     }
@@ -1241,21 +1613,30 @@ router.get('/reports/download', async (req, res) => {
   }
 
   try {
-    const generated = await generatePlatformReport(session, payload);
+    const generated = isLocalCompositeReportType(type)
+      ? await generateLocalCompositeReport(session, payload)
+      : await generatePlatformReport(session, payload);
     if (!generated.ok) {
       return res.status(generated.code === 'SESSION_EXPIRED' ? 401 : (generated.status || 502))
         .send(generated.message || generated.json?.error || generated.json?.message || 'No se pudo generar el reporte.');
     }
 
     const contentType = String(generated.contentType || '').toLowerCase();
-    if (!contentType.includes('application/pdf')) {
-      return res.status(502).send('El portal no devolvio un PDF para este reporte.');
+    if (contentType.includes('application/pdf')) {
+      const fileName = `${safeReportFileName(title, 'reporte')}.pdf`;
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+      return res.send(generated.body);
     }
 
-    const fileName = `${safeReportFileName(title, 'reporte')}.pdf`;
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
-    return res.send(generated.body);
+    if (contentType.includes('text/html')) {
+      const fileName = `${safeReportFileName(title, 'reporte')}.html`;
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+      return res.send(generated.body);
+    }
+
+    return res.status(502).send('El portal no devolvio un formato compatible para este reporte.');
   } catch (error) {
     return res.status(502).send(error?.message || 'No se pudo generar el reporte.');
   }
@@ -1568,36 +1949,19 @@ router.get('/monitor/events/recent', async (req, res) => {
   }
 
   try {
-    const result = await fetchPlatform('/Monitoreo/Monitor?handler=Events', {
-      headers: {
-        Cookie: session.cookies.join('; ')
-      }
-    });
-
-    let payload;
-    try {
-      payload = JSON.parse(result.text);
-    } catch {
-      const looksLikeLogin =
-        String(result.text || '').includes('Iniciar sesi') ||
-        String(result.text || '').includes('class="login-form"');
-
-      return res.status(401).json({
+    const resolved = await loadRecentEventsForSession(session, limit);
+    if (!resolved.ok) {
+      return res.status(resolved.status || 502).json({
         ok: false,
-        code: looksLikeLogin ? 'SESSION_EXPIRED' : 'INVALID_EVENTS_RESPONSE',
-        message: looksLikeLogin
-          ? 'La sesion del portal expiro o ya no es valida para consultar eventos.'
-          : 'El modulo de eventos respondio con un contenido inesperado.'
+        code: resolved.code || 'EVENTS_PROXY_ERROR',
+        message: resolved.message || 'No se pudieron cargar eventos.'
       });
     }
-
-    const data = normalizeRecentEvents(payload, limit);
-    await fillMissingAddresses(data.items);
 
     return res.json({
       ok: true,
       mode: session.mode,
-      data
+      data: resolved.data
     });
   } catch (error) {
     return res.status(502).json({
@@ -1632,31 +1996,19 @@ router.get('/monitor/geofences', async (req, res) => {
   }
 
   try {
-    const resolved = await resolveLiveGeofences(session.cookies);
+    const resolved = await loadGeofencesForSession(session);
     if (!resolved.ok) {
-      if (resolved.code === 'SESSION_EXPIRED') {
-        return res.status(401).json({
-          ok: false,
-          code: 'SESSION_EXPIRED',
-          message: resolved.message
-        });
-      }
-
-      return res.status(502).json({
+      return res.status(resolved.status || 502).json({
         ok: false,
         code: resolved.code || 'GEOFENCES_ERROR',
         message: resolved.message || 'No se pudieron cargar geocercas.'
       });
     }
 
-    const data = normalizeGeofences(resolved.payload);
     return res.json({
       ok: true,
       mode: session.mode,
-      data: {
-        ...data,
-        source: resolved.sourcePath
-      }
+      data: resolved.data
     });
   } catch (error) {
     return res.status(502).json({
