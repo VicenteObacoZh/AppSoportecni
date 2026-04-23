@@ -21,8 +21,14 @@ Thumbs.db
 
 .esclavo/
 backend/src/data/geocode-cache.json
+__pycache__/
 *.pyc
+*.pyc.*
 *.tmp
 *.cache
 obj/
 bin/
+
+__pycache__/
+*.pyc.*
+
