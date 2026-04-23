@@ -18,3 +18,11 @@ ios/
 Thumbs.db
 .vscode/
 .idea/
+
+.esclavo/
+backend/src/data/geocode-cache.json
+*.pyc
+*.tmp
+*.cache
+obj/
+bin/
