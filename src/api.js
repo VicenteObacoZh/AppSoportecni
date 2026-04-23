@@ -196,6 +196,51 @@
     clearRouteContext();
   }
 
+  function clearSavedCredentials() {
+    try {
+      window.localStorage.removeItem('gpsrastreo.savedCredentials');
+    } catch {
+      // no-op
+    }
+  }
+
+  function markManualLogout() {
+    try {
+      window.localStorage.setItem('gpsrastreo.manualLogout', '1');
+    } catch {
+      // no-op
+    }
+  }
+
+  function clearManualLogout() {
+    try {
+      window.localStorage.removeItem('gpsrastreo.manualLogout');
+    } catch {
+      // no-op
+    }
+  }
+
+  function hasManualLogout() {
+    try {
+      return window.localStorage.getItem('gpsrastreo.manualLogout') === '1';
+    } catch {
+      return false;
+    }
+  }
+
+  async function changePasswordBySession(sessionId, payload = {}) {
+    return request(config.endpoints.authChangePassword || '/auth/change-password', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        sessionId,
+        ...payload
+      })
+    });
+  }
+
   function emitClientEvent(name, detail = {}) {
     if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function') {
       return;
@@ -593,6 +638,8 @@
       title: String(reportRequest?.title || 'Reporte'),
       from: String(reportRequest?.from || ''),
       to: String(reportRequest?.to || ''),
+      fromLabel: String(reportRequest?.fromLabel || ''),
+      toLabel: String(reportRequest?.toLabel || ''),
       deviceId: String(
         Array.isArray(reportRequest?.deviceIds)
           ? reportRequest.deviceIds[0]
@@ -626,9 +673,24 @@
       });
       syncRuntimeMode(payload);
       if (payload?.sessionId) {
+        clearManualLogout();
         storeSessionId(payload.sessionId);
       }
       return payload;
+    },
+
+    async changePassword(passwordData) {
+      const sessionId = ensureSessionId();
+
+      try {
+        return await changePasswordBySession(sessionId, passwordData || {});
+      } catch (error) {
+        throw handleClientError(error, {
+          context: 'change-password',
+          emit: true,
+          clearOnSession: true
+        });
+      }
     },
 
     async getDashboard() {
@@ -893,6 +955,9 @@
     async getSessionInfo() {
       const sessionId = getStoredSessionId();
       if (!sessionId) {
+      if (hasManualLogout()) {
+        return null;
+      }
       try {
         const latest = await request(config.endpoints.authLatestSession || '/auth/latest-session');
         if (latest?.id) {
@@ -947,6 +1012,9 @@
     getRouteContext,
     clearRouteContext,
     clearOperationalState,
+    clearSavedCredentials,
+    markManualLogout,
+    clearManualLogout,
     isSessionError,
     isNetworkError,
     getUserMessageFromError

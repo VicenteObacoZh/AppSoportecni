@@ -24,7 +24,7 @@ html {
 
 body {
   margin: 0;
-  font-family: 'Manrope', sans-serif;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: var(--text);
   background:
     radial-gradient(circle at top, rgba(70, 125, 255, 0.25), transparent 28%),
@@ -5138,6 +5138,16 @@ img {
   font-weight: 700;
 }
 
+.mobile-device-info-card__rows p.mobile-device-info-card__row--stacked {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mobile-device-info-card__rows p.mobile-device-info-card__row--stacked strong {
+  align-self: flex-start;
+}
+
 .mobile-device-info-card__top {
   display: flex;
   align-items: center;
@@ -5891,4 +5901,165 @@ img {
   .mobile-routes-player__signal {
     display: none;
   }
+}
+
+.mobile-settings-row--action {
+  cursor: pointer;
+}
+
+.mobile-settings-row--action:active {
+  background: #f6f7f9;
+}
+
+.mobile-settings-password-modal[hidden] {
+  display: none !important;
+}
+
+.mobile-settings-password-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+}
+
+.mobile-settings-password-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(13, 17, 23, 0.36);
+}
+
+.mobile-settings-password-modal__card {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.22);
+  overflow: hidden;
+}
+
+.mobile-settings-password-modal__head {
+  padding: 18px 18px 10px;
+}
+
+.mobile-settings-password-modal__head h3 {
+  margin: 0;
+  color: #2a2f37;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.mobile-settings-password-modal__body {
+  display: grid;
+  gap: 14px;
+  padding: 0 18px 14px;
+}
+
+.mobile-settings-password-modal__body label {
+  display: grid;
+  gap: 6px;
+}
+
+.mobile-settings-password-modal__body span {
+  color: #656d79;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.mobile-settings-password-modal__body input {
+  width: 100%;
+  border: 0;
+  border-bottom: 2px solid #cfd5dd;
+  padding: 10px 0 8px;
+  color: #22272f;
+  background: transparent;
+  font-family: inherit;
+  font-size: 0.98rem;
+}
+
+.mobile-settings-password-modal__message {
+  min-height: 18px;
+  margin: 0;
+  color: #495261;
+  font-size: 0.85rem;
+}
+
+.mobile-settings-password-modal__footer {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding: 0 18px 18px;
+}
+
+.mobile-settings-password-modal__footer button {
+  border: 0;
+  border-radius: 10px;
+  padding: 14px 12px;
+  color: #fff;
+  font-size: 0.98rem;
+  font-weight: 800;
+}
+
+.mobile-settings-password-modal__cancel {
+  background: #ff4b44;
+}
+
+.mobile-settings-password-modal__accept {
+  background: #4a474d;
+}
+
+.mobile-events-topbar--settings {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.mobile-events-back {
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 12px;
+  color: #fff;
+  background: transparent;
+  font-size: 1.4rem;
+}
+
+.mobile-alert-config-list {
+  display: grid;
+  gap: 12px;
+}
+
+.mobile-alert-config-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 18px;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.1);
+}
+
+.mobile-alert-config-card__content {
+  display: grid;
+  gap: 6px;
+}
+
+.mobile-alert-config-card__content strong {
+  color: #2a2f37;
+  font-size: 0.98rem;
+  font-weight: 500;
+}
+
+.mobile-alert-config-card__content small {
+  color: #7a828d;
+  font-size: 0.8rem;
+}
+
+.mobile-alert-config-card__check input {
+  width: 28px;
+  height: 28px;
+  accent-color: #4d4a53;
 }

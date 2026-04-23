@@ -3,21 +3,21 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GpsRastreo | Eventos recientes</title>
-  <meta name="description" content="Vista movil de eventos recientes para GpsRastreo." />
+  <title>GpsRastreo | Alertas</title>
+  <meta name="description" content="Vista movil de alertas configuradas para GpsRastreo." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css?v=28" />
+  <link rel="stylesheet" href="./styles.css?v=29" />
 </head>
 <body class="dashboard-body dashboard-body--events-mobile">
   <div class="mobile-events-app">
-    <header class="mobile-events-topbar">
+    <header class="mobile-events-topbar mobile-events-topbar--settings">
+      <button class="mobile-events-back" id="alertsBackButton" type="button" aria-label="Volver">&#8592;</button>
       <div>
-        <p class="eyebrow">Operacion</p>
-        <h1>Eventos recientes</h1>
+        <h1>Alertas</h1>
       </div>
-      <button class="mobile-events-refresh" id="refreshAlertsButton" type="button" aria-label="Actualizar eventos">&#8635;</button>
+      <button class="mobile-events-refresh" id="refreshAlertsButton" type="button" aria-label="Actualizar alertas">&#8635;</button>
     </header>
 
     <main class="mobile-events-main">
@@ -25,18 +25,20 @@
 
       <label class="mobile-events-search">
         <span class="mobile-events-search__icon">&#128269;</span>
-        <input type="text" id="alertsSearch" placeholder="Buscar vehiculo o evento" />
+        <input type="text" id="alertsSearch" placeholder="Buscar alerta" />
       </label>
 
       <label class="mobile-events-type-filter">
         <span>Tipo</span>
         <select id="alertsTypeFilter">
           <option value="all">Todos</option>
+          <option value="active">Activas</option>
+          <option value="inactive">Inactivas</option>
         </select>
       </label>
 
-      <section class="mobile-events-list" id="alertsEventsList">
-        <div class="mobile-map-empty">Cargando eventos recientes...</div>
+      <section class="mobile-alert-config-list" id="alertsEventsList">
+        <div class="mobile-map-empty">Cargando alertas...</div>
       </section>
     </main>
 
@@ -45,9 +47,9 @@
         <span class="mobile-bottom-nav__icon"><img class="mobile-bottom-nav__icon-img" src="./assets/device-actions/DeviceInf.png" alt="" /></span>
         <span>Dispositivos</span>
       </a>
-      <a class="mobile-bottom-nav__item mobile-bottom-nav__item--active" href="./alerts.html" aria-label="Eventos">
+      <a class="mobile-bottom-nav__item mobile-bottom-nav__item--active" href="./alerts.html" aria-label="Alertas">
         <span class="mobile-bottom-nav__icon">&#128276;</span>
-        <span>Eventos</span>
+        <span>Alertas</span>
       </a>
       <a class="mobile-bottom-nav__item" href="./map.html" aria-label="Mapa">
         <span class="mobile-bottom-nav__icon">&#128506;</span>
@@ -60,10 +62,10 @@
     </nav>
   </div>
 
-  <script src="./config.js?v=4"></script>
-  <script src="./mock-data.js?v=4"></script>
-  <script src="./api.js?v=4"></script>
+  <script src="./config.js?v=5"></script>
+  <script src="./mock-data.js?v=5"></script>
+  <script src="./api.js?v=5"></script>
   <script src="./app-shell.js?v=1"></script>
-  <script src="./alerts.js?v=4"></script>
+  <script src="./alerts.js?v=5"></script>
 </body>
 </html>

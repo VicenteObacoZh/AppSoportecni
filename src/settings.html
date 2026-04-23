@@ -26,23 +26,20 @@
       </section>
 
       <section class="mobile-settings-card">
-        <article class="mobile-settings-row">
+        <article class="mobile-settings-row mobile-settings-row--action" id="settingsAlertsRow" role="button" tabindex="0">
           <div>
             <strong>Alertas</strong>
+            <small>Ver alertas creadas y su estado actual.</small>
           </div>
+          <span>&#8250;</span>
         </article>
 
-        <article class="mobile-settings-row">
+        <article class="mobile-settings-row mobile-settings-row--action" id="settingsChangePasswordRow" role="button" tabindex="0">
           <div>
             <strong>Cambiar contrasena</strong>
+            <small>Actualiza la clave del portal y de la app.</small>
           </div>
-        </article>
-
-        <article class="mobile-settings-row">
-          <div>
-            <strong>Vencimiento</strong>
-          </div>
-          <span>Sin datos</span>
+          <span>&#8250;</span>
         </article>
 
         <article class="mobile-settings-row mobile-settings-row--lang">
@@ -66,6 +63,34 @@
         </article>
       </section>
     </main>
+
+    <section class="mobile-settings-password-modal" id="settingsPasswordModal" hidden>
+      <div class="mobile-settings-password-modal__backdrop" id="settingsPasswordModalBackdrop"></div>
+      <div class="mobile-settings-password-modal__card" role="dialog" aria-modal="true" aria-labelledby="settingsPasswordModalTitle">
+        <div class="mobile-settings-password-modal__head">
+          <h3 id="settingsPasswordModalTitle">Cambiar contrasena</h3>
+        </div>
+        <div class="mobile-settings-password-modal__body">
+          <label>
+            <span>Clave actual</span>
+            <input type="password" id="settingsCurrentPassword" autocomplete="current-password" />
+          </label>
+          <label>
+            <span>Nueva contrasena</span>
+            <input type="password" id="settingsNewPassword" autocomplete="new-password" />
+          </label>
+          <label>
+            <span>Vuelve a escribir la contrasena</span>
+            <input type="password" id="settingsConfirmPassword" autocomplete="new-password" />
+          </label>
+          <p class="mobile-settings-password-modal__message" id="settingsPasswordMessage"></p>
+        </div>
+        <div class="mobile-settings-password-modal__footer">
+          <button type="button" class="mobile-settings-password-modal__cancel" id="settingsPasswordCancel">Cancelar</button>
+          <button type="button" class="mobile-settings-password-modal__accept" id="settingsPasswordAccept">Aceptar</button>
+        </div>
+      </div>
+    </section>
 
     <nav class="mobile-bottom-nav mobile-bottom-nav--settings">
       <a class="mobile-bottom-nav__item" href="./devices.html" aria-label="Dispositivos">

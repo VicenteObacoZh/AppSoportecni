@@ -9,6 +9,25 @@ function buildUrl(path = '/') {
   return `${baseUrl}${path.startsWith('/') ? path : `/${path}`}`;
 }
 
+function decodeHtmlEntities(value) {
+  return String(value || '').replace(/&#(x?[0-9a-f]+);/gi, (_match, code) => {
+    const raw = String(code || '').trim();
+    const parsed = raw.toLowerCase().startsWith('x')
+      ? Number.parseInt(raw.slice(1), 16)
+      : Number.parseInt(raw, 10);
+
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return '';
+    }
+
+    try {
+      return String.fromCodePoint(parsed);
+    } catch {
+      return '';
+    }
+  });
+}
+
 function getSetCookieHeaders(response) {
   if (typeof response.headers.getSetCookie === 'function') {
     return response.headers.getSetCookie();
@@ -63,7 +82,7 @@ function extractReturnUrl(html) {
 }
 
 function stripTags(value) {
-  return String(value || '')
+  return decodeHtmlEntities(String(value || ''))
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/gi, ' ')
     .replace(/&amp;/gi, '&')
@@ -259,6 +278,94 @@ async function fetchConfigurationContext(cookies = []) {
     cookies: mergedCookies,
     location,
     isLoginScreen: isLoginRedirect || looksLikeLoginScreen(html)
+  };
+}
+
+async function fetchChangePasswordContext(cookies = []) {
+  const response = await fetch(buildUrl('/Cuenta/CambiarClave'), {
+    method: 'GET',
+    redirect: 'manual',
+    headers: {
+      'User-Agent': 'GpsRastreo-Backend/0.1',
+      Cookie: cookies.join('; ')
+    }
+  });
+
+  const html = await response.text();
+  const location = response.headers.get('location');
+  const responseCookies = normalizeCookies(getSetCookieHeaders(response));
+  const mergedCookies = mergeCookies(cookies, responseCookies);
+  const token = extractRequestVerificationToken(html);
+  const isLoginRedirect = response.status >= 300 && response.status < 400 && /\/Cuenta\/Login/i.test(location || '');
+
+  return {
+    status: response.status,
+    html,
+    token,
+    cookies: mergedCookies,
+    location,
+    isLoginScreen: isLoginRedirect || looksLikeLoginScreen(html)
+  };
+}
+
+async function submitChangePassword({
+  currentPassword,
+  newPassword,
+  confirmPassword,
+  cookies = []
+}) {
+  const context = await fetchChangePasswordContext(cookies);
+
+  if (!context.token) {
+    return {
+      ok: false,
+      status: context.status,
+      cookies: context.cookies,
+      isLoginScreen: context.isLoginScreen,
+      validationMessages: [],
+      responseText: context.html || '',
+      code: context.isLoginScreen ? 'SESSION_EXPIRED' : 'CHANGE_PASSWORD_TOKEN_MISSING'
+    };
+  }
+
+  const form = new URLSearchParams();
+  form.set('Input.CurrentPassword', currentPassword);
+  form.set('Input.NewPassword', newPassword);
+  form.set('Input.ConfirmPassword', confirmPassword);
+  form.set('__RequestVerificationToken', context.token);
+
+  const response = await fetch(buildUrl('/Cuenta/CambiarClave'), {
+    method: 'POST',
+    redirect: 'manual',
+    headers: {
+      'User-Agent': 'GpsRastreo-Backend/0.1',
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Cookie: context.cookies.join('; ')
+    },
+    body: form.toString()
+  });
+
+  const responseText = await response.text();
+  const location = response.headers.get('location');
+  const responseCookies = normalizeCookies(getSetCookieHeaders(response));
+  const mergedCookies = mergeCookies(context.cookies, responseCookies);
+  const isLoginRedirect = response.status >= 300 && response.status < 400 && /\/Cuenta\/Login/i.test(location || '');
+  const isLoginScreen = isLoginRedirect || looksLikeLoginScreen(responseText);
+  const validationMessages = extractValidationMessages(responseText);
+  const isSuccessRedirect =
+    response.status >= 300 &&
+    response.status < 400 &&
+    /\/Cuenta\/CambiarClave/i.test(location || '');
+
+  return {
+    ok: response.ok || isSuccessRedirect,
+    status: response.status,
+    location,
+    cookies: mergedCookies,
+    isLoginScreen,
+    isSuccessRedirect,
+    validationMessages,
+    responseText
   };
 }
 
@@ -520,8 +627,10 @@ module.exports = {
   submitLogin,
   fetchMonitorCommandContext,
   fetchConfigurationContext,
+  fetchChangePasswordContext,
   fetchConfigurationDeviceMeta,
   saveConfigurationDevice,
+  submitChangePassword,
   sendMonitorCommand,
   saveMonitorMeta,
   looksLikeLoginScreen

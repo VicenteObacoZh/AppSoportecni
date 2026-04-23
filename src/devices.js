@@ -65,11 +65,11 @@
       subtitle: 'Genera el detalle de movimientos y paradas para el rango seleccionado.'
     },
     events: {
-      cardLabel: 'Eventos',
-      type: 'events',
-      title: 'Reporte de Eventos',
-      subtitle: 'Genera el detalle de eventos del dispositivo para el rango seleccionado.'
-    },
+        cardLabel: 'Eventos',
+        type: 'events',
+        title: 'Reporte de Eventos',
+        subtitle: 'Genera el detalle de eventos del dispositivo para el rango seleccionado.'
+      },
     geofences: {
       cardLabel: 'Geocercas',
       type: 'geofences',
@@ -644,7 +644,7 @@
     activeReportRequest = reportConfig || null;
     const range = getDefaultReportRange();
     deviceReportRequestTitle.textContent = reportConfig?.cardLabel || 'Generar reporte';
-    deviceReportRequestSubtitle.textContent = reportConfig?.subtitle || 'Selecciona el rango para exportar el PDF.';
+    deviceReportRequestSubtitle.textContent = reportConfig?.subtitle || 'Selecciona el rango para generar el reporte.';
     deviceReportRequestFromDate.value = range.fromDate;
     deviceReportRequestFromTime.value = range.fromTime;
     deviceReportRequestToDate.value = range.toDate;
@@ -896,6 +896,8 @@
         title: activeReportRequest.title,
         from: fromDate.toISOString(),
         to: toDate.toISOString(),
+        fromLabel: `${deviceReportRequestFromDate.value} ${deviceReportRequestFromTime.value}`,
+        toLabel: `${deviceReportRequestToDate.value} ${deviceReportRequestToTime.value}`,
         deviceIds: [Number(device.deviceId)],
         stopMinMinutes: 3,
         stopSpeedKmh: 1,

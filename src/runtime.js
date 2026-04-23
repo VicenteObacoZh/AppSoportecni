@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   const apiClient = window.GpsRastreoApi;
   const appConfig = window.GpsRastreoConfig || {};
 
@@ -24,64 +24,17 @@
   const apiMessage = document.getElementById('apiMessage');
   const refreshDashboardButton = document.getElementById('refreshDashboardButton');
   const appShell = window.GpsRastreoShell;
-  let loginRetryButton = null;
   let liveMap = null;
   let liveMapMarkers = [];
 
-  function ensureLoginRetryButton() {
-    if (!loginForm) {
-      return null;
-    }
-
-    if (loginRetryButton && loginRetryButton.isConnected) {
-      return loginRetryButton;
-    }
-
-    loginRetryButton = document.createElement('button');
-    loginRetryButton.type = 'button';
-    loginRetryButton.className = 'pill pill--ghost auth-submit';
-    loginRetryButton.textContent = 'Reintentar conexion';
-    loginRetryButton.style.display = 'none';
-    loginRetryButton.addEventListener('click', async () => {
-      setLoginUiState('loading', 'Reintentando conexion con backend...');
-      try {
-        await apiClient.checkPlatform();
-        await syncPlatformStatus();
-        setLoginUiState('idle', 'Conexion recuperada. Intenta iniciar sesion nuevamente.');
-      } catch (error) {
-        await syncPlatformStatus();
-        setLoginUiState('network_error', apiClient?.getUserMessageFromError?.(error) || 'No se pudo conectar con el backend local.');
-      }
-    });
-
-    loginForm.appendChild(loginRetryButton);
-    return loginRetryButton;
-  }
-
   function setLoginUiState(state, message) {
     if (loginMessage) {
-      loginMessage.textContent = message || '';
-    }
-
-    const retryButton = ensureLoginRetryButton();
-    if (retryButton) {
-      retryButton.style.display = (state === 'network_error' || state === 'session_expired') ? '' : 'none';
+      loginMessage.textContent = '';
     }
 
     if (integrationBanner) {
-      if (state === 'loading') {
-        integrationBanner.textContent = appConfig.mockMode
-          ? 'Validando flujo mock en backend local...'
-          : 'Conectando con backend y validando sesion...';
-      } else if (state === 'network_error') {
-        integrationBanner.textContent = 'No hay conexion con backend local. Puedes reintentar cuando el servicio este activo.';
-      } else if (state === 'session_expired') {
-        integrationBanner.textContent = 'La sesion anterior ya no es valida. Inicia sesion de nuevo para continuar.';
-      } else {
-        integrationBanner.textContent = appConfig.mockMode
-          ? 'Modo mock controlado por backend. El flujo usa el mismo contrato de login y sessionId.'
-          : 'Listo para autenticar contra el backend configurado.';
-      }
+      const defaultMessage = 'GpsRastreo - Todos los derechos reservados.';
+      integrationBanner.textContent = String(message || '').trim() || defaultMessage;
     }
   }
 
@@ -464,11 +417,11 @@
   }
 
   if (loginForm && apiClient) {
-    setLoginUiState('idle', 'Ingresa con tu cuenta real del portal para crear la sesión del dashboard.');
+    setLoginUiState('idle', '');
 
     const loginReasonMessage = appShell?.readLoginMessageFromUrl?.();
-    if (loginReasonMessage && loginMessage) {
-      loginMessage.textContent = loginReasonMessage;
+    if (loginReasonMessage) {
+      setLoginUiState('idle', loginReasonMessage);
     }
 
     const savedCredentials = readSavedCredentials();
@@ -490,7 +443,7 @@
     loginForm.addEventListener('submit', (event) => {
       event.preventDefault();
 
-      setLoginUiState('loading', 'Validando acceso con la capa de integración actual...');
+      setLoginUiState('loading', 'Ingresando...');
 
       apiClient.login({
         email: loginForm.elements.email.value,
@@ -502,9 +455,7 @@
           Boolean(rememberCredentials?.checked)
         );
 
-        if (loginMessage) {
-          loginMessage.textContent = 'Autenticación completada. Redirigiendo al mapa operativo...';
-        }
+        setLoginUiState('success', 'Ingreso correcto. Abriendo el mapa...');
 
         window.setTimeout(() => {
           const nextUrl = new URL('./map.html', window.location.href);
@@ -584,7 +535,7 @@
     });
 
     window.addEventListener('gpsrastreo:session-expired', (event) => {
-      const message = String(event?.detail?.message || '').trim() || 'Tu sesion expiro. Vuelve a iniciar sesion.';
+      const message = String(event?.detail?.message || '').trim();
 
       if (loginForm) {
         setLoginUiState('session_expired', message);
@@ -606,3 +557,4 @@
   attachRuntimeEventHandlers();
   bootDashboard();
 })();
+

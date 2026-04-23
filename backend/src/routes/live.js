@@ -1,4 +1,8 @@
 const express = require('express');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const { spawnSync } = require('child_process');
 const mockData = require('../data/mockDashboard');
 const { getSession, updateSession } = require('../services/sessionStore');
 const {
@@ -631,6 +635,8 @@ function buildReportPayloadFromRequest(source = {}) {
     title,
     from,
     to,
+    fromLabel: String(source?.fromLabel || '').trim(),
+    toLabel: String(source?.toLabel || '').trim(),
     deviceIds,
     stopMinMinutes: Number(source?.stopMinMinutes || 3),
     stopSpeedKmh: Number(source?.stopSpeedKmh || 1),
@@ -897,7 +903,7 @@ function normalizeRecentEvents(payload, limit = 30) {
       };
     })
     .filter((item) => Number.isFinite(item.latitude) && Number.isFinite(item.longitude) && item.eventTime)
-    .sort((a, b) => new Date(b.eventTime).getTime() - new Date(a.eventTime).getTime());
+    .sort((a, b) => parseSortableDateValue(b.eventTime) - parseSortableDateValue(a.eventTime));
 
   return {
     items: normalized.slice(0, Math.max(1, limit)),
@@ -929,7 +935,7 @@ function buildMockGeofencesSummary() {
 
 function isLocalCompositeReportType(type) {
   const normalized = String(type || '').trim().toLowerCase();
-  return normalized === 'events' || normalized === 'geofences';
+  return normalized === 'events';
 }
 
 function escapeHtml(value) {
@@ -1069,6 +1075,74 @@ async function loadGeofencesForSession(session) {
   }
 }
 
+async function loadRouteForSession(session, { deviceId, from, to }) {
+  if (!session) {
+    return {
+      ok: false,
+      status: 404,
+      code: 'SESSION_NOT_FOUND',
+      message: 'Sesion valida no encontrada.'
+    };
+  }
+
+  if (session.mode === 'mock') {
+    return {
+      ok: true,
+      data: buildMockRouteSummary()
+    };
+  }
+
+  if (!hasLiveCookies(session)) {
+    return {
+      ok: false,
+      status: 404,
+      code: 'SESSION_NOT_FOUND',
+      message: 'Sesion valida no encontrada.'
+    };
+  }
+
+  const query = new URLSearchParams({
+    deviceId: String(deviceId || '').trim(),
+    from: String(from || '').trim(),
+    to: String(to || '').trim()
+  });
+
+  try {
+    const result = await fetchPlatform(`/Monitoreo/Monitor?handler=Route&${query.toString()}`, {
+      headers: {
+        Cookie: session.cookies.join('; ')
+      }
+    });
+
+    let payload;
+    try {
+      payload = JSON.parse(result.text);
+    } catch {
+      const looksLikeLogin = looksLikePortalLogin(result.text);
+      return {
+        ok: false,
+        status: 401,
+        code: looksLikeLogin ? 'SESSION_EXPIRED' : 'INVALID_ROUTE_RESPONSE',
+        message: looksLikeLogin
+          ? 'La sesion del portal expiro o ya no es valida para consultar rutas.'
+          : 'El modulo de rutas respondio con un contenido inesperado.'
+      };
+    }
+
+    return {
+      ok: true,
+      data: buildRouteSummary(payload)
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 502,
+      code: 'ROUTE_PROXY_ERROR',
+      message: error?.message || 'No se pudieron cargar rutas.'
+    };
+  }
+}
+
 function buildLocalHtmlReportDocument({
   title,
   subtitle,
@@ -1193,49 +1267,719 @@ function buildLocalHtmlReportDocument({
 </html>`;
 }
 
+function splitCamelOrPascal(value) {
+  const text = String(value || '').trim();
+  if (!text) {
+    return 'Evento';
+  }
+
+  const chars = [];
+  for (let index = 0; index < text.length; index += 1) {
+    const current = text[index];
+    const previous = text[index - 1];
+    if (
+      index > 0 &&
+      /[A-Z]/.test(current) &&
+      previous &&
+      /[a-z0-9]/.test(previous)
+    ) {
+      chars.push(' ');
+    }
+    chars.push(current);
+  }
+
+  const normalized = chars.join('').replaceAll('_', ' ').trim();
+  return normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : 'Evento';
+}
+
+function resolveEventTypeLabel(rawValue) {
+  const normalized = String(rawValue || '').trim();
+  if (!normalized) {
+    return 'Evento';
+  }
+
+  switch (normalized.toLowerCase()) {
+    case 'devicemoving':
+      return 'Movimiento';
+    case 'devicestopped':
+      return 'Detencion';
+    case 'ignitionon':
+      return 'Encendido';
+    case 'ignitionoff':
+      return 'Apagado';
+    case 'deviceonline':
+      return 'Conexion';
+    case 'deviceoffline':
+      return 'Desconexion';
+    case 'alarm':
+      return 'Alarma';
+    case 'overspeed':
+      return 'Exceso de velocidad';
+    case 'geofenceenter':
+      return 'Entrada a geocerca';
+    case 'geofenceexit':
+      return 'Salida de geocerca';
+    default:
+      return splitCamelOrPascal(normalized);
+  }
+}
+
+function resolveEventMessage(item) {
+  const explicit = String(item?.message || item?.description || '').trim();
+  if (explicit) {
+    return explicit;
+  }
+
+  const type = String(item?.eventType || '').trim().toLowerCase();
+  const speed = Number(item?.speed || 0);
+  switch (type) {
+    case 'devicemoving':
+      return speed > 0
+        ? `El dispositivo inicio movimiento a ${Math.round(speed)} km/h.`
+        : 'El dispositivo inicio movimiento.';
+    case 'devicestopped':
+      return 'El dispositivo se detuvo.';
+    case 'ignitionon':
+      return 'El motor fue encendido.';
+    case 'ignitionoff':
+      return 'El motor fue apagado.';
+    case 'deviceonline':
+      return 'El dispositivo se conecto nuevamente.';
+    case 'deviceoffline':
+      return 'El dispositivo quedo sin conexion.';
+    case 'overspeed':
+      return speed > 0
+        ? `Se detecto exceso de velocidad a ${Math.round(speed)} km/h.`
+        : 'Se detecto exceso de velocidad.';
+    case 'geofenceenter':
+      return 'El dispositivo ingreso a una geocerca.';
+    case 'geofenceexit':
+      return 'El dispositivo salio de una geocerca.';
+    default:
+      return 'Evento detectado por la plataforma.';
+  }
+}
+
+function formatDetailedReportDate(value, timeZone = 'America/Bogota') {
+  const raw = String(value || '').trim();
+  const naiveMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?$/);
+  if (naiveMatch) {
+    return `${naiveMatch[3]}-${naiveMatch[2]}-${naiveMatch[1]} ${naiveMatch[4]}:${naiveMatch[5]}:${naiveMatch[6] || '00'}`;
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '-';
+  }
+
+  const parts = new Intl.DateTimeFormat('es-CO', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+    timeZone
+  }).formatToParts(date);
+
+  const map = Object.fromEntries(parts.map((item) => [item.type, item.value]));
+  return `${map.day}-${map.month}-${map.year} ${map.hour}:${map.minute}:${map.second}`;
+}
+
+function formatReportRangeLabel(value, timeZone = 'America/Bogota') {
+  const raw = String(value || '').trim();
+  const naiveMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?$/);
+  if (naiveMatch) {
+    return `${naiveMatch[3]}/${naiveMatch[2]}/${naiveMatch[1]} ${naiveMatch[4]}:${naiveMatch[5]}`;
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '-';
+  }
+
+  const parts = new Intl.DateTimeFormat('es-CO', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone
+  }).formatToParts(date);
+
+  const map = Object.fromEntries(parts.map((item) => [item.type, item.value]));
+  return `${map.day}/${map.month}/${map.year} ${map.hour}:${map.minute}`;
+}
+
+function parseSortableDateValue(value) {
+  const raw = String(value || '').trim();
+  const naiveMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?$/);
+  if (naiveMatch) {
+    return Date.UTC(
+      Number(naiveMatch[1]),
+      Number(naiveMatch[2]) - 1,
+      Number(naiveMatch[3]),
+      Number(naiveMatch[4]),
+      Number(naiveMatch[5]),
+      Number(naiveMatch[6] || '0'),
+      0
+    );
+  }
+
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
+}
+
+function buildEventsFromRoutePoints(routePoints = []) {
+  const ordered = (Array.isArray(routePoints) ? routePoints : [])
+    .filter((item) => item?.fixTime)
+    .sort((a, b) => parseSortableDateValue(a.fixTime) - parseSortableDateValue(b.fixTime));
+
+  const events = [];
+  let wasMoving = false;
+
+  ordered.forEach((point, index) => {
+    const speed = Number(point?.speedKmh || 0);
+    const isMoving = speed > 3;
+    const previous = ordered[index - 1] || null;
+
+    if (index === 0) {
+      wasMoving = isMoving;
+      return;
+    }
+
+    if (!wasMoving && isMoving) {
+      events.push({
+        eventTime: point.fixTime,
+        eventType: 'Movimiento',
+        message: speed > 0
+          ? `El dispositivo inicio movimiento a ${Math.round(speed)} km/h.`
+          : 'El dispositivo inicio movimiento.',
+        speedLabel: `${Math.round(speed)} km/h`,
+        address: point.address || `${Number(point.lat).toFixed(5)}, ${Number(point.lon).toFixed(5)}`
+      });
+    }
+
+    if (wasMoving && !isMoving) {
+      const stopPoint = previous || point;
+      events.push({
+        eventTime: stopPoint.fixTime || point.fixTime,
+        eventType: 'Detencion',
+        message: 'El dispositivo se detuvo.',
+        speedLabel: '0 km/h',
+        address: stopPoint.address || `${Number(stopPoint.lat).toFixed(5)}, ${Number(stopPoint.lon).toFixed(5)}`
+      });
+    }
+
+    wasMoving = isMoving;
+  });
+
+  return events.sort((a, b) => parseSortableDateValue(b.eventTime) - parseSortableDateValue(a.eventTime));
+}
+
+function resolvePdfPythonCommand() {
+  const home = os.homedir();
+  const bundled = path.join(
+    home,
+    '.cache',
+    'codex-runtimes',
+    'codex-primary-runtime',
+    'dependencies',
+    'python',
+    'python.exe'
+  );
+
+  if (fs.existsSync(bundled)) {
+    return { command: bundled, argsPrefix: [] };
+  }
+
+  return { command: 'python', argsPrefix: [] };
+}
+
+function generateEventsPdfBuffer(payload) {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'gpsrastreo-events-'));
+  const inputPath = path.join(tempRoot, 'input.json');
+  const outputPath = path.join(tempRoot, 'report.pdf');
+  const scriptPath = path.resolve(__dirname, '../../scripts/generate_events_pdf.py');
+  const python = resolvePdfPythonCommand();
+
+  try {
+    fs.writeFileSync(inputPath, JSON.stringify(payload), 'utf8');
+
+    const result = spawnSync(
+      python.command,
+      [...python.argsPrefix, scriptPath, inputPath, outputPath],
+      { encoding: 'utf8' }
+    );
+
+    if (result.status !== 0 || !fs.existsSync(outputPath)) {
+      throw new Error((result.stderr || result.stdout || 'No se pudo generar el PDF local.').trim());
+    }
+
+    return fs.readFileSync(outputPath);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+}
+
+async function resolveReportBranding(session, selectedDeviceId) {
+  const fallbackLogoPath = path.resolve(__dirname, '../../../assets/icono.png');
+  const fallbackLogoBase64 = fs.existsSync(fallbackLogoPath)
+    ? fs.readFileSync(fallbackLogoPath).toString('base64')
+    : null;
+  const fallback = {
+    companyName: 'Empresa Tecnologica Soportecni',
+    logoBase64: fallbackLogoBase64,
+    deviceName: Number.isFinite(selectedDeviceId) ? `Unidad ${selectedDeviceId}` : 'Unidad'
+  };
+
+  if (!session || session.mode === 'mock' || !hasLiveCookies(session)) {
+    return fallback;
+  }
+
+  try {
+    const result = await fetchPlatform('/Dashboard', {
+      headers: {
+        Cookie: session.cookies.join('; ')
+      }
+    });
+    const logoMatch = String(result.text || '').match(/<img[^>]+src="([^"]+)"[^>]*class="top-logo"[^>]*>/i);
+    const companyMatch = String(result.text || '').match(/<div[^>]+class="top-title"[^>]*>([\s\S]*?)<\/div>/i);
+    const companyName = stripHtml(companyMatch?.[1] || '') || fallback.companyName;
+    let logoBase64 = fallback.logoBase64;
+
+    const logoUrl = String(logoMatch?.[1] || '').trim();
+    if (logoUrl) {
+      const logoPath = logoUrl.startsWith('http://') || logoUrl.startsWith('https://')
+        ? logoUrl
+        : logoUrl.startsWith('/')
+          ? logoUrl
+          : `/${logoUrl.replace(/^\.?\//, '')}`;
+
+      try {
+        const logoResponse = await fetchPlatformBinary(logoPath, {
+          headers: {
+            Cookie: session.cookies.join('; ')
+          }
+        });
+        if (logoResponse.ok && logoResponse.body?.length) {
+          logoBase64 = logoResponse.body.toString('base64');
+        }
+      } catch {
+        logoBase64 = fallback.logoBase64;
+      }
+    }
+
+    const monitorResult = await fetchPlatform('/Monitoreo/Monitor?handler=Data', {
+      headers: {
+        Cookie: session.cookies.join('; ')
+      }
+    });
+    const payload = JSON.parse(monitorResult.text);
+    const summary = buildMonitorSummary(payload);
+    const devices = Array.isArray(summary?.devices) ? summary.devices : [];
+    const matchedDevice = devices.find((item) => (
+      Number(item?.deviceId ?? item?.DeviceId ?? item?.id ?? item?.Id) === selectedDeviceId
+    ));
+
+    return {
+      companyName: String(
+        companyName ||
+        summary?.empresaNombre ||
+        matchedDevice?.groupName ||
+        fallback.companyName
+      ).trim() || fallback.companyName,
+      logoBase64,
+      deviceName: String(
+        matchedDevice?.vehicleName ||
+        matchedDevice?.name ||
+        fallback.deviceName
+      ).trim() || fallback.deviceName
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+function buildLocalEventsReportDocument({
+  title,
+  generatedAt,
+  from,
+  to,
+  fromLabel,
+  toLabel,
+  reports = []
+}) {
+  const totalDevices = reports.length;
+  const devicesWithEvents = reports.filter((item) => item.rows.length > 0).length;
+  const totalEvents = reports.reduce((sum, item) => sum + item.rows.length, 0);
+  const distinctTypes = new Set(
+    reports.flatMap((item) => item.rows.map((row) => row.eventType).filter(Boolean))
+  ).size;
+
+  const summaryMarkup = [
+    ['Dispositivos seleccionados', String(totalDevices)],
+    ['Dispositivos con eventos', String(devicesWithEvents)],
+    ['Eventos', String(totalEvents)],
+    ['Tipos distintos', String(distinctTypes)]
+  ].map(([label, value]) => `
+    <article class="summary-card">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+    </article>
+  `).join('');
+
+  const reportsMarkup = reports.map((report) => {
+    const firstEvent = report.rows.length ? report.rows[report.rows.length - 1].eventTime : null;
+    const lastEvent = report.rows.length ? report.rows[0].eventTime : null;
+    const rowsMarkup = report.rows.length
+      ? report.rows.map((row) => `
+          <tr>
+            <td>${escapeHtml(formatDetailedReportDate(row.eventTime))}</td>
+            <td>${escapeHtml(row.eventType)}</td>
+            <td>${escapeHtml(row.message)}</td>
+            <td>${escapeHtml(row.speedLabel)}</td>
+            <td>${escapeHtml(row.address)}</td>
+          </tr>
+        `).join('')
+      : `
+          <tr>
+            <td colspan="5">Sin eventos para este dispositivo en el rango seleccionado.</td>
+          </tr>
+        `;
+
+    return `
+      <section class="device-report">
+        <h2>${escapeHtml(report.deviceName)}</h2>
+        <div class="device-summary">
+          <article class="device-summary-card">
+            <span>Eventos</span>
+            <strong>${escapeHtml(String(report.rows.length))}</strong>
+          </article>
+          <article class="device-summary-card">
+            <span>Primer evento</span>
+            <strong>${escapeHtml(firstEvent ? formatDetailedReportDate(firstEvent) : '-')}</strong>
+          </article>
+          <article class="device-summary-card">
+            <span>Ultimo evento</span>
+            <strong>${escapeHtml(lastEvent ? formatDetailedReportDate(lastEvent) : '-')}</strong>
+          </article>
+        </div>
+        <div class="table-wrap">
+          <table class="report-table">
+            <thead>
+              <tr>
+                <th>Fecha y hora</th>
+                <th>Tipo</th>
+                <th>Mensaje</th>
+                <th>Velocidad</th>
+                <th>Ubicacion</th>
+              </tr>
+            </thead>
+            <tbody>${rowsMarkup}</tbody>
+          </table>
+        </div>
+      </section>
+    `;
+  }).join('');
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${escapeHtml(title)}</title>
+  <style>
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 24px;
+      background: #eef2f6;
+      color: #1f2937;
+      font-family: "Segoe UI", Arial, sans-serif;
+    }
+    .sheet {
+      max-width: 1180px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 28px;
+      border-radius: 18px;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid #d1d5db;
+    }
+    .brand {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .meta {
+      color: #4b5563;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .summary-grid,
+    .device-summary {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .summary-grid { margin: 18px 0 22px; }
+    .summary-card,
+    .device-summary-card {
+      border: 1px solid #d1d5db;
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: #f9fafb;
+      min-width: 0;
+    }
+    .summary-card span,
+    .device-summary-card span {
+      display: block;
+      font-size: 11px;
+      color: #6b7280;
+      margin-bottom: 4px;
+      line-height: 1.2;
+    }
+    .summary-card strong,
+    .device-summary-card strong {
+      font-size: 15px;
+      color: #111827;
+      line-height: 1.2;
+      word-break: break-word;
+    }
+    .device-report {
+      margin-top: 18px;
+      padding-top: 12px;
+      border-top: 1px solid #e5e7eb;
+    }
+    .device-report h2 {
+      margin: 0 0 10px;
+      font-size: 18px;
+      color: #111827;
+    }
+    .report-table {
+      width: 100%;
+      margin-top: 12px;
+      border-collapse: collapse;
+      border: 1px solid #d1d5db;
+      table-layout: fixed;
+    }
+    .report-table th:nth-child(1),
+    .report-table td:nth-child(1) { width: 120px; }
+    .report-table th:nth-child(2),
+    .report-table td:nth-child(2) { width: 92px; }
+    .report-table th:nth-child(4),
+    .report-table td:nth-child(4) { width: 86px; }
+    .report-table th:nth-child(5),
+    .report-table td:nth-child(5) { width: 110px; }
+    .report-table th {
+      background: #e5e7eb;
+      text-align: left;
+      padding: 10px;
+      font-size: 13px;
+    }
+    .report-table td {
+      padding: 10px;
+      font-size: 13px;
+      vertical-align: top;
+      border-top: 1px solid #e5e7eb;
+      word-break: break-word;
+    }
+    .report-table tbody tr:nth-child(even) {
+      background: #f9fafb;
+    }
+    .table-wrap {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      border-radius: 12px;
+    }
+    @media (max-width: 720px) {
+      body {
+        padding: 14px;
+      }
+      .sheet {
+        padding: 18px;
+      }
+      .summary-grid,
+      .device-summary {
+        grid-template-columns: repeat(4, minmax(72px, 1fr));
+        gap: 6px;
+      }
+      .summary-card,
+      .device-summary-card {
+        padding: 8px 9px;
+        border-radius: 10px;
+      }
+      .summary-card span,
+      .device-summary-card span {
+        font-size: 10px;
+      }
+      .summary-card strong,
+      .device-summary-card strong {
+        font-size: 12px;
+      }
+      .report-table {
+        min-width: 0;
+      }
+      .report-table th,
+      .report-table td {
+        padding: 8px 7px;
+        font-size: 12px;
+      }
+      .report-table th:nth-child(1),
+      .report-table td:nth-child(1) { width: 92px; }
+      .report-table th:nth-child(2),
+      .report-table td:nth-child(2) { width: 74px; }
+      .report-table th:nth-child(4),
+      .report-table td:nth-child(4) { width: 62px; }
+      .report-table th:nth-child(5),
+      .report-table td:nth-child(5) { width: 78px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="sheet">
+    <header class="header">
+      <div>
+        <div class="brand">Empresa Tecnologica Soportecni</div>
+        <div class="title">${escapeHtml(title)}</div>
+        <div class="meta">Generado: ${escapeHtml(generatedAt)}</div>
+        <div class="meta">${escapeHtml(fromLabel || formatDetailedReportDate(from))} - ${escapeHtml(toLabel || formatDetailedReportDate(to))}</div>
+      </div>
+    </header>
+    <section class="summary-grid">${summaryMarkup}</section>
+    ${reportsMarkup}
+  </div>
+</body>
+</html>`;
+}
+
+function buildLocalEventsPdfPayload({
+  companyName,
+  logoBase64,
+  title,
+  generatedAt,
+  from,
+  to,
+  fromLabel,
+  toLabel,
+  reports = []
+}) {
+  const summary = [
+    { label: 'Dispositivos seleccionados', value: String(reports.length) },
+    { label: 'Dispositivos con eventos', value: String(reports.filter((item) => item.rows.length > 0).length) },
+    { label: 'Eventos', value: String(reports.reduce((sum, item) => sum + item.rows.length, 0)) },
+    {
+      label: 'Tipos distintos',
+      value: String(new Set(reports.flatMap((item) => item.rows.map((row) => row.eventType).filter(Boolean))).size)
+    }
+  ];
+
+  return {
+    companyName: String(companyName || 'Empresa Tecnologica Soportecni').trim(),
+    logoBase64: String(logoBase64 || '').trim() || null,
+    title,
+    generatedAt,
+    from,
+    to,
+    fromLabel: fromLabel || formatReportRangeLabel(from),
+    toLabel: toLabel || formatReportRangeLabel(to),
+    dateRangeLabel: `${fromLabel || formatReportRangeLabel(from)} - ${toLabel || formatReportRangeLabel(to)}`,
+    summary,
+    reports: reports.map((report) => ({
+      deviceName: report.deviceName,
+      eventCount: report.rows.length,
+      firstEvent: report.rows.length ? formatDetailedReportDate(report.rows[report.rows.length - 1].eventTime) : '-',
+      lastEvent: report.rows.length ? formatDetailedReportDate(report.rows[0].eventTime) : '-',
+      rows: report.rows.map((row) => ({
+        eventTime: formatDetailedReportDate(row.eventTime),
+        eventType: row.eventType,
+        message: row.message,
+        speedLabel: row.speedLabel,
+        address: row.address
+      }))
+    }))
+  };
+}
+
 async function generateLocalCompositeReport(session, reportPayload = {}) {
   const type = String(reportPayload?.type || '').trim().toLowerCase();
   const title = String(reportPayload?.title || 'Reporte').trim() || 'Reporte';
   const from = String(reportPayload?.from || '').trim();
   const to = String(reportPayload?.to || '').trim();
+  const fromLabel = String(reportPayload?.fromLabel || '').trim();
+  const toLabel = String(reportPayload?.toLabel || '').trim();
   const selectedDeviceId = Number(Array.isArray(reportPayload?.deviceIds) ? reportPayload.deviceIds[0] : null);
 
   if (type === 'events') {
-    const resolved = await loadRecentEventsForSession(session, 250);
+    const branding = await resolveReportBranding(session, selectedDeviceId);
+    const resolved = await loadRouteForSession(session, {
+      deviceId: selectedDeviceId,
+      from,
+      to
+    });
     if (!resolved.ok) {
       return resolved;
     }
 
-    const filteredItems = (resolved.data?.items || []).filter((item) => {
-      const matchesDevice = Number.isFinite(selectedDeviceId)
-        ? String(item.deviceId || '') === String(selectedDeviceId)
-        : true;
-      const eventTime = new Date(item.eventTime || '').getTime();
-      const matchesFrom = from ? eventTime >= new Date(from).getTime() : true;
-      const matchesTo = to ? eventTime <= new Date(to).getTime() : true;
-      return matchesDevice && matchesFrom && matchesTo;
+    const routePoints = resolved.data?.points || [];
+    const rows = buildEventsFromRoutePoints(routePoints);
+
+    const html = buildLocalEventsReportDocument({
+      title,
+      generatedAt: formatDetailedReportDate(new Date().toISOString()),
+      from,
+      to,
+      fromLabel,
+      toLabel,
+      reports: [
+        {
+          deviceName: branding.deviceName,
+          rows
+        }
+      ]
     });
 
-    const html = buildLocalHtmlReportDocument({
+    const pdfPayload = buildLocalEventsPdfPayload({
+      companyName: branding.companyName,
+      logoBase64: branding.logoBase64,
       title,
-      subtitle: 'Resumen operativo basado en el feed reciente de eventos disponible en el portal.',
-      generatedAt: formatReportDate(new Date().toISOString()),
-      details: [
-        { label: 'Tipo', value: 'Eventos' },
-        { label: 'Desde', value: formatReportDate(from) },
-        { label: 'Hasta', value: formatReportDate(to) },
-        { label: 'Total', value: String(filteredItems.length) }
-      ],
-      headers: ['Fecha', 'Unidad', 'Evento', 'Velocidad', 'Ubicacion'],
-      rows: filteredItems.map((item) => [
-        formatReportDate(item.eventTime),
-        item.vehicleName || 'Unidad',
-        item.eventType || 'Evento',
-        `${Math.round(Number(item.speed || 0))} km/h`,
-        item.address || `${Number(item.latitude).toFixed(5)}, ${Number(item.longitude).toFixed(5)}`
-      ]),
-      emptyMessage: 'No hay eventos recientes para el rango y dispositivo seleccionados.'
+      generatedAt: formatDetailedReportDate(new Date().toISOString()),
+      from,
+      to,
+      fromLabel,
+      toLabel,
+      reports: [
+        {
+          deviceName: branding.deviceName,
+          rows
+        }
+      ]
     });
+
+    if (String(reportPayload?.format || 'PDF').trim().toUpperCase() === 'PDF') {
+      return {
+        ok: true,
+        status: 200,
+        contentType: 'application/pdf',
+        body: generateEventsPdfBuffer(pdfPayload)
+      };
+    }
 
     return {
       ok: true,

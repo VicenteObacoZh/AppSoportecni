@@ -5,9 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GpsRastreo | Acceso operativo</title>
   <meta name="description" content="Pantalla de acceso operativo para GpsRastreo." />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background: #02060d;
+      color: #eef6ff;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+  </style>
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body class="auth-body">
@@ -20,17 +26,17 @@
 
       <div class="auth-panel__top">
         <div>
-          <h2 class="auth-panel__subtitle">Inicio de sesión</h2>
+          <h2 class="auth-panel__subtitle">Rastreo Satelital</h2>
         </div>
       </div>
 
       <form class="auth-form" id="loginForm">
         <label class="field">
-          <span>Correo electrónico</span>
+          <span>Usuario</span>
           <input type="email" name="email" placeholder="operaciones@gpsrastreo.com" autocomplete="username" />
         </label>
         <label class="field">
-          <span>Contraseña</span>
+          <span>Contrasena</span>
           <input type="password" name="password" placeholder="********" autocomplete="current-password" />
         </label>
         <div class="auth-form__meta">
@@ -38,12 +44,11 @@
             <input type="checkbox" id="rememberCredentials" checked />
             <span>Recordar correo en este equipo</span>
           </label>
-          <a class="text-link" href="https://rastreo.soportecni.com" target="_blank" rel="noreferrer">Ir a la plataforma real</a>
         </div>
-        <button class="pill pill--primary auth-submit" type="submit">Entrar al dashboard</button>
-        <p class="form-note" id="loginMessage">Ingresa con tu cuenta real del portal para crear la sesión del dashboard.</p>
-        <div class="integration-banner" id="integrationBanner">
-          La app usa el backend proxy configurado. Si el backend está en modo mock o live, la UI mantiene el mismo contrato.
+        <button class="pill pill--primary auth-submit" type="submit">Ingresar</button>
+        <p class="form-note" id="loginMessage" hidden></p>
+        <div class="integration-banner" id="integrationBanner" aria-live="polite">
+          GpsRastreo - Todos los derechos reservados.
         </div>
       </form>
     </section>

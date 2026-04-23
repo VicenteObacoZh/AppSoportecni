@@ -1,8 +1,8 @@
 const express = require('express');
 const config = require('../config');
 const mockData = require('../data/mockDashboard');
-const { fetchLoginPage, submitLogin } = require('../services/platformClient');
-const { createSession, getSession, getLatestSession } = require('../services/sessionStore');
+const { fetchLoginPage, submitLogin, submitChangePassword } = require('../services/platformClient');
+const { createSession, getSession, getLatestSession, updateSession } = require('../services/sessionStore');
 
 const router = express.Router();
 
@@ -194,6 +194,141 @@ router.get('/latest-session', (_req, res) => {
     hasCookies: Array.isArray(session.cookies) && session.cookies.length > 0,
     sessionTtlMinutes: config.sessionTtlMinutes
   });
+});
+
+router.post('/change-password', async (req, res) => {
+  const sessionId = String(req.body?.sessionId || '').trim();
+  const currentPassword = String(req.body?.currentPassword || '').trim();
+  const newPassword = String(req.body?.newPassword || '').trim();
+  const confirmPassword = String(req.body?.confirmPassword || '').trim();
+
+  if (!sessionId) {
+    return res.status(400).json({
+      ok: false,
+      code: 'SESSION_REQUIRED',
+      message: 'sessionId es obligatorio.'
+    });
+  }
+
+  if (!currentPassword || !newPassword || !confirmPassword) {
+    return res.status(400).json({
+      ok: false,
+      code: 'VALIDATION_ERROR',
+      message: 'Debes completar clave actual, nueva clave y confirmacion.'
+    });
+  }
+
+  if (newPassword !== confirmPassword) {
+    return res.status(400).json({
+      ok: false,
+      code: 'PASSWORD_CONFIRMATION_MISMATCH',
+      message: 'La confirmacion no coincide con la nueva clave.'
+    });
+  }
+
+  const session = getSession(sessionId);
+  if (!session || !Array.isArray(session.cookies) || session.cookies.length === 0) {
+    return res.status(404).json({
+      ok: false,
+      code: 'SESSION_NOT_FOUND',
+      message: 'Sesion valida no encontrada.'
+    });
+  }
+
+  if (config.mockMode || session.mode === 'mock') {
+    return res.json({
+      ok: true,
+      mode: 'mock',
+      verified: true,
+      message: 'Cambio de clave simulado correctamente.'
+    });
+  }
+
+  try {
+    const result = await submitChangePassword({
+      currentPassword,
+      newPassword,
+      confirmPassword,
+      cookies: session.cookies
+    });
+
+    if (Array.isArray(result.cookies) && result.cookies.length > 0) {
+      updateSession(sessionId, { cookies: result.cookies });
+    }
+
+    if (result.isLoginScreen) {
+      return res.status(401).json({
+        ok: false,
+        code: 'SESSION_EXPIRED',
+        message: 'La sesion del portal expiro o ya no es valida para cambiar la clave.'
+      });
+    }
+
+    if (!result.isSuccessRedirect) {
+      return res.status(400).json({
+        ok: false,
+        code: 'CHANGE_PASSWORD_REJECTED',
+        message: result.validationMessages?.[0] || 'La plataforma no pudo cambiar la clave.',
+        validationMessages: result.validationMessages || []
+      });
+    }
+
+    if (!session.email) {
+      return res.status(502).json({
+        ok: false,
+        code: 'CHANGE_PASSWORD_UNVERIFIED',
+        message: 'La plataforma respondio sin error, pero no se pudo verificar el cambio porque falta el correo de la sesion.'
+      });
+    }
+
+    const verificationPage = await fetchLoginPage();
+    if (!verificationPage.token) {
+      return res.status(502).json({
+        ok: false,
+        code: 'CHANGE_PASSWORD_VERIFICATION_UNAVAILABLE',
+        message: 'La clave pudo haberse actualizado, pero no se pudo verificar el acceso con la nueva clave.'
+      });
+    }
+
+    const verification = await submitLogin({
+      email: session.email,
+      password: newPassword,
+      rememberMe: true,
+      returnUrl: verificationPage.returnUrl,
+      token: verificationPage.token,
+      cookies: verificationPage.cookies
+    });
+
+    if (!verification.isSuccessRedirect && !verification.looksAuthenticated) {
+      return res.status(502).json({
+        ok: false,
+        code: 'CHANGE_PASSWORD_NOT_CONFIRMED',
+        message: verification.validationMessages?.[0] || 'La plataforma respondio al cambio, pero la nueva clave no pudo ser confirmada.',
+        validationMessages: verification.validationMessages || []
+      });
+    }
+
+    if (Array.isArray(verification.cookies) && verification.cookies.length > 0) {
+      updateSession(sessionId, {
+        cookies: verification.cookies,
+        location: verification.location || session.location || '/Dashboard'
+      });
+    }
+
+    return res.json({
+      ok: true,
+      mode: 'live',
+      verified: true,
+      message: 'La clave fue actualizada correctamente.'
+    });
+  } catch (error) {
+    return res.status(502).json({
+      ok: false,
+      mode: 'live',
+      code: 'CHANGE_PASSWORD_PROXY_ERROR',
+      message: error?.message || 'No se pudo cambiar la clave.'
+    });
+  }
 });
 
 module.exports = router;

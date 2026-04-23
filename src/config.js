@@ -37,6 +37,7 @@
 
   function resolveBackendBaseUrl() {
     const fallback = 'http://localhost:4100/api';
+    const androidLanFallback = 'http://192.168.100.48:4100/api';
 
     if (typeof window === 'undefined' || !window.location) {
       return fallback;
@@ -59,7 +60,8 @@
       window.location.protocol === 'file:';
 
     if (isCapacitorApp) {
-      return fallback;
+      const isAndroid = Boolean(window.CapacitorAndroid) || /Android/i.test(window.navigator?.userAgent || '');
+      return isAndroid ? androidLanFallback : fallback;
     }
 
     return fallback;
@@ -76,6 +78,7 @@
       const isAndroid = Boolean(window.CapacitorAndroid) || /Android/i.test(window.navigator?.userAgent || '');
       if (isAndroid) {
         candidates.push('http://10.0.2.2:4100/api');
+        candidates.push('http://192.168.100.48:4100/api');
       }
       candidates.push(primary);
     } else {
@@ -95,6 +98,7 @@
     endpoints: {
       health: '/health',
       login: '/auth/login',
+      authChangePassword: '/auth/change-password',
       authSession: '/auth/session',
       authLatestSession: '/auth/latest-session',
       dashboard: '/dashboard',

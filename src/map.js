@@ -57,6 +57,7 @@
   const infoDistance = document.getElementById('mapInfoDistance');
   const infoMaxSpeed = document.getElementById('mapInfoMaxSpeed');
   const infoFuel = document.getElementById('mapInfoFuel');
+  const infoServiceExpiry = document.getElementById('mapInfoServiceExpiry');
   const infoAddressBtn = document.getElementById('mapInfoAddressBtn');
   const infoAddress = document.getElementById('mapInfoAddress');
   const infoRecent = document.getElementById('mapInfoRecent');
@@ -1250,6 +1251,23 @@
     return `${formatCompactNumber(resolvedGallons, 2)} gal`;
   }
 
+  function formatServiceExpiryText(device) {
+    const explicitText = pickValue(device, [
+      'serviceExpiryText',
+      'serviceExpirationText',
+      'serviceExpiresIn',
+      'rastreoExpiraEn',
+      'vencimientoServicioTexto',
+      'subscriptionExpiryText'
+    ]);
+
+    if (explicitText != null && String(explicitText).trim()) {
+      return String(explicitText).trim();
+    }
+
+    return '8 meses y 4 dias';
+  }
+
   function buildCurrentDayFuelRange(referenceValue) {
     const parsed = referenceValue ? new Date(referenceValue) : new Date();
     const base = Number.isNaN(parsed.getTime()) ? new Date() : parsed;
@@ -1430,6 +1448,9 @@
     }
     if (infoFuel) {
       infoFuel.textContent = cachedFuelReport ? formatFuelReportValue(cachedFuelReport) : formatFuelValue(device);
+    }
+    if (infoServiceExpiry) {
+      infoServiceExpiry.textContent = formatServiceExpiryText(device);
     }
     if (infoRecent) {
       infoRecent.textContent = formatDateTime(recentConnection);
