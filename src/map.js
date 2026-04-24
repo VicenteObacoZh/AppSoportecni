@@ -917,9 +917,6 @@ function normalizeDegrees(value) {
   return ((num % 360) + 360) % 360;
 }
 
-function angleDelta(from, to) {
-  return ((to - from + 540) % 360) - 180;
-}
 
 function bearingBetweenPoints(fromLat, fromLon, toLat, toLon) {
   const toRad = (value) => value * Math.PI / 180;
@@ -975,74 +972,12 @@ function resolveDeviceHeading(device, previousSnapshot) {
   return normalizeDegrees(previousSnapshot?.heading) ?? 0;
 }
 
-function normalizeDegrees(value) {
-  const num = Number(value);
-  if (!Number.isFinite(num)) {
-    return null;
-  }
-
-  return ((num % 360) + 360) % 360;
-}
 
 function angleDelta(from, to) {
   return ((to - from + 540) % 360) - 180;
 }
 
-function bearingBetweenPoints(fromLat, fromLon, toLat, toLon) {
-  const toRad = (value) => value * Math.PI / 180;
-  const toDeg = (value) => value * 180 / Math.PI;
 
-  const lat1 = toRad(Number(fromLat));
-  const lat2 = toRad(Number(toLat));
-  const dLon = toRad(Number(toLon) - Number(fromLon));
-
-  const y = Math.sin(dLon) * Math.cos(lat2);
-  const x =
-    Math.cos(lat1) * Math.sin(lat2) -
-    Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
-
-  return normalizeDegrees(toDeg(Math.atan2(y, x)));
-}
-
-function resolveDeviceHeading(device, previousSnapshot) {
-  const explicitHeading = normalizeDegrees(
-    device?.course ??
-    device?.Course ??
-    device?.heading ??
-    device?.Heading ??
-    device?.direction ??
-    device?.Direction
-  );
-
-  const speed = Number(device?.speedKmh ?? device?.speed ?? 0);
-
-  if (explicitHeading !== null && speed >= 2) {
-    return explicitHeading;
-  }
-
-  const lat = Number(device?.lat);
-  const lon = Number(device?.lon);
-  const prevLat = Number(previousSnapshot?.lat);
-  const prevLon = Number(previousSnapshot?.lon);
-
-  if (
-    Number.isFinite(lat) &&
-    Number.isFinite(lon) &&
-    Number.isFinite(prevLat) &&
-    Number.isFinite(prevLon)
-  ) {
-    const movedMeters = distanceMeters(prevLat, prevLon, lat, lon);
-
-    if (movedMeters >= 3) {
-      const calculated = bearingBetweenPoints(prevLat, prevLon, lat, lon);
-      if (calculated !== null) {
-        return calculated;
-      }
-    }
-  }
-
-  return normalizeDegrees(previousSnapshot?.heading) ?? 0;
-}
 
   function clearEventFocusMarker() {
     if (eventFocusMarker) {
