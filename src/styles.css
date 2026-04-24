@@ -6166,3 +6166,39 @@ img {
   height: 28px;
   accent-color: #4d4a53;
 }
+
+/* Rotación real de vehículos en mapa en vivo */
+.vehicle-marker-leaflet {
+  background: transparent;
+  border: 0;
+}
+
+.vehicle-marker-shell {
+  position: relative;
+  width: 54px;
+  height: 54px;
+  display: grid;
+  place-items: center;
+  overflow: visible;
+}
+
+.vehicle-marker-pulse {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: rgba(0, 255, 90, 0.22);
+  box-shadow: 0 0 0 8px rgba(0, 255, 90, 0.16);
+  pointer-events: none;
+}
+
+.vehicle-marker-img {
+  position: relative;
+  z-index: 2;
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  transform-origin: 50% 50%;
+  transition: transform 260ms linear;
+  will-change: transform;
+}

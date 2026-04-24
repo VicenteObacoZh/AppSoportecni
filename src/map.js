@@ -2061,28 +2061,55 @@ function angleDelta(from, to) {
   }
 
   function addDeviceMarker(device) {
-    const lat = Number(device.lat);
-    const lon = Number(device.lon);
+  const lat = Number(device.lat);
+  const lon = Number(device.lon);
 
-    const marker = window.L.marker([lat, lon], {
-      icon: buildDeviceIcon(device, Number(device?.course || 0))
-    }).addTo(liveMap);
-
-    marker.bindTooltip(escapeHtml(device.vehicleName || device.name || 'Unidad'), {
-      permanent: true,
-      direction: 'top',
-      offset: [0, -18],
-      className: 'gps-name-label'
-    });
-
-    const onSelectMarker = () => {
-      selectDeviceFromMap(device, { center: true });
-    };
-    marker.on('click', onSelectMarker);
-    marker.on('touchstart', onSelectMarker);
-
-    renderMarkers.push(marker);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+    return;
   }
+
+  const deviceId = String(
+    device?.deviceId ??
+    device?.DeviceId ??
+    device?.id ??
+    device?.Id ??
+    device?.uniqueId ??
+    device?.UniqueId ??
+    `${lat},${lon}`
+  );
+
+  const previousSnapshot = detailedSnapshots.get(deviceId) || {};
+  const heading = resolveDeviceHeading(device, previousSnapshot);
+
+  const marker = window.L.marker([lat, lon], {
+    icon: buildVehicleIcon(device, heading)
+  }).addTo(liveMap);
+
+  marker.__heading = heading;
+
+  marker.bindTooltip(escapeHtml(device.vehicleName || device.name || 'Unidad'), {
+    permanent: true,
+    direction: 'top',
+    offset: [0, -18],
+    className: 'gps-name-label'
+  });
+
+  const onSelectMarker = () => {
+    selectDeviceFromMap(device, { center: true });
+  };
+
+  marker.on('click', onSelectMarker);
+  marker.on('touchstart', onSelectMarker);
+
+  detailedSnapshots.set(deviceId, {
+    ...device,
+    lat,
+    lon,
+    heading
+  });
+
+  renderMarkers.push(marker);
+}
 
   function getDeviceMarkerId(device) {
     return String(
