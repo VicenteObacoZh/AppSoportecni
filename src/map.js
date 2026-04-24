@@ -693,12 +693,62 @@
   }
 
   function getMarkerBase(device) {
-    return String(device?.iconBase || 'flecha').trim() || 'flecha';
+  return String(device?.iconBase || 'flecha').trim() || 'flecha';
+}
+
+function getMarkerUrl(device) {
+  return `../assets/markers/${getMarkerBase(device)}_${getStatusColor(device)}.png`;
+}
+
+/* ==========================================================
+   ROTACIÓN DEL VEHÍCULO EN MAPA EN VIVO
+   Esta función crea el icono como divIcon para rotar SOLO la imagen.
+   No se debe rotar el marker completo de Leaflet.
+   ========================================================== */
+function buildVehicleIcon(device, heading) {
+  const markerUrl = getMarkerUrl(device);
+  const safeHeading = normalizeDegrees(heading) ?? 0;
+
+  return window.L.divIcon({
+    className: 'vehicle-marker-leaflet',
+    iconSize: [54, 54],
+    iconAnchor: [27, 27],
+    popupAnchor: [0, -28],
+    html: `
+      <div class="vehicle-marker-shell">
+        <span class="vehicle-marker-pulse"></span>
+        <img
+          class="vehicle-marker-img"
+          data-vehicle-img="true"
+          src="${markerUrl}"
+          alt=""
+          style="transform: rotate(${safeHeading}deg);"
+        />
+      </div>
+    `
+  });
+}
+
+function updateVehicleMarkerRotation(marker, heading) {
+  const nextHeading = normalizeDegrees(heading) ?? 0;
+  const img = marker?.getElement?.()?.querySelector('[data-vehicle-img="true"]');
+
+  if (!img) {
+    return;
   }
 
-  function getMarkerUrl(device) {
-    return `../assets/markers/${getMarkerBase(device)}_${getStatusColor(device)}.png`;
+  const currentHeading = normalizeDegrees(marker.__heading) ?? nextHeading;
+  const diff = angleDelta(currentHeading, nextHeading);
+
+  if (Math.abs(diff) < LIVE_ROTATE_MIN_DIFF_DEG) {
+    return;
   }
+
+  const finalHeading = currentHeading + diff;
+  marker.__heading = normalizeDegrees(finalHeading);
+  img.style.transform = `rotate(${finalHeading}deg)`;
+}
+
 
   function setSheetOpen(isOpen) {
     if (!sheet || !menuButton) {
@@ -859,6 +909,140 @@
     const h = (sinDLat * sinDLat) + (Math.cos(lat1) * Math.cos(lat2) * sinDLon * sinDLon);
     return 2 * earthRadius * Math.asin(Math.min(1, Math.sqrt(h)));
   }
+
+
+function normalizeDegrees(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return null;
+  return ((num % 360) + 360) % 360;
+}
+
+function angleDelta(from, to) {
+  return ((to - from + 540) % 360) - 180;
+}
+
+function bearingBetweenPoints(fromLat, fromLon, toLat, toLon) {
+  const toRad = (value) => value * Math.PI / 180;
+  const toDeg = (value) => value * 180 / Math.PI;
+
+  const lat1 = toRad(Number(fromLat));
+  const lat2 = toRad(Number(toLat));
+  const dLon = toRad(Number(toLon) - Number(fromLon));
+
+  const y = Math.sin(dLon) * Math.cos(lat2);
+  const x =
+    Math.cos(lat1) * Math.sin(lat2) -
+    Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+
+  return normalizeDegrees(toDeg(Math.atan2(y, x)));
+}
+
+function resolveDeviceHeading(device, previousSnapshot) {
+  const explicitHeading = normalizeDegrees(
+    device?.course ??
+    device?.Course ??
+    device?.heading ??
+    device?.Heading ??
+    device?.direction ??
+    device?.Direction
+  );
+
+  const speed = Number(device?.speedKmh ?? device?.speed ?? 0);
+
+  if (explicitHeading !== null && speed >= 2) {
+    return explicitHeading;
+  }
+
+  const lat = Number(device?.lat);
+  const lon = Number(device?.lon);
+  const prevLat = Number(previousSnapshot?.lat);
+  const prevLon = Number(previousSnapshot?.lon);
+
+  if (
+    Number.isFinite(lat) &&
+    Number.isFinite(lon) &&
+    Number.isFinite(prevLat) &&
+    Number.isFinite(prevLon)
+  ) {
+    const movedMeters = distanceMeters(prevLat, prevLon, lat, lon);
+
+    if (movedMeters >= 3) {
+      const calculated = bearingBetweenPoints(prevLat, prevLon, lat, lon);
+      if (calculated !== null) return calculated;
+    }
+  }
+
+  return normalizeDegrees(previousSnapshot?.heading) ?? 0;
+}
+
+function normalizeDegrees(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) {
+    return null;
+  }
+
+  return ((num % 360) + 360) % 360;
+}
+
+function angleDelta(from, to) {
+  return ((to - from + 540) % 360) - 180;
+}
+
+function bearingBetweenPoints(fromLat, fromLon, toLat, toLon) {
+  const toRad = (value) => value * Math.PI / 180;
+  const toDeg = (value) => value * 180 / Math.PI;
+
+  const lat1 = toRad(Number(fromLat));
+  const lat2 = toRad(Number(toLat));
+  const dLon = toRad(Number(toLon) - Number(fromLon));
+
+  const y = Math.sin(dLon) * Math.cos(lat2);
+  const x =
+    Math.cos(lat1) * Math.sin(lat2) -
+    Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+
+  return normalizeDegrees(toDeg(Math.atan2(y, x)));
+}
+
+function resolveDeviceHeading(device, previousSnapshot) {
+  const explicitHeading = normalizeDegrees(
+    device?.course ??
+    device?.Course ??
+    device?.heading ??
+    device?.Heading ??
+    device?.direction ??
+    device?.Direction
+  );
+
+  const speed = Number(device?.speedKmh ?? device?.speed ?? 0);
+
+  if (explicitHeading !== null && speed >= 2) {
+    return explicitHeading;
+  }
+
+  const lat = Number(device?.lat);
+  const lon = Number(device?.lon);
+  const prevLat = Number(previousSnapshot?.lat);
+  const prevLon = Number(previousSnapshot?.lon);
+
+  if (
+    Number.isFinite(lat) &&
+    Number.isFinite(lon) &&
+    Number.isFinite(prevLat) &&
+    Number.isFinite(prevLon)
+  ) {
+    const movedMeters = distanceMeters(prevLat, prevLon, lat, lon);
+
+    if (movedMeters >= 3) {
+      const calculated = bearingBetweenPoints(prevLat, prevLon, lat, lon);
+      if (calculated !== null) {
+        return calculated;
+      }
+    }
+  }
+
+  return normalizeDegrees(previousSnapshot?.heading) ?? 0;
+}
 
   function clearEventFocusMarker() {
     if (eventFocusMarker) {
