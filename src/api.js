@@ -292,7 +292,7 @@
     }
 
     if (isNetworkError(error)) {
-      return 'No se pudo conectar con el backend local. Verifica red y servicio.';
+      return 'No se pudo conectar con el backend del servicio. Verifica internet y servidor.';
     }
 
     return String(error?.payload?.message || error?.message || 'No fue posible completar la solicitud.');
@@ -403,7 +403,7 @@
     }
 
     if (lastNetworkError) {
-      const networkError = new Error(`No se pudo conectar con ${lastNetworkError.requestUrl}. ${lastNetworkError.error?.message || 'Revisa backend y red local.'}`);
+      const networkError = new Error(`No se pudo conectar con ${lastNetworkError.requestUrl}. ${lastNetworkError.error?.message || 'Revisa backend y red del servicio.'}`);
       networkError.code = 'BACKEND_UNAVAILABLE';
       networkError.cause = lastNetworkError.error;
       networkError.context = 'network';
@@ -491,7 +491,7 @@
     }
 
     if (lastNetworkError) {
-      const networkError = new Error(`No se pudo conectar con ${lastNetworkError.requestUrl}. ${lastNetworkError.error?.message || 'Revisa backend y red local.'}`);
+      const networkError = new Error(`No se pudo conectar con ${lastNetworkError.requestUrl}. ${lastNetworkError.error?.message || 'Revisa backend y red del servicio.'}`);
       networkError.code = 'BACKEND_UNAVAILABLE';
       networkError.cause = lastNetworkError.error;
       networkError.context = 'network';

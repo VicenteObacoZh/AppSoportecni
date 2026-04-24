@@ -54,7 +54,7 @@
 
     if (state === 'network_error') {
       liveBannerTitle.textContent = 'Sin conexion con backend';
-      liveBannerText.textContent = message || 'No se pudo conectar con backend local. Verifica servicio y red.';
+      liveBannerText.textContent = message || 'No se pudo conectar con backend del servicio. Verifica internet y servidor.';
       if (refreshDashboardButton) {
         refreshDashboardButton.disabled = false;
         refreshDashboardButton.textContent = 'Reintentar';
@@ -406,8 +406,8 @@
     } catch (error) {
       const reason = getUiErrorReason(error);
       if (reason === 'backend_unavailable') {
-        apiStatus.textContent = 'Backend local no disponible';
-        apiMessage.textContent = apiClient?.getUserMessageFromError?.(error) || 'No se pudo conectar con el backend local.';
+        apiStatus.textContent = 'Backend no disponible';
+        apiMessage.textContent = apiClient?.getUserMessageFromError?.(error) || 'No se pudo conectar con el backend del servicio.';
         return;
       }
 
@@ -483,7 +483,7 @@
             : backendCode === 'LOGIN_TOKEN_MISSING'
               ? 'No se pudo obtener el token de seguridad del login.'
               : backendCode === 'BACKEND_UNAVAILABLE'
-                ? 'No se pudo conectar con el backend local.'
+                ? 'No se pudo conectar con el backend del servicio.'
                 : '';
         const detailedMessage =
           validationMessages[0] ||
@@ -523,7 +523,7 @@
     }
 
     window.addEventListener('gpsrastreo:network-error', (event) => {
-      const message = String(event?.detail?.message || '').trim() || 'No se pudo conectar con backend local.';
+      const message = String(event?.detail?.message || '').trim() || 'No se pudo conectar con backend del servicio.';
 
       if (loginForm) {
         setLoginUiState('network_error', message);

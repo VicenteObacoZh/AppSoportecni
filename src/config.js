@@ -36,11 +36,11 @@
   }
 
   function resolveBackendBaseUrl() {
-    const fallback = 'http://localhost:4100/api';
-    const androidLanFallback = 'http://192.168.100.48:4100/api';
+    const localFallback = 'http://localhost:4100/api';
+    const productionFallback = 'https://rastreo.soportecni.com/api';
 
     if (typeof window === 'undefined' || !window.location) {
-      return fallback;
+      return productionFallback;
     }
 
     const configuredBaseUrl = readConfiguredBaseUrl();
@@ -60,11 +60,12 @@
       window.location.protocol === 'file:';
 
     if (isCapacitorApp) {
-      const isAndroid = Boolean(window.CapacitorAndroid) || /Android/i.test(window.navigator?.userAgent || '');
-      return isAndroid ? androidLanFallback : fallback;
+      return productionFallback;
     }
 
-    return fallback;
+    const currentHost = String(window.location.hostname || '').toLowerCase();
+    const isLocalHost = currentHost === 'localhost' || currentHost === '127.0.0.1' || currentHost === '10.0.2.2';
+    return isLocalHost ? localFallback : productionFallback;
   }
 
   function resolveBackendBaseUrlCandidates() {
@@ -75,12 +76,13 @@
     if (configuredBaseUrl) {
       candidates.push(primary);
     } else if (typeof window !== 'undefined') {
-      const isAndroid = Boolean(window.CapacitorAndroid) || /Android/i.test(window.navigator?.userAgent || '');
-      if (isAndroid) {
+      const currentHost = String(window.location.hostname || '').toLowerCase();
+      const isLocalHost = currentHost === 'localhost' || currentHost === '127.0.0.1' || currentHost === '10.0.2.2';
+      if (isLocalHost) {
         candidates.push('http://10.0.2.2:4100/api');
-        candidates.push('http://192.168.100.48:4100/api');
+        candidates.push('http://localhost:4100/api');
       }
-      candidates.push(primary);
+      candidates.push(primary || 'https://rastreo.soportecni.com/api');
     } else {
       candidates.push(primary);
     }
