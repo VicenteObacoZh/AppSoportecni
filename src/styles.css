@@ -1872,15 +1872,108 @@ img {
 .gps-marker-real__shell {
   width: 52px;
   height: 52px;
+  position: relative;
   display: grid;
   place-items: center;
+  overflow: visible;
+  isolation: isolate;
   filter: drop-shadow(0 10px 20px rgba(4, 10, 22, 0.42));
 }
 
+.gps-marker-real__wave,
+.gps-marker-real__glow {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.gps-marker-real__wave {
+  width: 42px;
+  height: 42px;
+  opacity: 0.86;
+  animation: gps-marker-wave 1.35s ease-out infinite;
+}
+
+.gps-marker-real__glow {
+  width: 50px;
+  height: 50px;
+  opacity: 1;
+  filter: blur(6px);
+}
+
+.gps-marker-real__shell--verde .gps-marker-real__wave {
+  background: rgba(73, 214, 112, 0.34);
+  border: 3px solid rgba(73, 214, 112, 0.92);
+  box-shadow: 0 0 0 8px rgba(73, 214, 112, 0.18);
+}
+
+.gps-marker-real__shell--verde .gps-marker-real__glow {
+  background: radial-gradient(circle, rgba(88, 255, 155, 0.96) 0%, rgba(88, 255, 155, 0.44) 42%, rgba(88, 255, 155, 0.14) 60%, rgba(88, 255, 155, 0) 84%);
+}
+
+.gps-marker-real__shell--verde {
+  filter: drop-shadow(0 8px 18px rgba(26, 88, 46, 0.34));
+}
+
+.gps-marker-real__shell--amarillo .gps-marker-real__wave {
+  background: rgba(255, 205, 86, 0.28);
+  border: 3px solid rgba(255, 205, 86, 0.82);
+  box-shadow: 0 0 0 8px rgba(255, 205, 86, 0.14);
+  animation-duration: 1.55s;
+}
+
+.gps-marker-real__shell--amarillo .gps-marker-real__glow {
+  background: radial-gradient(circle, rgba(255, 214, 102, 0.9) 0%, rgba(255, 214, 102, 0.34) 42%, rgba(255, 214, 102, 0.12) 60%, rgba(255, 214, 102, 0) 84%);
+}
+
+.gps-marker-real__shell--amarillo {
+  filter: drop-shadow(0 8px 18px rgba(120, 90, 18, 0.28));
+}
+
+.gps-marker-real__shell--rojo .gps-marker-real__wave,
+.gps-marker-real__shell--gris .gps-marker-real__wave {
+  background: rgba(235, 238, 244, 0.28);
+  border: 2px solid rgba(184, 192, 204, 0.66);
+  box-shadow: 0 0 0 6px rgba(180, 188, 198, 0.12);
+  animation-duration: 1.85s;
+  opacity: 0.62;
+}
+
+.gps-marker-real__shell--rojo .gps-marker-real__glow,
+.gps-marker-real__shell--gris .gps-marker-real__glow {
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.86) 0%, rgba(220, 228, 236, 0.34) 42%, rgba(220, 228, 236, 0.1) 60%, rgba(220, 228, 236, 0) 84%);
+}
+
+.gps-marker-real__shell--rojo,
+.gps-marker-real__shell--gris {
+  filter: drop-shadow(0 8px 18px rgba(74, 78, 86, 0.22));
+}
+
 .gps-marker-real__img {
+  position: relative;
+  z-index: 2;
   width: 44px;
   height: 44px;
   object-fit: contain;
+}
+
+@keyframes gps-marker-wave {
+  0% {
+    opacity: 0.92;
+    transform: translate(-50%, -50%) scale(0.56);
+  }
+
+  70% {
+    opacity: 0.26;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(2.7);
+  }
 }
 
 .mobile-map-sheet {
@@ -2087,6 +2180,16 @@ img {
   width: 42px;
   height: 42px;
   filter: none;
+}
+
+.gps-marker-real__wave {
+  width: 34px;
+  height: 34px;
+}
+
+.gps-marker-real__glow {
+  width: 40px;
+  height: 40px;
 }
 
 .gps-marker-real__img {

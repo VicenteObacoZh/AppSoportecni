@@ -135,6 +135,15 @@
   let shareSending = false;
   let historyOpening = false;
   let pendingDeviceAction = '';
+  const LIVE_MARKER_ANIM_MS = 1000;
+  const LIVE_ROTATE_ANIM_MS = 260;
+  const LIVE_STALE_MINUTES = 30;
+  const LIVE_TAIL_MAX_KM = 0.5;
+  const LIVE_TAIL_MIN_STEP_M = 8;
+  const LIVE_TAIL_RESET_JUMP_M = 120;
+  const LIVE_MOVE_MIN_ANIM_M = 1.5;
+  const LIVE_MOVE_MAX_SMOOTH_M = 180;
+  const LIVE_ROTATE_MIN_DIFF_DEG = 3;
   const pageUrl = new URL(window.location.href);
 
   function buildReturnToDeviceSheetUrl(deviceId) {
@@ -221,6 +230,29 @@
 
     const parsed = new Date(value);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  function getDeviceLastReportTime(device) {
+    return parseFixTime(device?.fixTime) ||
+      parseFixTime(device?.deviceTime) ||
+      parseFixTime(device?.gpsTime) ||
+      parseFixTime(device?.receiveTime) ||
+      parseFixTime(device?.serverTime) ||
+      null;
+  }
+
+  function isDeviceStale(device, staleMinutes = LIVE_STALE_MINUTES) {
+    const reportTime = getDeviceLastReportTime(device);
+    if (!reportTime) {
+      return true;
+    }
+
+    const ageMs = Date.now() - reportTime.getTime();
+    if (!Number.isFinite(ageMs)) {
+      return true;
+    }
+
+    return ageMs > (staleMinutes * 60 * 1000);
   }
 
   function normalizeStatusText(value) {
@@ -359,26 +391,32 @@
   }
 
   function getStatusColor(device) {
+    if (isDeviceStale(device)) {
+      return 'rojo';
+    }
+
     const explicit = resolveExplicitStatusColor(device);
+    if (explicit === 'gris') {
+      return 'rojo';
+    }
     if (explicit) {
       return explicit;
     }
 
     const speed = Number(device?.speedKmh || device?.speed || 0);
     const hasLocation = Number.isFinite(Number(device?.lat)) && Number.isFinite(Number(device?.lon));
-    const fixTime = parseFixTime(device?.fixTime);
-    const ageHours = fixTime ? Math.abs(Date.now() - fixTime.getTime()) / 36e5 : Number.POSITIVE_INFINITY;
+    const ignition = device?.ignition === true || device?.engineOn === true || device?.isEngineOn === true;
 
-    if (!hasLocation || ageHours > 24) {
-      return 'gris';
+    if (!hasLocation) {
+      return 'rojo';
     }
-    if (speed > 3) {
+    if (speed >= 5 || (device?.motion === true && speed >= 5)) {
       return 'verde';
     }
-    if (speed > 0) {
+    if (ignition || speed > 0) {
       return 'amarillo';
     }
-    return 'rojo';
+    return 'gris';
   }
 
   function getStatusTone(device) {
@@ -396,14 +434,14 @@
   }
 
   function getStatusKey(device) {
-    const tone = getStatusTone(device);
-    if (tone.accent === 'green') {
+    const color = getStatusColor(device);
+    if (color === 'verde') {
       return 'moving';
     }
-    if (tone.accent === 'yellow') {
+    if (color === 'amarillo') {
       return 'idle';
     }
-    if (tone.accent === 'gray') {
+    if (color === 'rojo') {
       return 'offline';
     }
     return 'stopped';
@@ -1639,11 +1677,14 @@
     const markerUrl = getMarkerUrl(device);
     const fallbackUrl = `../assets/markers/flecha_${getStatusColor(device)}.png`;
     const safeRotation = Number.isFinite(Number(rotationDeg)) ? Number(rotationDeg) : 0;
+    const statusColor = getStatusColor(device);
 
     return window.L.divIcon({
       className: 'gps-marker-real',
       html: `
-        <div class="gps-marker-real__shell">
+        <div class="gps-marker-real__shell gps-marker-real__shell--${statusColor}">
+          <span class="gps-marker-real__wave"></span>
+          <span class="gps-marker-real__glow"></span>
           <img class="gps-marker-real__img" style="transform: rotate(${safeRotation}deg); transition: transform 380ms linear;" src="${markerUrl}" alt="vehiculo" onerror="this.onerror=null;this.src='${fallbackUrl}'" />
         </div>
       `,
@@ -1677,7 +1718,7 @@
   }
 
   function updateCounters(devices, alertSummary) {
-    const moving = devices.filter((item) => Number(item?.speedKmh || 0) > 3).length;
+    const moving = devices.filter((item) => getStatusColor(item) === 'verde').length;
     const withLocation = devices.filter((item) => Number.isFinite(Number(item?.lat)) && Number.isFinite(Number(item?.lon))).length;
 
     if (movingCount) {
@@ -1891,10 +1932,10 @@
   }
 
   function pickClusterTone(items) {
-    if (items.some((item) => Number(item.speedKmh || 0) > 3)) {
+    if (items.some((item) => getStatusColor(item) === 'verde')) {
       return 'green';
     }
-    if (items.some((item) => Number(item.speedKmh || 0) > 0)) {
+    if (items.some((item) => getStatusColor(item) === 'amarillo')) {
       return 'orange';
     }
     return 'gray';
@@ -1947,10 +1988,144 @@
     return (theta + 360) % 360;
   }
 
+  function normalizeAngle(angle) {
+    const numeric = Number(angle);
+    if (!Number.isFinite(numeric)) {
+      return 0;
+    }
+
+    return ((numeric % 360) + 360) % 360;
+  }
+
+  function trimTrailToMaxKm(points, maxKm) {
+    if (!Array.isArray(points) || points.length <= 1) {
+      return Array.isArray(points) ? points : [];
+    }
+
+    const trimmed = [points[points.length - 1]];
+    let accumulatedKm = 0;
+
+    for (let index = points.length - 2; index >= 0; index -= 1) {
+      const current = points[index];
+      const next = points[index + 1];
+      const segmentKm = distanceMeters(current[0], current[1], next[0], next[1]) / 1000;
+
+      if ((accumulatedKm + segmentKm) > maxKm) {
+        break;
+      }
+
+      trimmed.push(current);
+      accumulatedKm += segmentKm;
+    }
+
+    trimmed.reverse();
+    return trimmed;
+  }
+
+  function updateMarkerRotationVisual(marker, angle) {
+    if (!marker) {
+      return;
+    }
+
+    const safeAngle = normalizeAngle(angle);
+    marker.__rotationAngle = safeAngle;
+
+    const markerElement = marker.getElement?.();
+    const image = markerElement?.querySelector?.('.gps-marker-real__img');
+    if (image) {
+      image.style.transform = `rotate(${safeAngle}deg)`;
+    }
+  }
+
+  function smoothRotateMarker(marker, targetAngle, durationMs = LIVE_ROTATE_ANIM_MS) {
+    if (!marker) {
+      return;
+    }
+
+    if (typeof marker.__rotateCancel === 'function') {
+      marker.__rotateCancel();
+      marker.__rotateCancel = null;
+    }
+
+    const startAngle = normalizeAngle(marker.__rotationAngle ?? marker.options?.rotationAngle ?? 0);
+    const endAngle = normalizeAngle(targetAngle);
+    let diff = endAngle - startAngle;
+    if (diff > 180) diff -= 360;
+    if (diff < -180) diff += 360;
+
+    if (Math.abs(diff) < LIVE_ROTATE_MIN_DIFF_DEG) {
+      updateMarkerRotationVisual(marker, endAngle);
+      marker.__rotateCancel = null;
+      return;
+    }
+
+    const startTime = performance.now();
+    let cancelled = false;
+
+    marker.__rotateCancel = () => {
+      cancelled = true;
+    };
+
+    function tick(now) {
+      if (cancelled) {
+        return;
+      }
+
+      const progress = Math.min((now - startTime) / durationMs, 1);
+      updateMarkerRotationVisual(marker, startAngle + (diff * progress));
+
+      if (progress < 1) {
+        window.requestAnimationFrame(tick);
+      } else {
+        marker.__rotateCancel = null;
+      }
+    }
+
+    window.requestAnimationFrame(tick);
+  }
+
+  function syncDeviceMarkerVisual(marker, device, rotation, forceRefresh = false) {
+    if (!marker) {
+      return;
+    }
+
+    const markerUrl = getMarkerUrl(device);
+    const fallbackUrl = `../assets/markers/${getMarkerBase(device)}_${getStatusColor(device)}.png`;
+    const visualKey = `${markerUrl}|${getStatusColor(device)}|${getMarkerBase(device)}`;
+    const markerElement = marker.getElement?.();
+    const image = markerElement?.querySelector?.('.gps-marker-real__img');
+
+    const currentAngle = normalizeAngle(marker.__rotationAngle ?? marker.options?.rotationAngle ?? 0);
+
+    if (forceRefresh || !markerElement || !image || marker.__visualKey !== visualKey) {
+      marker.setIcon(buildDeviceIcon(device, rotation));
+      marker.__visualKey = visualKey;
+      window.requestAnimationFrame(() => {
+        const refreshedElement = marker.getElement?.();
+        const refreshedImage = refreshedElement?.querySelector?.('.gps-marker-real__img');
+        if (refreshedImage) {
+          refreshedImage.src = markerUrl;
+          refreshedImage.onerror = () => {
+            refreshedImage.onerror = null;
+            refreshedImage.src = fallbackUrl;
+          };
+          updateMarkerRotationVisual(marker, currentAngle);
+        }
+      });
+      return;
+    }
+
+    image.src = markerUrl;
+    image.onerror = () => {
+      image.onerror = null;
+      image.src = fallbackUrl;
+    };
+  }
+
   function resolveDeviceRotation(device, previousSnapshot) {
-    const direct = Number(device?.course ?? device?.heading ?? device?.direction);
-    if (Number.isFinite(direct) && Math.abs(direct) > 0) {
-      return direct;
+    const direct = Number(device?.course ?? device?.heading ?? device?.direction ?? device?.attributes?.course ?? device?.attributes?.heading);
+    if (Number.isFinite(direct)) {
+      return normalizeAngle(direct);
     }
 
     if (previousSnapshot) {
@@ -1965,9 +2140,9 @@
         Number.isFinite(lon) &&
         (Math.abs(prevLat - lat) > 1e-7 || Math.abs(prevLon - lon) > 1e-7)
       ) {
-        return computeBearing(prevLat, prevLon, lat, lon);
+        return normalizeAngle(computeBearing(prevLat, prevLon, lat, lon));
       }
-      return Number(previousSnapshot.rotation || 0);
+      return normalizeAngle(previousSnapshot.rotation || 0);
     }
 
     return 0;
@@ -2010,18 +2185,20 @@
 
     const history = movementHistoryById.get(markerId) || [];
     const last = history[history.length - 1];
-    const shouldAppend = !last || distanceMeters(last[0], last[1], lat, lon) >= 2;
+    const stepDistance = last ? distanceMeters(last[0], last[1], lat, lon) : 0;
+    const shouldAppend = !last || stepDistance >= LIVE_TAIL_MIN_STEP_M;
 
     if (shouldAppend) {
-      history.push([lat, lon]);
-      if (history.length > 18) {
-        history.shift();
+      if (last && stepDistance > LIVE_TAIL_RESET_JUMP_M) {
+        history.length = 0;
       }
-      movementHistoryById.set(markerId, history);
+      history.push([lat, lon]);
+      movementHistoryById.set(markerId, trimTrailToMaxKm(history, LIVE_TAIL_MAX_KM));
     }
 
     const existing = trailPolylineById.get(markerId);
-    if (speed <= 3 || history.length < 2) {
+    const currentHistory = movementHistoryById.get(markerId) || history;
+    if (speed <= 3 || currentHistory.length < 2) {
       if (existing) {
         existing.remove();
         trailPolylineById.delete(markerId);
@@ -2032,15 +2209,15 @@
     const tone = getStatusColor(device);
     const color = tone === 'verde' ? '#31c45f' : '#f0de39';
     if (existing) {
-      existing.setLatLngs(history);
+      existing.setLatLngs(currentHistory);
       existing.setStyle({ color });
       return;
     }
 
-    const polyline = window.L.polyline(history, {
+    const polyline = window.L.polyline(currentHistory, {
       color,
       weight: 4,
-      opacity: 0.74,
+      opacity: 0.82,
       lineCap: 'round',
       lineJoin: 'round'
     }).addTo(trailLayerGroup);
@@ -2048,7 +2225,7 @@
     trailPolylineById.set(markerId, polyline);
   }
 
-  function animateMarkerTo(marker, toLat, toLon, durationMs = 1800) {
+  function animateMarkerTo(marker, toLat, toLon, durationMs = LIVE_MARKER_ANIM_MS, onUpdate = null, onDone = null) {
     const from = marker.getLatLng();
     const startLat = Number(from.lat);
     const startLon = Number(from.lng);
@@ -2057,6 +2234,9 @@
 
     if (!Number.isFinite(startLat) || !Number.isFinite(startLon) || !Number.isFinite(targetLat) || !Number.isFinite(targetLon)) {
       marker.setLatLng([toLat, toLon]);
+      if (typeof onDone === 'function') {
+        onDone(marker.getLatLng());
+      }
       return;
     }
 
@@ -2077,15 +2257,22 @@
       }
       const t = Math.min(1, (now - startTime) / durationMs);
       const eased = 1 - Math.pow(1 - t, 2);
-      marker.setLatLng([
+      const nextLatLng = [
         startLat + ((targetLat - startLat) * eased),
         startLon + ((targetLon - startLon) * eased)
-      ]);
+      ];
+      marker.setLatLng(nextLatLng);
+      if (typeof onUpdate === 'function') {
+        onUpdate(marker.getLatLng());
+      }
 
       if (t < 1) {
         window.requestAnimationFrame(tick);
       } else {
         marker.__animCancel = null;
+        if (typeof onDone === 'function') {
+          onDone(marker.getLatLng());
+        }
       }
     }
 
@@ -2126,11 +2313,44 @@
         };
         created.on('click', onSelectMarker);
         created.on('touchstart', onSelectMarker);
+        created.__visualKey = `${getMarkerUrl(device)}|${getStatusColor(device)}|${getMarkerBase(device)}`;
+        updateMarkerRotationVisual(created, rotation);
         detailedMarkers.set(markerId, created);
       } else {
-        marker.setIcon(buildDeviceIcon(device, rotation));
-        marker.unbindPopup();
-        marker.setLatLng([lat, lon]);
+        syncDeviceMarkerVisual(marker, device, rotation);
+        const currentLatLng = marker.getLatLng?.();
+        const movedMeters = currentLatLng
+          ? distanceMeters(currentLatLng.lat, currentLatLng.lng, lat, lon)
+          : Number.POSITIVE_INFINITY;
+
+        smoothRotateMarker(marker, rotation);
+
+        if (!Number.isFinite(movedMeters) || movedMeters <= LIVE_MOVE_MIN_ANIM_M) {
+          marker.setLatLng([lat, lon]);
+          updateTrailForDevice(markerId, marker, device);
+        } else if (movedMeters > LIVE_MOVE_MAX_SMOOTH_M) {
+          if (typeof marker.__animCancel === 'function') {
+            marker.__animCancel();
+            marker.__animCancel = null;
+          }
+          marker.setLatLng([lat, lon]);
+          updateTrailForDevice(markerId, marker, device);
+        } else {
+          animateMarkerTo(
+            marker,
+            lat,
+            lon,
+            LIVE_MARKER_ANIM_MS,
+            null,
+            (finalLatLng) => {
+              updateTrailForDevice(markerId, marker, {
+                ...device,
+                lat: finalLatLng?.lat ?? lat,
+                lon: finalLatLng?.lng ?? lon
+              });
+            }
+          );
+        }
       }
 
       detailedSnapshots.set(markerId, {
@@ -2140,7 +2360,7 @@
       });
 
       const markerRef = detailedMarkers.get(markerId);
-      if (markerRef) {
+      if (markerRef && !marker) {
         updateTrailForDevice(markerId, markerRef, device);
       }
     });

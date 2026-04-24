@@ -104,6 +104,38 @@
       .toLowerCase();
   }
 
+  function parseReportTime(value) {
+    if (!value) {
+      return null;
+    }
+
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  function getDeviceLastReportTime(device) {
+    return parseReportTime(device?.fixTime) ||
+      parseReportTime(device?.deviceTime) ||
+      parseReportTime(device?.gpsTime) ||
+      parseReportTime(device?.receiveTime) ||
+      parseReportTime(device?.serverTime) ||
+      null;
+  }
+
+  function isDeviceStale(device, staleMinutes = 30) {
+    const reportTime = getDeviceLastReportTime(device);
+    if (!reportTime) {
+      return true;
+    }
+
+    const ageMs = Date.now() - reportTime.getTime();
+    if (!Number.isFinite(ageMs)) {
+      return true;
+    }
+
+    return ageMs > (staleMinutes * 60 * 1000);
+  }
+
   function resolveColorFromText(value) {
     const text = normalizeStatusText(value);
     if (!text) {
@@ -224,14 +256,6 @@
   }
 
   function getMarkerColor(device) {
-    const explicitColor = resolveExplicitColor(device);
-    if (explicitColor) {
-      if (explicitColor === 'green') return 'verde';
-      if (explicitColor === 'yellow') return 'amarillo';
-      if (explicitColor === 'gray') return 'gris';
-      return 'rojo';
-    }
-
     const tone = getStatusTone(device).color;
     if (tone === 'green') return 'verde';
     if (tone === 'yellow') return 'amarillo';
@@ -240,10 +264,11 @@
   }
 
   function getStatusTone(device) {
-    const explicitColor = resolveExplicitColor(device);
-    if (explicitColor === 'gray') {
+    if (isDeviceStale(device)) {
       return { key: 'offline', label: 'Sin señal', color: 'gray' };
     }
+
+    const explicitColor = resolveExplicitColor(device);
     if (explicitColor === 'red') {
       return { key: 'stopped', label: 'Detenido', color: 'red' };
     }
@@ -252,6 +277,9 @@
     }
     if (explicitColor === 'yellow') {
       return { key: 'idle', label: 'Reposo', color: 'yellow' };
+    }
+    if (explicitColor === 'gray') {
+      return { key: 'offline', label: 'Sin señal', color: 'gray' };
     }
 
     const statusHint = [
@@ -301,20 +329,17 @@
       return { key: 'moving', label: 'Movimiento', color: 'green' };
     }
 
-    const speed = Number(device?.speedKmh || 0);
+    const speed = Number(device?.speedKmh || device?.speed || 0);
     const hasLocation = Number.isFinite(Number(device?.lat)) && Number.isFinite(Number(device?.lon));
-    const fixTime = device?.fixTime ? new Date(device.fixTime) : null;
-    const ageHours = fixTime && !Number.isNaN(fixTime.getTime())
-      ? Math.abs(Date.now() - fixTime.getTime()) / 36e5
-      : Number.POSITIVE_INFINITY;
+    const ignition = device?.ignition === true || device?.engineOn === true || device?.isEngineOn === true;
 
-    if (!hasLocation || ageHours > 24) {
+    if (!hasLocation) {
       return { key: 'offline', label: 'Sin señal', color: 'gray' };
     }
-    if (speed > 3) {
+    if (speed >= 5 || (device?.motion === true && speed >= 5)) {
       return { key: 'moving', label: 'Movimiento', color: 'green' };
     }
-    if (speed > 0) {
+    if (ignition || speed > 0) {
       return { key: 'idle', label: 'Reposo', color: 'yellow' };
     }
     return { key: 'stopped', label: 'Detenido', color: 'red' };
