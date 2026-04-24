@@ -2081,6 +2081,19 @@ function angleDelta(from, to) {
   const previousSnapshot = detailedSnapshots.get(deviceId) || {};
   const heading = resolveDeviceHeading(device, previousSnapshot);
 
+  console.log('ROTACION DEVICE', {
+    deviceId,
+    nombre: device.vehicleName || device.name,
+    course: device.course,
+    heading: device.heading,
+    direction: device.direction,
+    headingFinal: heading,
+    lat,
+    lon,
+    prevLat: previousSnapshot.lat,
+    prevLon: previousSnapshot.lon
+  });
+
   const marker = window.L.marker([lat, lon], {
     icon: buildVehicleIcon(device, heading)
   }).addTo(liveMap);
