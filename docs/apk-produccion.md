@@ -61,6 +61,36 @@ APK generado:
 android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
+## Publicar temporalmente el APK desde tu VPS
+
+El backend Node ya puede exponer una pagina publica para descarga directa:
+
+- `https://tu-dominio/apk`
+- `https://tu-dominio/apk/download`
+- `https://tu-dominio/api/public/apk/status`
+
+Variables recomendadas en `backend/.env`:
+
+```env
+PUBLIC_BASE_URL=https://rastreo.soportecni.com
+APK_FILE_PATH=C:\ruta\real\del\app-debug.apk
+APK_DISPLAY_NAME=GpsRastreo.apk
+```
+
+Notas:
+
+- `PUBLIC_BASE_URL` se usa para construir el enlace final y el QR.
+- `APK_FILE_PATH` debe apuntar al archivo `.apk` real que quedo en el VPS.
+- la pagina `/apk` muestra boton de descarga, tamano del archivo y un QR para compartir con el cliente.
+
+Flujo sugerido:
+
+1. Copiar el `.apk` al VPS.
+2. Configurar `APK_FILE_PATH` con esa ruta.
+3. Reiniciar el backend Node.
+4. Abrir `https://tu-dominio/apk`.
+5. Enviar ese enlace o el QR al cliente.
+
 ## Si cambia el dominio o backend
 
 Editar:

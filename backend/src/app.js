@@ -29,6 +29,7 @@ function createApp() {
   app.use('/api/live', liveRoutes);
   app.use('/api/public', publicRoutes);
   app.use('/share', publicRoutes);
+  app.use('/', publicRoutes);
 
   app.use((err, _req, res, _next) => {
     res.status(500).json({

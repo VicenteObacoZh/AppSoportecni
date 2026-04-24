@@ -1,5 +1,8 @@
 process.env.MOCK_MODE = 'true';
 process.env.SESSION_TTL_MINUTES = '480';
+process.env.APK_FILE_PATH = __filename;
+process.env.APK_DISPLAY_NAME = 'GpsRastreo-test.apk';
+process.env.PUBLIC_BASE_URL = 'https://rastreo.soportecni.com';
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -15,6 +18,16 @@ async function requestJson(path, options = {}) {
   return {
     status: response.status,
     payload
+  };
+}
+
+async function requestText(path, options = {}) {
+  const response = await fetch(`${baseUrl}${path}`, options);
+  const text = await response.text();
+  return {
+    status: response.status,
+    text,
+    headers: response.headers
   };
 }
 
@@ -64,6 +77,34 @@ test('health endpoint reports mock capabilities', async () => {
   assert.equal(payload.capabilities.monitor, true);
   assert.equal(payload.capabilities.alerts, true);
   assert.equal(payload.capabilities.route, true);
+});
+
+test('apk landing page exposes direct-download messaging', async () => {
+  const { status, text } = await requestText('/apk');
+
+  assert.equal(status, 200);
+  assert.match(text, /Descarga directa para Android/);
+  assert.match(text, /\/apk\/download/);
+});
+
+test('apk status exposes public download urls', async () => {
+  const { status, payload } = await requestJson('/api/public/apk/status');
+
+  assert.equal(status, 200);
+  assert.equal(payload.ok, true);
+  assert.equal(payload.data.filename, 'GpsRastreo-test.apk');
+  assert.equal(payload.data.downloadUrl, 'https://rastreo.soportecni.com/apk/download');
+  assert.equal(payload.data.pageUrl, 'https://rastreo.soportecni.com/apk');
+});
+
+test('apk download endpoint serves the configured file', async () => {
+  const response = await fetch(`${baseUrl}/apk/download`);
+  const contentDisposition = response.headers.get('content-disposition') || '';
+  const body = await response.text();
+
+  assert.equal(response.status, 200);
+  assert.match(contentDisposition, /GpsRastreo-test\.apk/);
+  assert.match(body, /createApp/);
 });
 
 test('login rejects missing credentials', async () => {
