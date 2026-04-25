@@ -705,49 +705,6 @@ function getMarkerUrl(device) {
    Esta función crea el icono como divIcon para rotar SOLO la imagen.
    No se debe rotar el marker completo de Leaflet.
    ========================================================== */
-function buildVehicleIcon(device, heading) {
-  const markerUrl = getMarkerUrl(device);
-  const safeHeading = normalizeDegrees(heading) ?? 0;
-
-  return window.L.divIcon({
-    className: 'vehicle-marker-leaflet',
-    iconSize: [54, 54],
-    iconAnchor: [27, 27],
-    popupAnchor: [0, -28],
-    html: `
-      <div class="vehicle-marker-shell">
-        <span class="vehicle-marker-pulse"></span>
-        <img
-          class="vehicle-marker-img"
-          data-vehicle-img="true"
-          src="${markerUrl}"
-          alt=""
-          style="transform: rotate(${safeHeading}deg);"
-        />
-      </div>
-    `
-  });
-}
-
-function updateVehicleMarkerRotation(marker, heading) {
-  const nextHeading = normalizeDegrees(heading) ?? 0;
-  const img = marker?.getElement?.()?.querySelector('[data-vehicle-img="true"]');
-
-  if (!img) {
-    return;
-  }
-
-  const currentHeading = normalizeDegrees(marker.__heading) ?? nextHeading;
-  const diff = angleDelta(currentHeading, nextHeading);
-
-  if (Math.abs(diff) < LIVE_ROTATE_MIN_DIFF_DEG) {
-    return;
-  }
-
-  const finalHeading = currentHeading + diff;
-  marker.__heading = normalizeDegrees(finalHeading);
-  img.style.transform = `rotate(${finalHeading}deg)`;
-}
 
 
   function setSheetOpen(isOpen) {
@@ -861,11 +818,13 @@ function updateVehicleMarkerRotation(marker, heading) {
   }
 
   function clearDetailedMarkers() {
-    detailedMarkers.forEach((marker) => marker.remove());
-    detailedMarkers = new Map();
-    detailedSnapshots = new Map();
-    clearTrails(false);
-  }
+  detailedMarkers.forEach((marker) => marker.remove());
+  detailedMarkers = new Map();
+
+  // NO borrar detailedSnapshots aquí.
+  // Si lo borras, pierdes la posición anterior y no puede calcular rumbo.
+  clearTrails(false);
+}
 
   function clearTrails(clearHistory = false) {
     trailPolylineById.forEach((polyline) => polyline.remove());
@@ -1958,97 +1917,130 @@ function angleDelta(from, to) {
   }
 
   function renderCompanyList() {
-    if (!companyList) {
-      return;
+  if (!companyList) {
+    return;
+  }
+
+  const query = getSearchQuery();
+  const companies = currentCompanies.filter((company) => {
+    if (!query) {
+      return true;
     }
 
-    const query = getSearchQuery();
-    const companies = currentCompanies.filter((company) => {
-      if (!query) {
-        return true;
-      }
+    const companyDevices = Array.isArray(company.devices) ? company.devices : [];
 
-      const haystack = [company.name, ...company.devices.map((item) => item.vehicleName || item.name || '')]
-        .join(' ')
-        .toLowerCase();
+    const haystack = [
+      company.name,
+      ...companyDevices.map((item) => item.vehicleName || item.name || '')
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
 
-      return haystack.includes(query);
-    });
+    return haystack.includes(query);
+  });
 
-    if (!companies.length) {
-      companyList.innerHTML = '<div class="mobile-map-empty">No hay empresas visibles.</div>';
-      return;
-    }
+  if (!companies.length) {
+    companyList.innerHTML = '<div class="mobile-map-empty">No hay empresas visibles.</div>';
+    return;
+  }
 
-    companyList.innerHTML = companies.map((company) => {
-      const expanded = activeCompany === company.name;
-      const companyKey = encodeURIComponent(company.name);
-      return `
-        <div class="mobile-company-group${expanded ? ' mobile-company-group--open' : ''}">
-          <button class="mobile-company-card${expanded ? ' mobile-company-card--active' : ''}" type="button" data-company-key="${companyKey}">
-            <span>${escapeHtml(company.name)}</span>
-            <div class="mobile-company-card__meta">
-              <strong>${company.total}</strong>
-              <span class="mobile-company-card__chevron">${expanded ? '&#9662;' : '&#8250;'}</span>
-            </div>
-          </button>
-          <div class="mobile-company-group__devices${expanded ? ' mobile-company-group__devices--open' : ''}">
-            ${expanded ? company.devices.map((device) => buildDeviceCard(device, true)).join('') : ''}
+  companyList.innerHTML = companies.map((company) => {
+    const expanded = activeCompany === company.name;
+    const companyKey = encodeURIComponent(company.name);
+    const companyDevices = Array.isArray(company.devices) ? company.devices : [];
+
+    return `
+      <div class="mobile-company-group${expanded ? ' mobile-company-group--open' : ''}">
+        <button class="mobile-company-card${expanded ? ' mobile-company-card--active' : ''}" type="button" data-company-key="${companyKey}">
+          <span>${escapeHtml(company.name)}</span>
+          <div class="mobile-company-card__meta">
+            <strong>${company.total}</strong>
+            <span class="mobile-company-card__chevron">${expanded ? '&#9662;' : '&#8250;'}</span>
           </div>
+        </button>
+        <div class="mobile-company-group__devices${expanded ? ' mobile-company-group__devices--open' : ''}">
+          ${expanded ? companyDevices.map((device) => buildDeviceCard(device, true)).join('') : ''}
         </div>
-      `;
-    }).join('');
+      </div>
+    `;
+  }).join('');
 
-    companyList.querySelectorAll('[data-company-key]').forEach((button) => {
-      button.addEventListener('click', () => {
-        const companyName = decodeURIComponent(button.getAttribute('data-company-key') || '');
-        activeCompany = companyName === activeCompany ? '' : companyName;
-        renderCompanyList();
-        renderDeviceList(filterDevices());
-      });
+  companyList.querySelectorAll('[data-company-key]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const companyName = decodeURIComponent(button.getAttribute('data-company-key') || '');
+      activeCompany = companyName === activeCompany ? '' : companyName;
+      renderCompanyList();
+      renderDeviceList(filterDevices());
     });
+  });
 
-    bindDeviceCardClicks(companyList);
+  bindDeviceCardClicks(companyList);
+}
+
+
+function getDeviceLiveLatLng(device) {
+  const markerId = getDeviceMarkerId(device);
+  const marker = markerId ? detailedMarkers.get(markerId) : null;
+  const markerLatLng = marker?.getLatLng?.();
+
+  if (markerLatLng) {
+    return markerLatLng;
   }
 
-  function buildClusters(devices, cellSize) {
-    if (!liveMap) {
-      return [];
+  const lat = Number(device?.lat);
+  const lon = Number(device?.lon);
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+    return null;
+  }
+
+  return window.L.latLng(lat, lon);
+}
+
+ function buildClusters(devices, cellSize) {
+  if (!liveMap) {
+    return [];
+  }
+
+  const zoom = liveMap.getZoom();
+  const grouped = new Map();
+
+  devices.forEach((device) => {
+    const latLng = getDeviceLiveLatLng(device);
+
+    if (!latLng) {
+      return;
     }
 
-    const zoom = liveMap.getZoom();
-    const grouped = new Map();
+    const point = liveMap.project(latLng, zoom);
+    const key = `${Math.floor(point.x / cellSize)}:${Math.floor(point.y / cellSize)}`;
 
-    devices.forEach((device) => {
-      const lat = Number(device.lat);
-      const lon = Number(device.lon);
-      if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-        return;
-      }
+    if (!grouped.has(key)) {
+      grouped.set(key, []);
+    }
 
-      const point = liveMap.project([lat, lon], zoom);
-      const key = `${Math.floor(point.x / cellSize)}:${Math.floor(point.y / cellSize)}`;
-      if (!grouped.has(key)) {
-        grouped.set(key, []);
-      }
-      grouped.get(key).push(device);
+    grouped.get(key).push({
+      device,
+      latLng
     });
+  });
 
-    return [...grouped.values()].map((items) => {
-      const center = items.reduce((acc, item) => {
-        acc.lat += Number(item.lat);
-        acc.lon += Number(item.lon);
-        return acc;
-      }, { lat: 0, lon: 0 });
+  return [...grouped.values()].map((items) => {
+    const center = items.reduce((acc, item) => {
+      acc.lat += item.latLng.lat;
+      acc.lon += item.latLng.lng;
+      return acc;
+    }, { lat: 0, lon: 0 });
 
-      return {
-        count: items.length,
-        items,
-        lat: center.lat / items.length,
-        lon: center.lon / items.length
-      };
-    });
-  }
+    return {
+      count: items.length,
+      items: items.map((item) => item.device),
+      lat: center.lat / items.length,
+      lon: center.lon / items.length
+    };
+  });
+}
 
   function pickClusterTone(items) {
     if (items.some((item) => getStatusColor(item) === 'verde')) {
@@ -2068,37 +2060,15 @@ function angleDelta(from, to) {
     return;
   }
 
-  const deviceId = String(
-    device?.deviceId ??
-    device?.DeviceId ??
-    device?.id ??
-    device?.Id ??
-    device?.uniqueId ??
-    device?.UniqueId ??
-    `${lat},${lon}`
-  );
-
-  const previousSnapshot = detailedSnapshots.get(deviceId) || {};
-  const heading = resolveDeviceHeading(device, previousSnapshot);
-
-  console.log('ROTACION DEVICE', {
-    deviceId,
-    nombre: device.vehicleName || device.name,
-    course: device.course,
-    heading: device.heading,
-    direction: device.direction,
-    headingFinal: heading,
-    lat,
-    lon,
-    prevLat: previousSnapshot.lat,
-    prevLon: previousSnapshot.lon
-  });
+  const deviceId = getDeviceMarkerId(device);
+  const previousSnapshot = detailedSnapshots.get(deviceId) || null;
+  const rotation = resolveDeviceRotation(device, previousSnapshot);
 
   const marker = window.L.marker([lat, lon], {
-    icon: buildVehicleIcon(device, heading)
+    icon: buildDeviceIcon(device, rotation)
   }).addTo(liveMap);
 
-  marker.__heading = heading;
+  updateMarkerRotationVisual(marker, rotation);
 
   marker.bindTooltip(escapeHtml(device.vehicleName || device.name || 'Unidad'), {
     permanent: true,
@@ -2107,18 +2077,20 @@ function angleDelta(from, to) {
     className: 'gps-name-label'
   });
 
-  const onSelectMarker = () => {
+  marker.on('click', () => {
     selectDeviceFromMap(device, { center: true });
-  };
+  });
 
-  marker.on('click', onSelectMarker);
-  marker.on('touchstart', onSelectMarker);
+  marker.on('touchstart', () => {
+    selectDeviceFromMap(device, { center: true });
+  });
+
+  bindDevicePopup(marker, device);
 
   detailedSnapshots.set(deviceId, {
-    ...device,
     lat,
     lon,
-    heading
+    rotation
   });
 
   renderMarkers.push(marker);
@@ -2244,68 +2216,103 @@ function angleDelta(from, to) {
   }
 
   function syncDeviceMarkerVisual(marker, device, rotation, forceRefresh = false) {
-    if (!marker) {
-      return;
-    }
-
-    const markerUrl = getMarkerUrl(device);
-    const fallbackUrl = `../assets/markers/${getMarkerBase(device)}_${getStatusColor(device)}.png`;
-    const visualKey = `${markerUrl}|${getStatusColor(device)}|${getMarkerBase(device)}`;
-    const markerElement = marker.getElement?.();
-    const image = markerElement?.querySelector?.('.gps-marker-real__img');
-
-    const currentAngle = normalizeAngle(marker.__rotationAngle ?? marker.options?.rotationAngle ?? 0);
-
-    if (forceRefresh || !markerElement || !image || marker.__visualKey !== visualKey) {
-      marker.setIcon(buildDeviceIcon(device, rotation));
-      marker.__visualKey = visualKey;
-      window.requestAnimationFrame(() => {
-        const refreshedElement = marker.getElement?.();
-        const refreshedImage = refreshedElement?.querySelector?.('.gps-marker-real__img');
-        if (refreshedImage) {
-          refreshedImage.src = markerUrl;
-          refreshedImage.onerror = () => {
-            refreshedImage.onerror = null;
-            refreshedImage.src = fallbackUrl;
-          };
-          updateMarkerRotationVisual(marker, currentAngle);
-        }
-      });
-      return;
-    }
-
-    image.src = markerUrl;
-    image.onerror = () => {
-      image.onerror = null;
-      image.src = fallbackUrl;
-    };
+  if (!marker) {
+    return;
   }
+
+  const markerUrl = getMarkerUrl(device);
+  const fallbackUrl = `../assets/markers/${getMarkerBase(device)}_${getStatusColor(device)}.png`;
+  const visualKey = `${markerUrl}|${getStatusColor(device)}|${getMarkerBase(device)}`;
+  const markerElement = marker.getElement?.();
+  const image = markerElement?.querySelector?.('.gps-marker-real__img');
+  const safeRotation = normalizeAngle(rotation);
+
+  if (forceRefresh || !markerElement || !image || marker.__visualKey !== visualKey) {
+    marker.setIcon(buildDeviceIcon(device, safeRotation));
+    marker.__visualKey = visualKey;
+    marker.__rotationAngle = safeRotation;
+
+    window.requestAnimationFrame(() => {
+      const refreshedElement = marker.getElement?.();
+      const refreshedImage = refreshedElement?.querySelector?.('.gps-marker-real__img');
+
+      if (refreshedImage) {
+        refreshedImage.src = markerUrl;
+        refreshedImage.onerror = () => {
+          refreshedImage.onerror = null;
+          refreshedImage.src = fallbackUrl;
+        };
+      }
+
+      updateMarkerRotationVisual(marker, safeRotation);
+    });
+
+    return;
+  }
+
+  image.src = markerUrl;
+  image.onerror = () => {
+    image.onerror = null;
+    image.src = fallbackUrl;
+  };
+}
 
   function resolveDeviceRotation(device, previousSnapshot) {
-    const direct = Number(device?.course ?? device?.heading ?? device?.direction ?? device?.attributes?.course ?? device?.attributes?.heading);
-    if (Number.isFinite(direct)) {
-      return normalizeAngle(direct);
-    }
+  const directCandidates = [
+    device?.course,
+    device?.Course,
+    device?.heading,
+    device?.Heading,
+    device?.direction,
+    device?.Direction,
+    device?.bearing,
+    device?.Bearing,
+    device?.angle,
+    device?.Angle,
+    device?.courseDegrees,
+    device?.courseDeg,
+    device?.gpsCourse,
+    device?.attributes?.course,
+    device?.attributes?.heading,
+    device?.attributes?.direction,
+    device?.attributes?.bearing,
+    device?.position?.course,
+    device?.position?.heading,
+    device?.position?.direction,
+    device?.position?.attributes?.course,
+    device?.position?.attributes?.heading,
+    device?.lastPosition?.course,
+    device?.lastPosition?.heading
+  ];
 
-    if (previousSnapshot) {
-      const prevLat = Number(previousSnapshot.lat);
-      const prevLon = Number(previousSnapshot.lon);
-      const lat = Number(device.lat);
-      const lon = Number(device.lon);
-      if (
-        Number.isFinite(prevLat) &&
-        Number.isFinite(prevLon) &&
-        Number.isFinite(lat) &&
-        Number.isFinite(lon) &&
-        (Math.abs(prevLat - lat) > 1e-7 || Math.abs(prevLon - lon) > 1e-7)
-      ) {
-        return normalizeAngle(computeBearing(prevLat, prevLon, lat, lon));
-      }
-      return normalizeAngle(previousSnapshot.rotation || 0);
+  for (const value of directCandidates) {
+    const num = Number(value);
+    if (Number.isFinite(num)) {
+      return normalizeAngle(num);
     }
-
-    return 0;
   }
+
+  const lat = Number(device?.lat);
+  const lon = Number(device?.lon);
+  const prevLat = Number(previousSnapshot?.lat);
+  const prevLon = Number(previousSnapshot?.lon);
+
+  if (
+    Number.isFinite(lat) &&
+    Number.isFinite(lon) &&
+    Number.isFinite(prevLat) &&
+    Number.isFinite(prevLon)
+  ) {
+    const movedMeters = distanceMeters(prevLat, prevLon, lat, lon);
+
+    // Antes era muy exigente. Con 0.5 m ya puede calcular una pequeña rotación.
+    if (movedMeters >= 0.5) {
+      return normalizeAngle(computeBearing(prevLat, prevLon, lat, lon));
+    }
+  }
+
+  return normalizeAngle(previousSnapshot?.rotation ?? 0);
+}
 
   function bindDevicePopup(marker, device) {
     marker.bindPopup(`
@@ -2453,6 +2460,16 @@ function angleDelta(from, to) {
 
       const previousSnapshot = detailedSnapshots.get(markerId) || null;
       const rotation = resolveDeviceRotation(device, previousSnapshot);
+      console.log('ROTACION MAPA', {
+        nombre: device.vehicleName || device.name,
+        course: device.course,
+        heading: device.heading,
+        direction: device.direction,
+        attributes: device.attributes,
+        previousSnapshot,
+        rotation
+      });
+
       const speed = Number(device?.speedKmh || 0);
       const marker = detailedMarkers.get(markerId);
 
@@ -3087,6 +3104,33 @@ function angleDelta(from, to) {
       renderGeofences();
     }
   }
+
+function getDeviceHeading(device, fallback = 0) {
+  const value = Number(device?.course ?? device?.heading ?? device?.direction);
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function animateMarkerMove(marker, fromLatLng, toLatLng, durationMs = LIVE_MARKER_ANIM_MS) {
+  const start = performance.now();
+
+  function step(now) {
+    const t = Math.min(1, (now - start) / durationMs);
+    const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+
+    const lat = fromLatLng.lat + (toLatLng.lat - fromLatLng.lat) * eased;
+    const lng = fromLatLng.lng + (toLatLng.lng - fromLatLng.lng) * eased;
+
+    marker.setLatLng([lat, lng]);
+
+    if (t < 1) {
+      requestAnimationFrame(step);
+    }
+  }
+
+  requestAnimationFrame(step);
+}
+
+
 
   async function loadMapPage(options = {}) {
     const preserveViewport = Boolean(options.preserveViewport);
