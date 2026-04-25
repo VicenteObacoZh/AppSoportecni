@@ -319,6 +319,19 @@ function toDecimalOrNull(value) {
   return Number.isFinite(numeric) ? numeric : null;
 }
 
+function toAngleOrNull(value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value === 'string' && !value.trim()) {
+    return null;
+  }
+
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
 function parseFuelReportHtml(html) {
   const source = String(html || '');
   const totalMatch = source.match(/Total estimado:\s*([\d.,]+)\s*gal\s*\(([\d.,]+)\s*L\)/i);
@@ -658,21 +671,20 @@ function buildMonitorSummary(payload) {
     lat: Number(item?.lat ?? item?.latitude ?? item?.Lat ?? item?.Latitude),
     lon: Number(item?.lon ?? item?.longitude ?? item?.Lon ?? item?.Longitude),
     speedKmh: Number(item?.speedKmh ?? item?.speed ?? item?.SpeedKmh ?? item?.Speed ?? 0),
-    course: Number(
-    item?.course ??
-    item?.Course ??
-    item?.heading ??
-    item?.Heading ??
-    item?.direction ??
-    item?.Direction ??
-    item?.position?.course ??
-    item?.Position?.course ??
-    item?.attributes?.course ??
-    item?.Attributes?.course ??
-    item?.attributes?.heading ??
-    item?.Attributes?.heading ??
-    0
-  ),
+    course: toAngleOrNull(
+      item?.course ??
+      item?.Course ??
+      item?.heading ??
+      item?.Heading ??
+      item?.direction ??
+      item?.Direction ??
+      item?.position?.course ??
+      item?.Position?.course ??
+      item?.attributes?.course ??
+      item?.Attributes?.course ??
+      item?.attributes?.heading ??
+      item?.Attributes?.heading
+    ),
     fixTime: item?.fixTime ?? item?.FixTime ?? item?.deviceTime ?? item?.DeviceTime ?? null,
     address: pickAddress(item)
   }));

@@ -144,6 +144,7 @@
   const LIVE_MOVE_MIN_ANIM_M = 1.5;
   const LIVE_MOVE_MAX_SMOOTH_M = 180;
   const LIVE_ROTATE_MIN_DIFF_DEG = 3;
+  const DEVICE_ICON_ROTATION_OFFSET_DEG = 180;
   const pageUrl = new URL(window.location.href);
 
   function buildReturnToDeviceSheetUrl(deviceId) {
@@ -1755,6 +1756,7 @@ function angleDelta(from, to) {
     const markerUrl = getMarkerUrl(device);
     const fallbackUrl = `../assets/markers/flecha_${getStatusColor(device)}.png`;
     const safeRotation = Number.isFinite(Number(rotationDeg)) ? Number(rotationDeg) : 0;
+    const visualRotation = normalizeAngle(safeRotation + DEVICE_ICON_ROTATION_OFFSET_DEG);
     const statusColor = getStatusColor(device);
 
     return window.L.divIcon({
@@ -1763,7 +1765,7 @@ function angleDelta(from, to) {
         <div class="gps-marker-real__shell gps-marker-real__shell--${statusColor}">
           <span class="gps-marker-real__wave"></span>
           <span class="gps-marker-real__glow"></span>
-          <img class="gps-marker-real__img" style="transform: rotate(${safeRotation}deg); transition: transform 380ms linear;" src="${markerUrl}" alt="vehiculo" onerror="this.onerror=null;this.src='${fallbackUrl}'" />
+          <img class="gps-marker-real__img" style="transform: rotate(${visualRotation}deg); transition: transform 380ms linear;" src="${markerUrl}" alt="vehiculo" onerror="this.onerror=null;this.src='${fallbackUrl}'" />
         </div>
       `,
       iconSize: [42, 42],
@@ -2159,12 +2161,13 @@ function getDeviceLiveLatLng(device) {
     }
 
     const safeAngle = normalizeAngle(angle);
+    const visualAngle = normalizeAngle(safeAngle + DEVICE_ICON_ROTATION_OFFSET_DEG);
     marker.__rotationAngle = safeAngle;
 
     const markerElement = marker.getElement?.();
     const image = markerElement?.querySelector?.('.gps-marker-real__img');
     if (image) {
-      image.style.transform = `rotate(${safeAngle}deg)`;
+      image.style.transform = `rotate(${visualAngle}deg)`;
     }
   }
 
@@ -2257,62 +2260,96 @@ function getDeviceLiveLatLng(device) {
   };
 }
 
-  function resolveDeviceRotation(device, previousSnapshot) {
-  const directCandidates = [
-    device?.course,
-    device?.Course,
-    device?.heading,
-    device?.Heading,
-    device?.direction,
-    device?.Direction,
-    device?.bearing,
-    device?.Bearing,
-    device?.angle,
-    device?.Angle,
-    device?.courseDegrees,
-    device?.courseDeg,
-    device?.gpsCourse,
-    device?.attributes?.course,
-    device?.attributes?.heading,
-    device?.attributes?.direction,
-    device?.attributes?.bearing,
-    device?.position?.course,
-    device?.position?.heading,
-    device?.position?.direction,
-    device?.position?.attributes?.course,
-    device?.position?.attributes?.heading,
-    device?.lastPosition?.course,
-    device?.lastPosition?.heading
-  ];
-
-  for (const value of directCandidates) {
-    const num = Number(value);
-    if (Number.isFinite(num)) {
-      return normalizeAngle(num);
+  function parseRotationValue(value) {
+    if (value === null || value === undefined) {
+      return null;
     }
+
+    if (typeof value === 'string' && !value.trim()) {
+      return null;
+    }
+
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      return null;
+    }
+
+    return normalizeAngle(numeric);
   }
 
-  const lat = Number(device?.lat);
-  const lon = Number(device?.lon);
-  const prevLat = Number(previousSnapshot?.lat);
-  const prevLon = Number(previousSnapshot?.lon);
+  function resolveDeviceRotation(device, previousSnapshot, withMeta = false) {
+    const finish = (rotation, source) => {
+      const normalized = normalizeAngle(rotation);
+      if (withMeta) {
+        return { rotation: normalized, source };
+      }
+      return normalized;
+    };
 
-  if (
-    Number.isFinite(lat) &&
-    Number.isFinite(lon) &&
-    Number.isFinite(prevLat) &&
-    Number.isFinite(prevLon)
-  ) {
-    const movedMeters = distanceMeters(prevLat, prevLon, lat, lon);
+    const directCandidates = [
+      ['course', device?.course],
+      ['Course', device?.Course],
+      ['heading', device?.heading],
+      ['Heading', device?.Heading],
+      ['direction', device?.direction],
+      ['Direction', device?.Direction],
+      ['bearing', device?.bearing],
+      ['Bearing', device?.Bearing],
+      ['angle', device?.angle],
+      ['Angle', device?.Angle],
+      ['courseDegrees', device?.courseDegrees],
+      ['courseDeg', device?.courseDeg],
+      ['gpsCourse', device?.gpsCourse],
+      ['attributes.course', device?.attributes?.course],
+      ['attributes.heading', device?.attributes?.heading],
+      ['attributes.direction', device?.attributes?.direction],
+      ['attributes.bearing', device?.attributes?.bearing],
+      ['position.course', device?.position?.course],
+      ['position.heading', device?.position?.heading],
+      ['position.direction', device?.position?.direction],
+      ['position.attributes.course', device?.position?.attributes?.course],
+      ['position.attributes.heading', device?.position?.attributes?.heading],
+      ['lastPosition.course', device?.lastPosition?.course],
+      ['lastPosition.heading', device?.lastPosition?.heading]
+    ];
 
-    // Antes era muy exigente. Con 0.5 m ya puede calcular una pequeña rotación.
-    if (movedMeters >= 0.5) {
-      return normalizeAngle(computeBearing(prevLat, prevLon, lat, lon));
+    const lat = Number(device?.lat);
+    const lon = Number(device?.lon);
+    const prevLat = Number(previousSnapshot?.lat);
+    const prevLon = Number(previousSnapshot?.lon);
+    const canComputeBearing =
+      Number.isFinite(lat) &&
+      Number.isFinite(lon) &&
+      Number.isFinite(prevLat) &&
+      Number.isFinite(prevLon);
+    const movedMeters = canComputeBearing ? distanceMeters(prevLat, prevLon, lat, lon) : 0;
+
+    for (const [source, value] of directCandidates) {
+      const parsed = parseRotationValue(value);
+      if (parsed !== null) {
+        // El backend puede normalizar rumbo ausente como 0.
+        // Si se detecta ese 0 y hubo movimiento, preferimos bearing calculado.
+        if (parsed === 0 && movedMeters >= 0.5) {
+          const computed = normalizeAngle(computeBearing(prevLat, prevLon, lat, lon));
+          if (Math.abs(computed - parsed) >= 8) {
+            return finish(computed, `${source}->computedBearing`);
+          }
+        }
+        return finish(parsed, source);
+      }
     }
-  }
 
-  return normalizeAngle(previousSnapshot?.rotation ?? 0);
-}
+    if (
+      canComputeBearing
+    ) {
+      // Antes era muy exigente. Con 0.5 m ya puede calcular una pequena rotacion.
+      if (movedMeters >= 0.5) {
+        return finish(computeBearing(prevLat, prevLon, lat, lon), 'computedBearing');
+      }
+    }
+
+    return finish(previousSnapshot?.rotation ?? 0, 'previousSnapshot.rotation');
+  }
 
   function bindDevicePopup(marker, device) {
     marker.bindPopup(`
@@ -2459,15 +2496,19 @@ function getDeviceLiveLatLng(device) {
       activeIds.add(markerId);
 
       const previousSnapshot = detailedSnapshots.get(markerId) || null;
-      const rotation = resolveDeviceRotation(device, previousSnapshot);
-      console.log('ROTACION MAPA', {
+      const rotationMeta = resolveDeviceRotation(device, previousSnapshot, true);
+      const rotation = rotationMeta.rotation;
+      console.log('[MAP ROTATION DEBUG]', {
         nombre: device.vehicleName || device.name,
         course: device.course,
         heading: device.heading,
         direction: device.direction,
+        bearing: device.bearing,
+        attributesCourse: device?.attributes?.course,
         attributes: device.attributes,
         previousSnapshot,
-        rotation
+        rotation,
+        source: rotationMeta.source
       });
 
       const speed = Number(device?.speedKmh || 0);
@@ -3066,7 +3107,8 @@ function getDeviceLiveLatLng(device) {
     return null;
   }
 
-  function focusSelectedEvent() {
+  function focusSelectedEvent(options = {}) {
+    const preserveViewport = Boolean(options.preserveViewport);
     if (!selectedEvent || !liveMap) {
       return;
     }
@@ -3074,6 +3116,10 @@ function getDeviceLiveLatLng(device) {
     const lat = Number(selectedEvent.latitude);
     const lon = Number(selectedEvent.longitude);
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      return;
+    }
+
+    if (preserveViewport) {
       return;
     }
 
@@ -3179,14 +3225,16 @@ function animateMarkerMove(marker, fromLatLng, toLatLng, durationMs = LIVE_MARKE
 
       if (selectedEvent) {
         showDevicePanel(null);
-        focusSelectedEvent();
+        focusSelectedEvent({ preserveViewport });
       } else if (selectedDevice?.deviceId) {
         const device = currentDevices.find((item) => String(item.deviceId) === String(selectedDevice.deviceId));
         if (device) {
           apiClient?.storeSelectedDevice?.(device);
           showDevicePanel(device);
-          if (liveMap && Number.isFinite(Number(device.lat)) && Number.isFinite(Number(device.lon))) {
-            liveMap.setView([Number(device.lat), Number(device.lon)], 16);
+          if (!preserveViewport && liveMap && Number.isFinite(Number(device.lat)) && Number.isFinite(Number(device.lon))) {
+            const currentZoom = Number(liveMap.getZoom?.());
+            const targetZoom = Math.max(16, currentZoom || 16);
+            liveMap.setView([Number(device.lat), Number(device.lon)], targetZoom);
           }
           consumePendingDeviceAction();
         }
