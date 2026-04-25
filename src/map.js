@@ -2278,7 +2278,7 @@ function getDeviceLiveLatLng(device) {
     return normalizeAngle(numeric);
   }
 
-  function resolveDeviceRotation(device, previousSnapshot, withMeta = false) {
+  function resolveDeviceRotation(device, previousSnapshot, withMeta = false, markerRef = null) {
     const finish = (rotation, source) => {
       const normalized = normalizeAngle(rotation);
       if (withMeta) {
@@ -2316,22 +2316,34 @@ function getDeviceLiveLatLng(device) {
 
     const lat = Number(device?.lat);
     const lon = Number(device?.lon);
-    const prevLat = Number(previousSnapshot?.lat);
-    const prevLon = Number(previousSnapshot?.lon);
+    const markerLatLng = markerRef?.getLatLng?.();
+    const prevLat = Number(markerLatLng?.lat ?? previousSnapshot?.lat);
+    const prevLon = Number(markerLatLng?.lng ?? previousSnapshot?.lon);
     const canComputeBearing =
       Number.isFinite(lat) &&
       Number.isFinite(lon) &&
       Number.isFinite(prevLat) &&
       Number.isFinite(prevLon);
     const movedMeters = canComputeBearing ? distanceMeters(prevLat, prevLon, lat, lon) : 0;
+    const computedBearing = canComputeBearing
+      ? normalizeAngle(computeBearing(prevLat, prevLon, lat, lon))
+      : null;
 
     for (const [source, value] of directCandidates) {
       const parsed = parseRotationValue(value);
       if (parsed !== null) {
+        if (computedBearing !== null && movedMeters >= 2) {
+          const diff = Math.abs((((parsed - computedBearing) % 360) + 540) % 360 - 180);
+          // Si el rumbo reportado viene invertido (retroceso visual), priorizar bearing real.
+          if (diff >= 135) {
+            return finish(computedBearing, `${source}->computedBearing(opposite)`);
+          }
+        }
+
         // El backend puede normalizar rumbo ausente como 0.
         // Si se detecta ese 0 y hubo movimiento, preferimos bearing calculado.
         if (parsed === 0 && movedMeters >= 0.5) {
-          const computed = normalizeAngle(computeBearing(prevLat, prevLon, lat, lon));
+          const computed = computedBearing ?? normalizeAngle(computeBearing(prevLat, prevLon, lat, lon));
           if (Math.abs(computed - parsed) >= 8) {
             return finish(computed, `${source}->computedBearing`);
           }
@@ -2483,6 +2495,51 @@ function getDeviceLiveLatLng(device) {
     window.requestAnimationFrame(tick);
   }
 
+  function keepDeviceMarkerInSafeView(marker, device) {
+    if (!liveMap || !marker || !device || !selectedDevice?.deviceId) {
+      return;
+    }
+
+    const selectedId = String(selectedDevice.deviceId || '');
+    const deviceId = String(device.deviceId || '');
+    if (!selectedId || selectedId !== deviceId) {
+      return;
+    }
+
+    const latLng = marker.getLatLng?.();
+    if (!latLng) {
+      return;
+    }
+
+    // Evita que la unidad quede detrás de botones flotantes y panel inferior.
+    liveMap.panInside(latLng, {
+      paddingTopLeft: [16, 88],
+      paddingBottomRight: [96, 230],
+      animate: false
+    });
+  }
+
+  function enforceSelectedDeviceViewportSafety() {
+    if (!liveMap || !selectedDevice?.deviceId) {
+      return;
+    }
+
+    const zoom = Number(liveMap.getZoom?.());
+    if (!Number.isFinite(zoom) || zoom >= 12) {
+      return;
+    }
+
+    const selected = currentDevices.find((item) => String(item?.deviceId) === String(selectedDevice.deviceId));
+    const lat = Number(selected?.lat ?? selectedDevice?.lat);
+    const lon = Number(selected?.lon ?? selectedDevice?.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      return;
+    }
+
+    // Evita zoom-out automático extremo cuando hay una unidad seleccionada.
+    liveMap.setView([lat, lon], 16, { animate: false });
+  }
+
   function renderDetailedMarkers(devices) {
     const activeIds = new Set();
 
@@ -2506,7 +2563,7 @@ function getDeviceLiveLatLng(device) {
             rotation: Number(marker?.__rotationAngle ?? previousSnapshot?.rotation ?? 0)
           }
         : previousSnapshot;
-      const rotationMeta = resolveDeviceRotation(device, previousForRotation, true);
+      const rotationMeta = resolveDeviceRotation(device, previousForRotation, true, marker);
       const rotation = rotationMeta.rotation;
       const visualState = getLiveVisualState(device);
       console.log('[MAP ROTATION DEBUG]', {
@@ -2544,6 +2601,7 @@ function getDeviceLiveLatLng(device) {
         created.__visualKey = `${getMarkerUrl(device)}|${getStatusColor(device)}|${getMarkerBase(device)}`;
         updateMarkerRotationVisual(created, rotation);
         detailedMarkers.set(markerId, created);
+        keepDeviceMarkerInSafeView(created, device);
       } else {
         syncDeviceMarkerVisual(marker, device, rotation);
         const currentLatLng = marker.getLatLng?.();
@@ -2556,6 +2614,7 @@ function getDeviceLiveLatLng(device) {
         if (!Number.isFinite(movedMeters) || movedMeters <= LIVE_MOVE_MIN_ANIM_M) {
           marker.setLatLng([lat, lon]);
           updateTrailForDevice(markerId, marker, device);
+          keepDeviceMarkerInSafeView(marker, device);
         } else if (movedMeters > LIVE_MOVE_MAX_SMOOTH_M) {
           if (typeof marker.__animCancel === 'function') {
             marker.__animCancel();
@@ -2563,6 +2622,7 @@ function getDeviceLiveLatLng(device) {
           }
           marker.setLatLng([lat, lon]);
           updateTrailForDevice(markerId, marker, device);
+          keepDeviceMarkerInSafeView(marker, device);
         } else {
           animateMarkerTo(
             marker,
@@ -2576,6 +2636,7 @@ function getDeviceLiveLatLng(device) {
                 lat: finalLatLng?.lat ?? lat,
                 lon: finalLatLng?.lng ?? lon
               });
+              keepDeviceMarkerInSafeView(marker, device);
             }
           );
         }
@@ -3191,6 +3252,12 @@ function animateMarkerMove(marker, fromLatLng, toLatLng, durationMs = LIVE_MARKE
 
   async function loadMapPage(options = {}) {
     const preserveViewport = Boolean(options.preserveViewport);
+    const viewportSnapshot = preserveViewport && liveMap
+      ? {
+          center: liveMap.getCenter?.(),
+          zoom: Number(liveMap.getZoom?.())
+        }
+      : null;
     if (!apiClient) {
       return;
     }
@@ -3272,6 +3339,17 @@ function animateMarkerMove(marker, fromLatLng, toLatLng, durationMs = LIVE_MARKE
       renderGeofences();
       applyEventFocusState();
       showDevicePanel(null);
+    } finally {
+      if (
+        preserveViewport &&
+        viewportSnapshot &&
+        liveMap &&
+        viewportSnapshot.center &&
+        Number.isFinite(viewportSnapshot.zoom)
+      ) {
+        liveMap.setView(viewportSnapshot.center, viewportSnapshot.zoom, { animate: false });
+      }
+      enforceSelectedDeviceViewportSafety();
     }
   }
 
