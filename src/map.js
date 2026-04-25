@@ -391,58 +391,59 @@
     return '';
   }
 
-  function getStatusColor(device) {
-    if (isDeviceStale(device)) {
-      return 'rojo';
+  function getLiveVisualState(device) {
+    const speed = Number(device?.speedKmh ?? device?.speed ?? 0);
+    const ignition = (
+      device?.ignition === true ||
+      device?.engineOn === true ||
+      device?.isEngineOn === true ||
+      String(device?.ignition ?? '').trim().toLowerCase() === 'true' ||
+      String(device?.ignitionStatus ?? '').trim().toLowerCase() === 'on'
+    );
+    const stale = isDeviceStale(device);
+
+    if (stale) {
+      return { color: 'rojo', state: 'offline' };
     }
 
-    const explicit = resolveExplicitStatusColor(device);
-    if (explicit === 'gris') {
-      return 'rojo';
-    }
-    if (explicit) {
-      return explicit;
-    }
-
-    const speed = Number(device?.speedKmh || device?.speed || 0);
-    const hasLocation = Number.isFinite(Number(device?.lat)) && Number.isFinite(Number(device?.lon));
-    const ignition = device?.ignition === true || device?.engineOn === true || device?.isEngineOn === true;
-
-    if (!hasLocation) {
-      return 'rojo';
-    }
     if (speed >= 5 || (device?.motion === true && speed >= 5)) {
-      return 'verde';
+      return { color: 'verde', state: 'moving' };
     }
+
     if (ignition || speed > 0) {
-      return 'amarillo';
+      return { color: 'amarillo', state: 'idle_ignition_or_slow' };
     }
-    return 'gris';
+
+    return { color: 'gris', state: 'stopped_off' };
+  }
+
+  function getStatusColor(device) {
+    return getLiveVisualState(device).color;
   }
 
   function getStatusTone(device) {
-    const color = getStatusColor(device);
-    if (color === 'verde') {
+    const visual = getLiveVisualState(device);
+    if (visual.color === 'verde') {
       return { label: 'Movimiento', accent: 'green' };
     }
-    if (color === 'amarillo') {
-      return { label: 'Reposo', accent: 'yellow' };
+    if (visual.color === 'amarillo') {
+      return { label: 'Encendido', accent: 'yellow' };
     }
-    if (color === 'gris') {
-      return { label: 'Sin señal', accent: 'gray' };
+    if (visual.color === 'rojo') {
+      return { label: 'Sin señal', accent: 'red' };
     }
-    return { label: 'Detenido', accent: 'red' };
+    return { label: 'Detenido', accent: 'gray' };
   }
 
   function getStatusKey(device) {
-    const color = getStatusColor(device);
-    if (color === 'verde') {
+    const visual = getLiveVisualState(device);
+    if (visual.color === 'verde') {
       return 'moving';
     }
-    if (color === 'amarillo') {
+    if (visual.color === 'amarillo') {
       return 'idle';
     }
-    if (color === 'rojo') {
+    if (visual.color === 'rojo') {
       return 'offline';
     }
     return 'stopped';
@@ -2496,8 +2497,18 @@ function getDeviceLiveLatLng(device) {
       activeIds.add(markerId);
 
       const previousSnapshot = detailedSnapshots.get(markerId) || null;
-      const rotationMeta = resolveDeviceRotation(device, previousSnapshot, true);
+      const marker = detailedMarkers.get(markerId);
+      const markerLatLng = marker?.getLatLng?.();
+      const previousForRotation = markerLatLng
+        ? {
+            lat: Number(markerLatLng.lat),
+            lon: Number(markerLatLng.lng),
+            rotation: Number(marker?.__rotationAngle ?? previousSnapshot?.rotation ?? 0)
+          }
+        : previousSnapshot;
+      const rotationMeta = resolveDeviceRotation(device, previousForRotation, true);
       const rotation = rotationMeta.rotation;
+      const visualState = getLiveVisualState(device);
       console.log('[MAP ROTATION DEBUG]', {
         nombre: device.vehicleName || device.name,
         course: device.course,
@@ -2506,13 +2517,13 @@ function getDeviceLiveLatLng(device) {
         bearing: device.bearing,
         attributesCourse: device?.attributes?.course,
         attributes: device.attributes,
-        previousSnapshot,
+        previousSnapshot: previousForRotation,
+        visualState: visualState.state,
         rotation,
         source: rotationMeta.source
       });
 
       const speed = Number(device?.speedKmh || 0);
-      const marker = detailedMarkers.get(markerId);
 
       if (!marker) {
         const created = window.L.marker([lat, lon], {
