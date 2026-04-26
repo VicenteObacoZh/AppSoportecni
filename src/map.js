@@ -144,7 +144,7 @@
   const LIVE_MOVE_MIN_ANIM_M = 1.5;
   const LIVE_MOVE_MAX_SMOOTH_M = 180;
   const LIVE_ROTATE_MIN_DIFF_DEG = 3;
-  const DEVICE_ICON_ROTATION_OFFSET_DEG = 180;
+  const DEVICE_ICON_ROTATION_OFFSET_DEG = 0;
   const pageUrl = new URL(window.location.href);
 
   function buildReturnToDeviceSheetUrl(deviceId) {
