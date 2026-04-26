@@ -144,7 +144,7 @@
   const LIVE_MOVE_MIN_ANIM_M = 1.5;
   const LIVE_MOVE_MAX_SMOOTH_M = 180;
   const LIVE_ROTATE_MIN_DIFF_DEG = 3;
-  const DEVICE_ICON_ROTATION_OFFSET_DEG = 180;
+  const DEVICE_ICON_ROTATION_OFFSET_DEG = 0;
   const pageUrl = new URL(window.location.href);
 
   function buildReturnToDeviceSheetUrl(deviceId) {
@@ -2329,28 +2329,15 @@ function getDeviceLiveLatLng(device) {
       ? normalizeAngle(computeBearing(prevLat, prevLon, lat, lon))
       : null;
 
-    for (const [source, value] of directCandidates) {
-      const parsed = parseRotationValue(value);
-      if (parsed !== null) {
-        if (computedBearing !== null && movedMeters >= 2) {
-          const diff = Math.abs((((parsed - computedBearing) % 360) + 540) % 360 - 180);
-          // Si el rumbo reportado viene invertido (retroceso visual), priorizar bearing real.
-          if (diff >= 135) {
-            return finish(computedBearing, `${source}->computedBearing(opposite)`);
-          }
-        }
+  for (const [source, value] of directCandidates) {
+  const parsed = parseRotationValue(value);
 
-        // El backend puede normalizar rumbo ausente como 0.
-        // Si se detecta ese 0 y hubo movimiento, preferimos bearing calculado.
-        if (parsed === 0 && movedMeters >= 0.5) {
-          const computed = computedBearing ?? normalizeAngle(computeBearing(prevLat, prevLon, lat, lon));
-          if (Math.abs(computed - parsed) >= 8) {
-            return finish(computed, `${source}->computedBearing`);
-          }
-        }
-        return finish(parsed, source);
-      }
+    if (parsed !== null) {
+      // Igual que la plataforma: si el GPS/backend manda course/heading,
+      // se respeta ese rumbo y no se reemplaza por el bearing calculado.
+      return finish(parsed, source);
     }
+  }
 
     if (
       canComputeBearing
