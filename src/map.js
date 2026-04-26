@@ -2566,20 +2566,7 @@ function getDeviceLiveLatLng(device) {
       const rotationMeta = resolveDeviceRotation(device, previousForRotation, true, marker);
       const rotation = rotationMeta.rotation;
       const visualState = getLiveVisualState(device);
-      console.log('[MAP ROTATION DEBUG]', {
-        nombre: device.vehicleName || device.name,
-        course: device.course,
-        heading: device.heading,
-        direction: device.direction,
-        bearing: device.bearing,
-        attributesCourse: device?.attributes?.course,
-        attributes: device.attributes,
-        previousSnapshot: previousForRotation,
-        visualState: visualState.state,
-        rotation,
-        source: rotationMeta.source
-      });
-
+      
       const speed = Number(device?.speedKmh || 0);
 
       if (!marker) {
