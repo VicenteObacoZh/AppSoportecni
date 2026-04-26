@@ -6209,3 +6209,9 @@ img {
     opacity: 0;
   }
 }
+
+/* Corrige la orientacion del vehiculo en el mapa movil */
+.leaflet-marker-icon img[src*="assets/markers/"] {
+  rotate: 180deg !important;
+  transform-origin: center center !important;
+}
