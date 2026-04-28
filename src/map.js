@@ -638,6 +638,18 @@
     return null;
   }
 
+  function isSameAddressTarget(first, second) {
+    const firstDeviceKey = getDeviceAddressKey(first);
+    const secondDeviceKey = getDeviceAddressKey(second);
+    if (firstDeviceKey && secondDeviceKey && firstDeviceKey === secondDeviceKey) {
+      return true;
+    }
+
+    const firstAddressKey = getAddressKey(first);
+    const secondAddressKey = getAddressKey(second);
+    return Boolean(firstAddressKey && secondAddressKey && firstAddressKey === secondAddressKey);
+  }
+
   function applyResolvedAddressToState(targetLike, address) {
     if (!address) {
       return;
@@ -657,7 +669,7 @@
 
     currentDevices.forEach((item) => {
       const itemKey = getAddressKey(item);
-      if (itemKey && itemKey === key) {
+      if ((itemKey && itemKey === key) || isSameAddressTarget(item, targetLike)) {
         item.address = address;
         item.direccion = address;
         item.formattedAddress = address;
@@ -665,9 +677,10 @@
     });
 
     if (selectedDevice) {
-      const selectedKey = getAddressKey(selectedDevice);
-      if (selectedKey && selectedKey === key) {
+      if (isSameAddressTarget(selectedDevice, targetLike)) {
         selectedDevice.address = address;
+        selectedDevice.direccion = address;
+        selectedDevice.formattedAddress = address;
       }
     }
   }
@@ -1246,7 +1259,7 @@ function angleDelta(from, to) {
     renderSensorRows(device, status.label);
 
     resolveAddressNowIfNeeded(device).then((resolved) => {
-      if (resolved && selectedDevice && getAddressKey(selectedDevice) === getAddressKey(device)) {
+      if (resolved && selectedDevice && isSameAddressTarget(selectedDevice, device)) {
         if (deviceCompany) {
           deviceCompany.textContent = resolved;
         }

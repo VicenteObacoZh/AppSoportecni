@@ -635,8 +635,40 @@
     }
   }
 
+  async function tryResolveDirectProvider() {
+    try {
+      const endpoint = new URL('https://nominatim.openstreetmap.org/reverse');
+      endpoint.searchParams.set('format', 'jsonv2');
+      endpoint.searchParams.set('lat', String(latitude));
+      endpoint.searchParams.set('lon', String(longitude));
+      endpoint.searchParams.set('zoom', '18');
+      endpoint.searchParams.set('addressdetails', '1');
+
+      const response = await fetch(endpoint.toString(), {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const payload = await response.json();
+      return readAddressFromPayload({
+        data: {
+          address: payload?.display_name || null
+        }
+      });
+    } catch {
+      return null;
+    }
+  }
+
   return await tryResolve('/geocode/reverse')
     || await tryResolve('/live/geocode/reverse')
+    || await tryResolveDirectProvider()
     || null;
 }
  
