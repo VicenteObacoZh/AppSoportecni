@@ -40,6 +40,132 @@
   let activeSheetDeviceId = '';
   let deviceRenameAbortController = null;
   let activeReportRequest = null;
+let resolvedAddressByKey = new Map();
+let pendingAddressByKey = new Map();
+
+function getAddressKey(device) {
+  const lat = Number(device?.lat ?? device?.latitude ?? device?.Lat ?? device?.Latitude);
+  const lon = Number(device?.lon ?? device?.longitude ?? device?.Lon ?? device?.Longitude);
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+    return null;
+  }
+
+  return `${lat.toFixed(5)},${lon.toFixed(5)}`;
+}
+
+function isCoordinateText(value) {
+  return /^-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?$/.test(String(value || '').trim());
+}
+
+function pickAddressText(device) {
+  const candidates = [
+    device?.address,
+    device?.Address,
+    device?.direccion,
+    device?.Direccion,
+    device?.locationAddress,
+    device?.LocationAddress,
+    device?.formattedAddress,
+    device?.FormattedAddress
+  ];
+
+  for (const value of candidates) {
+    const text = String(value || '').trim();
+    if (text && !isCoordinateText(text)) {
+      return text;
+    }
+  }
+
+  return '';
+}
+
+function updateRenderedAddressByKey(key, address) {
+  if (!key || !address) {
+    return;
+  }
+
+  document.querySelectorAll('[data-device-address-key]').forEach((element) => {
+    if (element.dataset.deviceAddressKey === key) {
+      element.textContent = `Dirección: ${address}`;
+    }
+  });
+}
+
+async function resolveAddressNowIfNeeded(device) {
+  const key = getAddressKey(device);
+  if (!key) {
+    return null;
+  }
+
+  const existingAddress = pickAddressText(device);
+  if (existingAddress) {
+    resolvedAddressByKey.set(key, existingAddress);
+    return existingAddress;
+  }
+
+  if (resolvedAddressByKey.has(key)) {
+    const cached = resolvedAddressByKey.get(key);
+    updateRenderedAddressByKey(key, cached);
+    return cached;
+  }
+
+  if (pendingAddressByKey.has(key)) {
+    return pendingAddressByKey.get(key);
+  }
+
+  const promise = (async () => {
+    const lat = Number(device?.lat ?? device?.latitude ?? device?.Lat ?? device?.Latitude);
+    const lon = Number(device?.lon ?? device?.longitude ?? device?.Lon ?? device?.Longitude);
+
+    const address = await apiClient?.reverseGeocode?.(lat, lon);
+    const cleanAddress = String(address || '').trim();
+
+    if (cleanAddress && !isCoordinateText(cleanAddress)) {
+      resolvedAddressByKey.set(key, cleanAddress);
+
+      currentDevices.forEach((item) => {
+        if (getAddressKey(item) === key) {
+          item.address = cleanAddress;
+          item.direccion = cleanAddress;
+          item.formattedAddress = cleanAddress;
+        }
+      });
+
+      updateRenderedAddressByKey(key, cleanAddress);
+      return cleanAddress;
+    }
+
+    return null;
+  })();
+
+  pendingAddressByKey.set(key, promise);
+
+  try {
+    return await promise;
+  } finally {
+    pendingAddressByKey.delete(key);
+  }
+}
+
+function resolveAddressesForVisibleDevices(devices) {
+  (devices || []).forEach((device) => {
+    if (!device) {
+      return;
+    }
+
+    const key = getAddressKey(device);
+    if (!key) {
+      return;
+    }
+
+    if (pickAddressText(device)) {
+      return;
+    }
+
+    resolveAddressNowIfNeeded(device);
+  });
+}
 
   function createLoadingMarkup() {
     return `
@@ -354,29 +480,22 @@
   }
 
   function getAddressLabel(device) {
-    const candidates = [
-      device?.address,
-      device?.Address,
-      device?.direccion,
-      device?.Direccion,
-      device?.locationAddress,
-      device?.LocationAddress,
-      device?.formattedAddress,
-      device?.FormattedAddress
-    ];
-    const found = candidates.find((value) => String(value || '').trim().length > 0);
-    if (found) {
-      return String(found).trim();
-    }
+  const directAddress = pickAddressText(device);
+  if (directAddress) {
+    return directAddress;
+  }
 
-    const lat = Number(device?.lat ?? device?.latitude ?? device?.Lat ?? device?.Latitude);
-    const lon = Number(device?.lon ?? device?.longitude ?? device?.Lon ?? device?.Longitude);
-    if (Number.isFinite(lat) && Number.isFinite(lon)) {
-      return `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
-    }
+  const key = getAddressKey(device);
+  if (key && resolvedAddressByKey.has(key)) {
+    return resolvedAddressByKey.get(key);
+  }
 
+  if (key) {
     return 'Obteniendo dirección...';
   }
+
+  return 'Obteniendo dirección...';
+}
 
   function hasAddressText(device) {
     const candidates = [
@@ -506,6 +625,7 @@
     const title = escapeHtml(device.vehicleName || device.name || 'Unidad');
     const ts = escapeHtml(device.fixTime ? new Date(device.fixTime).toLocaleString() : 'Sin fecha visible');
     const address = escapeHtml(getAddressLabel(device));
+    const addressKey = escapeHtml(getAddressKey(device) || '');
 
     return `
       <article class="fleet-device-card fleet-device-card--${status.color}" data-device-sheet-id="${escapeHtml(device.deviceId)}" tabindex="0" role="button" aria-label="Abrir acciones de ${title}">
@@ -518,7 +638,7 @@
             <div class="fleet-device-card__title">${title}</div>
           </div>
           <div class="fleet-device-card__meta">${status.label} | ${ts}</div>
-          <div class="fleet-device-card__meta">Dirección: ${address}</div>
+          <div class="fleet-device-card__meta" data-device-address-key="${addressKey}">Dirección: ${address}</div>
         </div>
         <div class="fleet-device-card__speed">${formatSpeed(device.speedKmh)}</div>
       </article>
@@ -950,90 +1070,99 @@
   }
 
   function renderCompanies() {
-    if (!companyList) return;
+  if (!companyList) return;
 
-    const companies = getFilteredCompanies();
-    if (!companies.length) {
-      companyList.innerHTML = '<div class="mobile-map-empty">No hay dispositivos para el filtro actual.</div>';
-      return;
-    }
-
-    companyList.innerHTML = companies.map((company) => {
-      const expanded = expandedCompany === company.name;
-      const itemsMarkup = expanded
-        ? company.items.map((device) => buildDeviceCard(device)).join('')
-        : '';
-
-      return `
-        <section class="fleet-company-block${expanded ? ' fleet-company-block--open' : ''}">
-          <button class="fleet-company-header" type="button" data-company-name="${escapeHtml(company.name)}">
-            <span class="fleet-company-header__name">${escapeHtml(company.name)}</span>
-            <span class="fleet-company-header__count">${company.items.length}</span>
-            <span class="fleet-company-header__chevron">${expanded ? '&#9662;' : '&#8250;'}</span>
-          </button>
-          <div class="fleet-company-devices${expanded ? ' fleet-company-devices--open' : ''}">
-            ${itemsMarkup}
-          </div>
-        </section>
-      `;
-    }).join('');
-
-    companyList.querySelectorAll('[data-company-name]').forEach((button) => {
-      button.addEventListener('click', () => {
-        const companyName = button.getAttribute('data-company-name') || '';
-        expandedCompany = expandedCompany === companyName ? '' : companyName;
-        renderCompanies();
-      });
-    });
-
-    companyList.querySelectorAll('[data-device-sheet-id]').forEach((card) => {
-      const openSheet = () => {
-        const deviceId = String(card.getAttribute('data-device-sheet-id') || '');
-        const device = currentDevices.find((item) => String(item.deviceId) === deviceId);
-        if (!device) {
-          return;
-        }
-
-        apiClient?.storeSelectedDevice?.(device);
-        openDeviceActionsSheet(device);
-      };
-
-      card.addEventListener('click', openSheet);
-      card.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          openSheet();
-        }
-      });
-    });
-
-    companyList.querySelectorAll('[data-device-action]').forEach((button) => {
-      button.addEventListener('click', (event) => {
-        event.stopPropagation();
-        const deviceId = String(button.getAttribute('data-device-id') || '');
-        const device = currentDevices.find((item) => String(item.deviceId) === deviceId);
-        if (!device) {
-          return;
-        }
-
-        apiClient?.storeSelectedDevice?.(device);
-
-        if (button.getAttribute('data-device-action') === 'map') {
-          appShell?.navigate?.('./map.html', { deviceId, from: 'devices' });
-          return;
-        }
-
-        const now = new Date();
-        const before = new Date(now.getTime() - (4 * 60 * 60 * 1000));
-        apiClient?.storeRouteContext?.({
-          deviceId,
-          from: before.toISOString(),
-          to: now.toISOString()
-        });
-        appShell?.navigate?.('./routes.html', { deviceId, from: 'devices' });
-      });
-    });
+  const companies = getFilteredCompanies();
+  if (!companies.length) {
+    companyList.innerHTML = '<div class="mobile-map-empty">No hay dispositivos para el filtro actual.</div>';
+    return;
   }
+
+  companyList.innerHTML = companies.map((company) => {
+    const expanded = expandedCompany === company.name;
+    const itemsMarkup = expanded
+      ? company.items.map((device) => buildDeviceCard(device)).join('')
+      : '';
+
+    return `
+      <section class="fleet-company-block${expanded ? ' fleet-company-block--open' : ''}">
+        <button class="fleet-company-header" type="button" data-company-name="${escapeHtml(company.name)}">
+          <span class="fleet-company-header__name">${escapeHtml(company.name)}</span>
+          <span class="fleet-company-header__count">${company.items.length}</span>
+          <span class="fleet-company-header__chevron">${expanded ? '&#9662;' : '&#8250;'}</span>
+        </button>
+        <div class="fleet-company-devices${expanded ? ' fleet-company-devices--open' : ''}">
+          ${itemsMarkup}
+        </div>
+      </section>
+    `;
+  }).join('');
+
+  const visibleDevices = companies
+    .filter((company) => expandedCompany === company.name)
+    .reduce((items, company) => items.concat(company.items || []), []);
+
+  resolveAddressesForVisibleDevices(visibleDevices);
+
+  companyList.querySelectorAll('[data-company-name]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const companyName = button.getAttribute('data-company-name') || '';
+      expandedCompany = expandedCompany === companyName ? '' : companyName;
+      renderCompanies();
+    });
+  });
+
+  companyList.querySelectorAll('[data-device-sheet-id]').forEach((card) => {
+    const openSheet = () => {
+      const deviceId = String(card.getAttribute('data-device-sheet-id') || '');
+      const device = currentDevices.find((item) => String(item.deviceId) === deviceId);
+      if (!device) {
+        return;
+      }
+
+      apiClient?.storeSelectedDevice?.(device);
+      openDeviceActionsSheet(device);
+    };
+
+    card.addEventListener('click', openSheet);
+    card.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        openSheet();
+      }
+    });
+  });
+
+  companyList.querySelectorAll('[data-device-action]').forEach((button) => {
+    button.addEventListener('click', (event) => {
+      event.stopPropagation();
+
+      const deviceId = String(button.getAttribute('data-device-id') || '');
+      const device = currentDevices.find((item) => String(item.deviceId) === deviceId);
+      if (!device) {
+        return;
+      }
+
+      apiClient?.storeSelectedDevice?.(device);
+
+      if (button.getAttribute('data-device-action') === 'map') {
+        appShell?.navigate?.('./map.html', { deviceId, from: 'devices' });
+        return;
+      }
+
+      const now = new Date();
+      const before = new Date(now.getTime() - (4 * 60 * 60 * 1000));
+
+      apiClient?.storeRouteContext?.({
+        deviceId,
+        from: before.toISOString(),
+        to: now.toISOString()
+      });
+
+      appShell?.navigate?.('./routes.html', { deviceId, from: 'devices' });
+    });
+  });
+}
 
   async function loadDevices() {
     if (!apiClient) return;
