@@ -36,8 +36,8 @@
   }
 
   function resolveBackendBaseUrl() {
-    const localFallback = 'http://localhost:4100/api';
-    const productionFallback = 'https://rastreo.soportecni.com/api';
+    const localFallback = 'http://localhost:5000';
+    const productionFallback = 'https://rastreo.soportecni.com';
 
     if (typeof window === 'undefined' || !window.location) {
       return productionFallback;
@@ -79,10 +79,10 @@
       const currentHost = String(window.location.hostname || '').toLowerCase();
       const isLocalHost = currentHost === 'localhost' || currentHost === '127.0.0.1' || currentHost === '10.0.2.2';
       if (isLocalHost) {
-        candidates.push('http://10.0.2.2:4100/api');
-        candidates.push('http://localhost:4100/api');
+        candidates.push('http://10.0.2.2:5000');
+        candidates.push('http://localhost:5000');
       }
-      candidates.push(primary || 'https://rastreo.soportecni.com/api');
+      candidates.push(primary || 'https://rastreo.soportecni.com');
     } else {
       candidates.push(primary);
     }
