@@ -36,8 +36,8 @@
   }
 
   function resolveBackendBaseUrl() {
-    const localFallback = 'http://localhost:5000';
-    const productionFallback = 'https://rastreo.soportecni.com';
+    const productionFallback = 'https://rastreo.soportecni.com/api';
+    const localFallback = 'https://rastreo.soportecni.com/api';
 
     if (typeof window === 'undefined' || !window.location) {
       return productionFallback;
