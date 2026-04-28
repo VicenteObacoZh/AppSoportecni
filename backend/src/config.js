@@ -16,5 +16,6 @@ module.exports = {
   mockMode: String(process.env.MOCK_MODE || 'false').toLowerCase() === 'true',
   sessionTtlMinutes: Math.max(5, Number(process.env.SESSION_TTL_MINUTES || 480)),
   geocodeEnabled: String(process.env.GEOCODE_ENABLED || 'true').toLowerCase() === 'true',
-  geocodeMaxPerRequest: Math.max(1, Number(process.env.GEOCODE_MAX_PER_REQUEST || 25))
+  geocodeMaxPerRequest: Math.max(1, Number(process.env.GEOCODE_MAX_PER_REQUEST || 25)),
+  geocodeResolvePerRequest: Math.max(0, Number(process.env.GEOCODE_RESOLVE_PER_REQUEST || 3))
 };

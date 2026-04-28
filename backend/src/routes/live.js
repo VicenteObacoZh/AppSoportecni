@@ -129,7 +129,18 @@ async function fillMissingAddresses(items = []) {
     }
   }
 
+  const resolveNowLimit = Math.min(Number(config.geocodeResolvePerRequest || 0), unresolved.length);
+  for (const target of unresolved.slice(0, resolveNowLimit)) {
+    const resolvedAddress = await geocodeCacheService.getAddressAsync(target.lat, target.lon);
+    if (resolvedAddress) {
+      resolvedByKey.set(target.key, resolvedAddress);
+    }
+  }
+
   if (!resolvedByKey.size) {
+    unresolved.slice(resolveNowLimit).forEach((target) => {
+      geocodeCacheService.warmAddressAsync(target.lat, target.lon);
+    });
     return;
   }
 
@@ -155,8 +166,8 @@ async function fillMissingAddresses(items = []) {
     }
   });
 
-  // Queue missing points for async geocoding without delaying response.
-  unresolved.forEach((target) => {
+  // Queue the rest without delaying the monitor response.
+  unresolved.slice(resolveNowLimit).forEach((target) => {
     geocodeCacheService.warmAddressAsync(target.lat, target.lon);
   });
 }
