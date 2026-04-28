@@ -140,54 +140,74 @@
         <p class="mobile-map-event-panel__address-text" id="mapEventAddressText" hidden></p>
       </section>
 
-      <section class="mobile-map-device-panel mobile-map-device-panel--v2" id="mapDevicePanel" hidden>
-        <button class="mobile-map-panel-grabber" type="button" id="mapDevicePanelGrabber" aria-label="Ajustar panel"></button>
-        <div class="mobile-map-device-panel__head">
-          <div class="mobile-map-device-panel__title-wrap">
-            <div class="mobile-map-device-panel__title-main">
-              <span aria-hidden="true">??</span>
-              <h3 id="mapDeviceTitle">Sin unidad</h3>
-            </div>
-            <p class="mobile-map-device-panel__speedline"><span aria-hidden="true">?</span><strong id="mapDeviceSpeed">0 km/h</strong></p>
-          </div>
-          <div class="mobile-map-device-panel__actions-top">
-            <button class="mobile-map-device-panel__action" type="button" id="mapDeviceInfoButton" title="Info">
-              <span class="mobile-map-device-panel__action-fallback">i</span>
-              <img src="./assets/icons/panel/icon_info_bold_white.png?v=1" alt="Info" onerror="this.style.display='none';this.previousElementSibling.style.display='grid'" />
-            </button>
-            <button class="mobile-map-device-panel__action" type="button" id="mapDeviceRouteButton" title="Ruta">
-              <span class="mobile-map-device-panel__action-fallback">&#10132;</span>
-              <img src="./assets/icons/panel/icon_arrow_bold_white.png?v=1" alt="Ruta" onerror="this.style.display='none';this.previousElementSibling.style.display='grid'" />
-            </button>
-            <button class="mobile-map-device-panel__action" type="button" id="mapDeviceShareButton" title="Compartir">
-              <span class="mobile-map-device-panel__action-fallback">&#10547;</span>
-              <img src="./assets/icons/panel/icon_share_bold_white.png?v=1" alt="Compartir" onerror="this.style.display='none';this.previousElementSibling.style.display='grid'" />
-            </button>
-            <button class="mobile-map-device-panel__action" type="button" id="mapDeviceHistoryButton" title="Histórico">
-              <span class="mobile-map-device-panel__action-fallback">&#9654;</span>
-              <img src="./assets/icons/panel/icon_play_bold_white.png?v=1" alt="Histórico" onerror="this.style.display='none';this.previousElementSibling.style.display='grid'" />
-            </button>
-          </div>
-        </div>
+    <section class="mobile-map-device-panel mobile-map-device-panel--v2" id="mapDevicePanel" hidden>
+  <button class="mobile-map-panel-grabber" type="button" id="mapDevicePanelGrabber" aria-label="Ajustar panel"></button>
 
-        <div class="mobile-map-device-panel__facts">
-          <p><span aria-hidden="true">??</span><strong id="mapDeviceTime">--</strong></p>
-          <p><span aria-hidden="true">??</span><strong id="mapDeviceUniqueId">-</strong></p>
-          <p><span aria-hidden="true">??</span><strong id="mapDeviceCompany">Obteniendo direccion...</strong></p>
-          <p><span aria-hidden="true">??</span><strong id="mapDeviceStatus">Sin estado</strong></p>
-        </div>
+  <div class="mobile-map-device-panel__head">
+    <div class="mobile-map-device-panel__title-wrap">
+      <div class="mobile-map-device-panel__title-main">
+        <span aria-hidden="true">&#128663;</span>
+        <h3 id="mapDeviceTitle">Sin unidad</h3>
+      </div>
 
-        <div class="mobile-map-device-panel__buttons">
-          <button class="mobile-map-device-panel__address" type="button" id="mapDeviceAddressButton">?? Ubicacion actual</button>
-          <button class="mobile-map-device-panel__address" type="button" id="mapDeviceCommandButton">?? Comando</button>
-        </div>
+      <p class="mobile-map-device-panel__speedline">
+        <span aria-hidden="true">&#128678;</span>
+        <strong id="mapDeviceSpeed">0 km/h</strong>
+      </p>
+    </div>
 
-        <section class="mobile-map-device-panel__sensors">
-          <h4>Sensores</h4>
-          <div id="mapDeviceSensorsList" class="mobile-map-device-panel__sensor-list"></div>
-        </section>
-        <p class="mobile-map-device-panel__address-text" id="mapDeviceAddressText" hidden>Obteniendo direccion...</p>
-      </section>
+    <div class="mobile-map-device-panel__actions-top">
+      <button class="mobile-map-device-panel__action" type="button" id="mapDeviceInfoButton" title="Info">
+        <span class="mobile-map-device-panel__action-fallback">i</span>
+        <img src="./assets/icons/panel/icon_info_bold_white.png?v=1" alt="Info" onerror="this.style.display='none';this.previousElementSibling.style.display='grid'" />
+      </button>
+
+      <button class="mobile-map-device-panel__action" type="button" id="mapDeviceRouteButton" title="Ruta">
+        <span class="mobile-map-device-panel__action-fallback">&#10132;</span>
+        <img src="./assets/icons/panel/icon_arrow_bold_white.png?v=1" alt="Ruta" onerror="this.style.display='none';this.previousElementSibling.style.display='grid'" />
+      </button>
+
+      <button class="mobile-map-device-panel__action" type="button" id="mapDeviceShareButton" title="Compartir">
+        <span class="mobile-map-device-panel__action-fallback">&#10547;</span>
+        <img src="./assets/icons/panel/icon_share_bold_white.png?v=1" alt="Compartir" onerror="this.style.display='none';this.previousElementSibling.style.display='grid'" />
+      </button>
+
+      <button class="mobile-map-device-panel__action" type="button" id="mapDeviceHistoryButton" title="Histórico">
+        <span class="mobile-map-device-panel__action-fallback">&#9654;</span>
+        <img src="./assets/icons/panel/icon_play_bold_white.png?v=1" alt="Histórico" onerror="this.style.display='none';this.previousElementSibling.style.display='grid'" />
+      </button>
+    </div>
+  </div>
+
+  <div class="mobile-map-device-panel__facts">
+    <p>
+      <span aria-hidden="true">&#128337;</span>
+      <strong id="mapDeviceTime">--</strong>
+    </p>
+
+    <p>
+      <span aria-hidden="true">&#129517;</span>
+      <strong id="mapDeviceUniqueId">Curso --</strong>
+    </p>
+
+    <p>
+      <span aria-hidden="true">&#128205;</span>
+      <strong id="mapDeviceCompany">Obteniendo direccion...</strong>
+    </p>
+
+    <p>
+      <span aria-hidden="true">&#128260;</span>
+      <strong id="mapDeviceStatus">Sin estado</strong>
+    </p>
+  </div>
+
+ <section class="mobile-map-device-panel__sensors" hidden aria-hidden="true">
+    <h4>Sensores</h4>
+    <div id="mapDeviceSensorsList" class="mobile-map-device-panel__sensor-list"></div>
+  </section>
+
+  <p class="mobile-map-device-panel__address-text" id="mapDeviceAddressText" hidden>Obteniendo direccion...</p>
+</section>
 
       <section class="mobile-device-info-modal" id="mapInfoModal" hidden>
         <div class="mobile-device-info-modal__backdrop" id="mapInfoModalBackdrop"></div>
@@ -361,7 +381,7 @@
   <script src="./app-shell.js?v=1"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="./map-viewport-guard.js?v=1"></script>
-  <script src="./map.js?v=38"></script>
+  <script src="./map.js?v=39"></script>
 </body>
 </html>
 
