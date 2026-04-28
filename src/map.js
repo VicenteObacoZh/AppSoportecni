@@ -472,6 +472,113 @@
     return 'Obteniendo direccion...';
   }
 
+  function isUsableAddressText(value) {
+    const text = String(value || '').trim();
+    const lower = text.toLowerCase();
+    return Boolean(
+      text &&
+      !/^[-\d.]+\s*,\s*[-\d.]+$/.test(text) &&
+      !lower.startsWith('obteniendo direcci') &&
+      lower !== 'sin direccion' &&
+      lower !== 'sin dirección'
+    );
+  }
+
+  function pickDeviceAddressValue(device) {
+    const candidates = [
+      device?.address,
+      device?.Address,
+      device?.direccion,
+      device?.Direccion,
+      device?.locationAddress,
+      device?.LocationAddress,
+      device?.formattedAddress,
+      device?.FormattedAddress
+    ];
+
+    return candidates.find(isUsableAddressText) || '';
+  }
+
+  function rememberDeviceAddress(device, address) {
+    if (!device || !isUsableAddressText(address)) {
+      return;
+    }
+
+    const text = String(address).trim();
+    const coordinateKey = getAddressKey(device);
+    const deviceKey = getDeviceAddressKey(device);
+
+    if (coordinateKey) {
+      resolvedAddressByKey.set(coordinateKey, text);
+    }
+    if (deviceKey) {
+      resolvedAddressByDevice.set(deviceKey, text);
+    }
+
+    device.address = text;
+    device.direccion = text;
+    device.formattedAddress = text;
+  }
+
+  function hydrateDeviceAddress(device) {
+    if (!device) {
+      return;
+    }
+
+    const directAddress = pickDeviceAddressValue(device);
+    if (directAddress) {
+      rememberDeviceAddress(device, directAddress);
+      return;
+    }
+
+    const deviceKey = getDeviceAddressKey(device);
+    if (deviceKey && resolvedAddressByDevice.has(deviceKey)) {
+      rememberDeviceAddress(device, resolvedAddressByDevice.get(deviceKey));
+      return;
+    }
+
+    const coordinateKey = getAddressKey(device);
+    if (coordinateKey && resolvedAddressByKey.has(coordinateKey)) {
+      rememberDeviceAddress(device, resolvedAddressByKey.get(coordinateKey));
+    }
+  }
+
+  function getCurrentDeviceSnapshot(device) {
+    if (!device?.deviceId || !Array.isArray(currentDevices)) {
+      return null;
+    }
+
+    return currentDevices.find((item) => String(item?.deviceId) === String(device.deviceId)) || null;
+  }
+
+  function mergeCurrentDeviceAddress(device) {
+    const current = getCurrentDeviceSnapshot(device);
+    if (!device || !current || current === device) {
+      hydrateDeviceAddress(device);
+      return device;
+    }
+
+    hydrateDeviceAddress(current);
+    hydrateDeviceAddress(device);
+
+    const currentAddress = pickDeviceAddressValue(current);
+    const selectedAddress = pickDeviceAddressValue(device);
+    const address = currentAddress || selectedAddress;
+
+    if (address) {
+      rememberDeviceAddress(current, address);
+      rememberDeviceAddress(device, address);
+    }
+
+    return {
+      ...device,
+      ...current,
+      address: address || current.address || device.address,
+      direccion: address || current.direccion || device.direccion,
+      formattedAddress: address || current.formattedAddress || device.formattedAddress
+    };
+  }
+
   function formatCourse(device) {
     const course = Number(device?.course ?? device?.heading ?? device?.direction);
     if (!Number.isFinite(course)) {
@@ -690,11 +797,14 @@
       return;
     }
 
+    hydrateDeviceAddress(selectedDevice);
+    const address = pickDeviceAddressValue(selectedDevice) || selectedDevice.address;
+
     if (deviceCompany) {
-      deviceCompany.textContent = getAddressLabel(selectedDevice.address, selectedDevice);
+      deviceCompany.textContent = getAddressLabel(address, selectedDevice);
     }
     if (deviceAddressText && !deviceAddressText.hidden) {
-      deviceAddressText.textContent = getAddressLabel(selectedDevice.address, selectedDevice);
+      deviceAddressText.textContent = getAddressLabel(address, selectedDevice);
     }
   }
 
@@ -1211,6 +1321,8 @@ function angleDelta(from, to) {
   }
 
   function showDevicePanel(device) {
+    device = mergeCurrentDeviceAddress(device);
+    hydrateDeviceAddress(device);
     selectedDevice = device || null;
     syncSelectionActionButtons(Boolean(selectedDevice));
     if (!devicePanel) {
@@ -1237,7 +1349,7 @@ function angleDelta(from, to) {
       deviceTitle.textContent = device.vehicleName || device.name || 'Unidad';
     }
     if (deviceCompany) {
-      deviceCompany.textContent = getAddressLabel(device.address, device);
+      deviceCompany.textContent = getAddressLabel(pickDeviceAddressValue(device) || device.address, device);
     }
     if (deviceSpeed) {
       deviceSpeed.textContent = formatSpeed(device.speedKmh);
@@ -1252,7 +1364,7 @@ function angleDelta(from, to) {
       deviceStatus.textContent = status.label;
     }
     if (deviceAddressText) {
-      deviceAddressText.textContent = getAddressLabel(device.address, device);
+      deviceAddressText.textContent = getAddressLabel(pickDeviceAddressValue(device) || device.address, device);
       deviceAddressText.hidden = true;
     }
 
@@ -3327,6 +3439,7 @@ function animateMarkerMove(marker, fromLatLng, toLatLng, durationMs = LIVE_MARKE
 
       const dashboard = await apiClient.getDashboard();
       currentDevices = Array.isArray(dashboard.devices) ? dashboard.devices : [];
+      currentDevices.forEach(hydrateDeviceAddress);
       currentAlertSummary = dashboard.alertSummary || null;
       try {
         const geofencesPayload = await apiClient.getGeofences();
