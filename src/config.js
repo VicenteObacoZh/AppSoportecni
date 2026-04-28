@@ -13,14 +13,14 @@
       return fromGlobal;
     }
 
-    try {
-      const fromStorage = normalizeBaseUrl(window.localStorage?.getItem('gpsrastreo.backendBaseUrl'));
-      if (fromStorage) {
-        return fromStorage;
-      }
-    } catch {
+    //try {
+    //  const fromStorage = normalizeBaseUrl(window.localStorage?.getItem('gpsrastreo.backendBaseUrl'));
+    //  if (fromStorage) {
+    //    return fromStorage;
+    //  }
+    // } catch {
       // no-op
-    }
+    //}
 
     try {
       const currentUrl = new URL(window.location.href);
