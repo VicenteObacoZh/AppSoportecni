@@ -129,6 +129,7 @@
   let detailedSnapshots = new Map();
   let resolvedAddressByKey = new Map();
   let pendingAddressByKey = new Map();
+  let resolvedAddressByDevice = new Map();
   let trailPolylineById = new Map();
   let movementHistoryById = new Map();
   let fuelReportByDeviceId = new Map();
@@ -455,6 +456,11 @@
       return primary;
     }
 
+    const deviceKey = getDeviceAddressKey(fallback);
+    if (deviceKey && resolvedAddressByDevice.has(deviceKey)) {
+      return resolvedAddressByDevice.get(deviceKey);
+    }
+
     const lat = Number(fallback?.lat ?? fallback?.latitude ?? fallback?.Lat ?? fallback?.Latitude);
     const lon = Number(fallback?.lon ?? fallback?.longitude ?? fallback?.Lon ?? fallback?.Longitude);
     if (Number.isFinite(lat) && Number.isFinite(lon)) {
@@ -604,21 +610,55 @@
     return `${lat.toFixed(5)},${lon.toFixed(5)}`;
   }
 
+  function getDeviceAddressKey(deviceLike) {
+    const candidates = [
+      deviceLike?.deviceId,
+      deviceLike?.DeviceId,
+      deviceLike?.id,
+      deviceLike?.Id,
+      deviceLike?.uniqueId,
+      deviceLike?.UniqueId,
+      deviceLike?.imei,
+      deviceLike?.Imei,
+      deviceLike?.vehicleName,
+      deviceLike?.VehicleName,
+      deviceLike?.name,
+      deviceLike?.Name
+    ];
+
+    for (const value of candidates) {
+      const text = String(value || '').trim();
+      if (text) {
+        return text;
+      }
+    }
+
+    return null;
+  }
+
   function applyResolvedAddressToState(targetLike, address) {
     if (!address) {
       return;
     }
     targetLike.address = address;
+    targetLike.direccion = address;
+    targetLike.formattedAddress = address;
 
     const key = getAddressKey(targetLike);
     if (key) {
       resolvedAddressByKey.set(key, address);
+    }
+    const deviceKey = getDeviceAddressKey(targetLike);
+    if (deviceKey) {
+      resolvedAddressByDevice.set(deviceKey, address);
     }
 
     currentDevices.forEach((item) => {
       const itemKey = getAddressKey(item);
       if (itemKey && itemKey === key) {
         item.address = address;
+        item.direccion = address;
+        item.formattedAddress = address;
       }
     });
 
@@ -649,8 +689,22 @@
       return null;
     }
 
+    const directAddress = getAddressLabel(
+      deviceLike?.address || deviceLike?.direccion || deviceLike?.formattedAddress,
+      null
+    );
+    if (directAddress && directAddress !== 'Obteniendo direccion...') {
+      applyResolvedAddressToState(deviceLike, directAddress);
+      return directAddress;
+    }
+
     if (resolvedAddressByKey.has(key)) {
       return resolvedAddressByKey.get(key);
+    }
+
+    const deviceKey = getDeviceAddressKey(deviceLike);
+    if (deviceKey && resolvedAddressByDevice.has(deviceKey)) {
+      return resolvedAddressByDevice.get(deviceKey);
     }
 
     if (pendingAddressByKey.has(key)) {

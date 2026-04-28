@@ -583,43 +583,64 @@
     query.set('sessionId', sessionId);
   }
 
+  function readAddressFromPayload(payload) {
+    if (typeof payload === 'string') {
+      const text = payload.trim();
+
+      if (
+        text &&
+        text !== '[object Object]' &&
+        !text.startsWith('{') &&
+        !text.startsWith('<')
+      ) {
+        return text;
+      }
+
+      return null;
+    }
+
+    const candidates = [
+      payload?.data?.address,
+      payload?.data?.direccion,
+      payload?.data?.formattedAddress,
+      payload?.address,
+      payload?.direccion,
+      payload?.formattedAddress,
+      payload?.result,
+      payload?.data
+    ];
+
+    for (const value of candidates) {
+      const text = String(value || '').trim();
+
+      if (
+        text &&
+        text !== '[object Object]' &&
+        !text.startsWith('{') &&
+        !text.startsWith('<')
+      ) {
+        return text;
+      }
+    }
+
+    return null;
+  }
+
   async function tryResolve(path) {
     try {
       const payload = await request(`${path}?${query.toString()}`);
-
-      if (typeof payload === 'string') {
-        const text = payload.trim();
-        return text && !text.startsWith('{') ? text : null;
-      }
-
-      const candidates = [
-        payload?.data?.address,
-        payload?.data?.direccion,
-        payload?.data?.formattedAddress,
-        payload?.address,
-        payload?.direccion,
-        payload?.formattedAddress,
-        payload?.result,
-        payload?.data
-      ];
-
-      const found = candidates.find((value) => {
-        const text = String(value || '').trim();
-        return text && text !== '[object Object]';
-      });
-
-      return found ? String(found).trim() : null;
+      return readAddressFromPayload(payload);
     } catch {
       return null;
     }
   }
 
-  return await tryResolve('/live/geocode/reverse')
-    || await tryResolve('/api/geocode/reverse')
+  return await tryResolve('/geocode/reverse')
+    || await tryResolve('/live/geocode/reverse')
     || null;
 }
-
-  async function sendCommandBySession(sessionId, { deviceId, command, authorizationKey }) {
+ 
+async function sendCommandBySession(sessionId, { deviceId, command, authorizationKey }) {
     const payload = await request(config.endpoints.liveMonitorCommand || '/live/monitor/command', {
       method: 'POST',
       body: JSON.stringify({

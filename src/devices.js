@@ -42,6 +42,7 @@
   let activeReportRequest = null;
 let resolvedAddressByKey = new Map();
 let pendingAddressByKey = new Map();
+let resolvedAddressByDevice = new Map();
 
 function getAddressKey(device) {
   const lat = Number(device?.lat ?? device?.latitude ?? device?.Lat ?? device?.Latitude);
@@ -52,6 +53,32 @@ function getAddressKey(device) {
   }
 
   return `${lat.toFixed(5)},${lon.toFixed(5)}`;
+}
+
+function getDeviceAddressKey(device) {
+  const candidates = [
+    device?.deviceId,
+    device?.DeviceId,
+    device?.id,
+    device?.Id,
+    device?.uniqueId,
+    device?.UniqueId,
+    device?.imei,
+    device?.Imei,
+    device?.vehicleName,
+    device?.VehicleName,
+    device?.name,
+    device?.Name
+  ];
+
+  for (const value of candidates) {
+    const text = String(value || '').trim();
+    if (text) {
+      return text;
+    }
+  }
+
+  return null;
 }
 
 function isCoordinateText(value) {
@@ -101,6 +128,10 @@ async function resolveAddressNowIfNeeded(device) {
   const existingAddress = pickAddressText(device);
   if (existingAddress) {
     resolvedAddressByKey.set(key, existingAddress);
+    const deviceKey = getDeviceAddressKey(device);
+    if (deviceKey) {
+      resolvedAddressByDevice.set(deviceKey, existingAddress);
+    }
     return existingAddress;
   }
 
@@ -123,6 +154,10 @@ async function resolveAddressNowIfNeeded(device) {
 
     if (cleanAddress && !isCoordinateText(cleanAddress)) {
       resolvedAddressByKey.set(key, cleanAddress);
+      const deviceKey = getDeviceAddressKey(device);
+      if (deviceKey) {
+        resolvedAddressByDevice.set(deviceKey, cleanAddress);
+      }
 
       currentDevices.forEach((item) => {
         if (getAddressKey(item) === key) {
@@ -159,7 +194,12 @@ function resolveAddressesForVisibleDevices(devices) {
       return;
     }
 
-    if (pickAddressText(device)) {
+    const existingAddress = pickAddressText(device);
+    if (existingAddress) {
+      const deviceKey = getDeviceAddressKey(device);
+      if (deviceKey) {
+        resolvedAddressByDevice.set(deviceKey, existingAddress);
+      }
       return;
     }
 
@@ -488,6 +528,11 @@ function resolveAddressesForVisibleDevices(devices) {
   const key = getAddressKey(device);
   if (key && resolvedAddressByKey.has(key)) {
     return resolvedAddressByKey.get(key);
+  }
+
+  const deviceKey = getDeviceAddressKey(device);
+  if (deviceKey && resolvedAddressByDevice.has(deviceKey)) {
+    return resolvedAddressByDevice.get(deviceKey);
   }
 
   if (key) {
