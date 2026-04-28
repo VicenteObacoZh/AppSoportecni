@@ -566,13 +566,58 @@
   }
 
   async function reverseGeocode(lat, lon) {
-    const query = new URLSearchParams({
-      lat: String(lat),
-      lon: String(lon)
-    });
-    const payload = await request(`/live/geocode/reverse?${query.toString()}`);
-    return payload?.data?.address || null;
+  const latitude = Number(lat);
+  const longitude = Number(lon);
+
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    return null;
   }
+
+  const query = new URLSearchParams({
+    lat: String(latitude),
+    lon: String(longitude)
+  });
+
+  const sessionId = getStoredSessionId();
+  if (sessionId) {
+    query.set('sessionId', sessionId);
+  }
+
+  async function tryResolve(path) {
+    try {
+      const payload = await request(`${path}?${query.toString()}`);
+
+      if (typeof payload === 'string') {
+        const text = payload.trim();
+        return text && !text.startsWith('{') ? text : null;
+      }
+
+      const candidates = [
+        payload?.data?.address,
+        payload?.data?.direccion,
+        payload?.data?.formattedAddress,
+        payload?.address,
+        payload?.direccion,
+        payload?.formattedAddress,
+        payload?.result,
+        payload?.data
+      ];
+
+      const found = candidates.find((value) => {
+        const text = String(value || '').trim();
+        return text && text !== '[object Object]';
+      });
+
+      return found ? String(found).trim() : null;
+    } catch {
+      return null;
+    }
+  }
+
+  return await tryResolve('/live/geocode/reverse')
+    || await tryResolve('/api/geocode/reverse')
+    || null;
+}
 
   async function sendCommandBySession(sessionId, { deviceId, command, authorizationKey }) {
     const payload = await request(config.endpoints.liveMonitorCommand || '/live/monitor/command', {
