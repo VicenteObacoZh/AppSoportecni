@@ -452,7 +452,9 @@
 
   function getAddressLabel(value, fallback = null) {
     const primary = String(value || '').trim();
-    if (primary && !/^[-\d.]+\s*,\s*[-\d.]+$/.test(primary)) {
+    const primaryLower = primary.toLowerCase();
+    const isPlaceholder = primaryLower.startsWith('obteniendo direcci');
+    if (primary && !/^[-\d.]+\s*,\s*[-\d.]+$/.test(primary) && !isPlaceholder) {
       return primary;
     }
 

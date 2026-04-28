@@ -85,6 +85,11 @@ function isCoordinateText(value) {
   return /^-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?$/.test(String(value || '').trim());
 }
 
+function isAddressPlaceholder(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  return normalized.startsWith('obteniendo direcci');
+}
+
 function pickAddressText(device) {
   const candidates = [
     device?.address,
@@ -99,7 +104,7 @@ function pickAddressText(device) {
 
   for (const value of candidates) {
     const text = String(value || '').trim();
-    if (text && !isCoordinateText(text)) {
+    if (text && !isCoordinateText(text) && !isAddressPlaceholder(text)) {
       return text;
     }
   }
@@ -554,7 +559,10 @@ function resolveAddressesForVisibleDevices(devices) {
       device?.FormattedAddress
     ];
 
-    return candidates.some((value) => String(value || '').trim().length > 0);
+    return candidates.some((value) => {
+      const text = String(value || '').trim();
+      return text.length > 0 && !isAddressPlaceholder(text);
+    });
   }
 
   function scheduleGeocodeRefreshIfNeeded(devices) {

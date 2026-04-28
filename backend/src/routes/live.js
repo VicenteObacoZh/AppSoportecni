@@ -44,8 +44,20 @@ function pickAddress(item) {
     item?.Position?.address
   ];
 
-  const found = candidates.find((value) => String(value || '').trim().length > 0);
+  const found = candidates.find((value) => {
+    const text = String(value || '').trim();
+    return text.length > 0 && !isAddressPlaceholderText(text);
+  });
   return found ? String(found).trim() : null;
+}
+
+function isAddressPlaceholderText(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  return (
+    normalized.startsWith('obteniendo direcci') ||
+    normalized === 'sin direccion' ||
+    normalized === 'sin dirección'
+  );
 }
 
 function isCoordinateAddressText(value) {
@@ -83,7 +95,10 @@ async function fillMissingAddresses(items = []) {
     }
 
     const rawAddress = String(item?.address || '').trim();
-    const hasUsableAddress = rawAddress && !isCoordinateAddressText(rawAddress);
+    const hasUsableAddress =
+      rawAddress &&
+      !isCoordinateAddressText(rawAddress) &&
+      !isAddressPlaceholderText(rawAddress);
     if (hasUsableAddress) {
       return;
     }
@@ -125,7 +140,10 @@ async function fillMissingAddresses(items = []) {
     }
 
     const rawAddress = String(item?.address || '').trim();
-    const hasUsableAddress = rawAddress && !isCoordinateAddressText(rawAddress);
+    const hasUsableAddress =
+      rawAddress &&
+      !isCoordinateAddressText(rawAddress) &&
+      !isAddressPlaceholderText(rawAddress);
     if (hasUsableAddress) {
       return;
     }

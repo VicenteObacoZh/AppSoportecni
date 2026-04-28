@@ -292,7 +292,15 @@ function pickAddress(item) {
     item?.FullAddress
   ];
 
-  const found = candidates.find((value) => String(value || '').trim().length > 0);
+  const found = candidates.find((value) => {
+    const text = String(value || '').trim().toLowerCase();
+    return (
+      text.length > 0 &&
+      !text.startsWith('obteniendo direcci') &&
+      text !== 'sin direccion' &&
+      text !== 'sin dirección'
+    );
+  });
   return found ? String(found).trim() : null;
 }
 
