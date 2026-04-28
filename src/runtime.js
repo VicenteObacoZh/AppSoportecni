@@ -120,16 +120,9 @@
         return null;
       }
 
-      if (Object.prototype.hasOwnProperty.call(parsed, 'password')) {
-        window.localStorage.setItem('gpsrastreo.savedCredentials', JSON.stringify({
-          email: String(parsed.email || ''),
-          remember: Boolean(parsed.remember)
-        }));
-      }
-
       return {
         email: String(parsed.email || ''),
-        password: '',
+        password: String(parsed.password || ''),
         remember: Boolean(parsed.remember)
       };
     } catch {
@@ -137,7 +130,7 @@
     }
   }
 
-  function saveCredentials(email, _password, remember) {
+  function saveCredentials(email, password, remember) {
     if (typeof window === 'undefined') {
       return;
     }
@@ -150,6 +143,7 @@
 
       window.localStorage.setItem('gpsrastreo.savedCredentials', JSON.stringify({
         email: String(email || ''),
+        password: String(password || ''),
         remember: true
       }));
     } catch {
@@ -429,16 +423,19 @@
       if (loginForm.elements.email) {
         loginForm.elements.email.value = savedCredentials.email;
       }
+      if (loginForm.elements.password) {
+        loginForm.elements.password.value = savedCredentials.password;
+      }
       if (rememberCredentials) {
         rememberCredentials.checked = savedCredentials.remember;
       }
     }
 
-    //apiClient.getSessionInfo().then((session) => {
-    //  if (session && window.location.pathname.endsWith('/login.html')) {
-    //    window.location.href = new URL('./map.html', window.location.href).toString();
-    //  }
-    //}).catch(() => {});
+    apiClient.getSessionInfo().then((session) => {
+      if (session && window.location.pathname.endsWith('/login.html')) {
+        window.location.href = new URL('./map.html', window.location.href).toString();
+      }
+    }).catch(() => {});
 
     loginForm.addEventListener('submit', (event) => {
       event.preventDefault();
@@ -465,12 +462,6 @@
           window.location.href = nextUrl.toString();
         }, 700);
       }).catch((error) => {
-        saveCredentials(
-          loginForm.elements.email.value,
-          loginForm.elements.password.value,
-          Boolean(rememberCredentials?.checked)
-        );
-
         const validationMessages = Array.isArray(error?.payload?.validationMessages)
           ? error.payload.validationMessages.filter(Boolean)
           : [];

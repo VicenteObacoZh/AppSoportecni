@@ -146,6 +146,8 @@
   const LIVE_MOVE_MAX_SMOOTH_M = 180;
   const LIVE_ROTATE_MIN_DIFF_DEG = 3;
   const DEVICE_ICON_ROTATION_OFFSET_DEG = 0;
+  const SELECTED_DEVICE_MIN_ZOOM = 16;
+  const FOLLOW_VIEWPORT_ALLOW_MS = 700;
   const pageUrl = new URL(window.location.href);
 
   function buildReturnToDeviceSheetUrl(deviceId) {
@@ -1035,6 +1037,181 @@ function getMarkerUrl(device) {
       window.clearInterval(autoRefreshTimer);
       autoRefreshTimer = null;
     }
+  }
+
+  function getElementViewportHeight(element) {
+    if (!element || element.hidden) {
+      return 0;
+    }
+
+    const rect = element.getBoundingClientRect?.();
+    return Math.max(0, Number(rect?.height) || 0);
+  }
+
+  function getSelectedDeviceSafePadding() {
+    const actionsRect = document.querySelector('.mobile-map-actions')?.getBoundingClientRect?.();
+    const actionRightPadding = Math.max(92, Math.ceil(Number(actionsRect?.width) || 0) + 34);
+    const visiblePanel = selectedEvent
+      ? eventPanel
+      : (!devicePanel?.hidden ? devicePanel : null);
+    const panelHeight = getElementViewportHeight(visiblePanel);
+    const bottomNavHeight = getElementViewportHeight(document.querySelector('.mobile-bottom-nav'));
+    const bottomPadding = Math.max(170, Math.ceil(panelHeight + bottomNavHeight + 22));
+
+    return {
+      topLeft: [18, 96],
+      bottomRight: [actionRightPadding, bottomPadding]
+    };
+  }
+
+  function allowFollowViewportChange() {
+    if (!liveMap) {
+      return;
+    }
+
+    liveMap.__gpsRastreoAllowAutoViewportUntil = Date.now() + FOLLOW_VIEWPORT_ALLOW_MS;
+  }
+
+  function panLatLngToSafeCenter(latLng, options = {}) {
+    if (!liveMap || !latLng) {
+      return;
+    }
+
+    const container = liveMap.getContainer?.();
+    const size = liveMap.getSize?.();
+    if (!container || !size) {
+      return;
+    }
+
+    const padding = getSelectedDeviceSafePadding();
+    const safeLeft = padding.topLeft[0];
+    const safeTop = padding.topLeft[1];
+    const safeRight = Math.max(safeLeft + 40, size.x - padding.bottomRight[0]);
+    const safeBottom = Math.max(safeTop + 40, size.y - padding.bottomRight[1]);
+    const targetPoint = window.L.point(
+      safeLeft + ((safeRight - safeLeft) / 2),
+      safeTop + ((safeBottom - safeTop) / 2)
+    );
+    const currentPoint = liveMap.latLngToContainerPoint(latLng);
+    const offset = currentPoint.subtract(targetPoint);
+
+    if (Math.abs(offset.x) < 1 && Math.abs(offset.y) < 1) {
+      return;
+    }
+
+    allowFollowViewportChange();
+    liveMap.panBy(offset, {
+      animate: Boolean(options.animate),
+      duration: 0.25,
+      easeLinearity: 0.25
+    });
+  }
+
+  function getMapRelativeRect(element, mapRect) {
+    const rect = element?.getBoundingClientRect?.();
+    if (!rect || rect.width <= 0 || rect.height <= 0) {
+      return null;
+    }
+
+    return {
+      left: rect.left - mapRect.left,
+      right: rect.right - mapRect.left,
+      top: rect.top - mapRect.top,
+      bottom: rect.bottom - mapRect.top
+    };
+  }
+
+  function panLatLngAwayFromControlOverlays(latLng, options = {}) {
+    if (!liveMap || !latLng) {
+      return;
+    }
+
+    const container = liveMap.getContainer?.();
+    const mapRect = container?.getBoundingClientRect?.();
+    if (!container || !mapRect) {
+      return;
+    }
+
+    const markerPoint = liveMap.latLngToContainerPoint(latLng);
+    const markerRadius = 34;
+    const overlayPadding = 18;
+    const overlays = [
+      ...document.querySelectorAll('.mobile-map-action:not(.mobile-map-action--hidden)'),
+      ...document.querySelectorAll('.mobile-map-menu-button'),
+      ...document.querySelectorAll('.mobile-map-device-panel:not([hidden])'),
+      ...document.querySelectorAll('.mobile-map-event-panel:not([hidden])'),
+      ...document.querySelectorAll('.mobile-bottom-nav')
+    ]
+      .map((element) => getMapRelativeRect(element, mapRect))
+      .filter(Boolean);
+
+    let offsetX = 0;
+    let offsetY = 0;
+
+    overlays.forEach((rect) => {
+      const left = rect.left - markerRadius - overlayPadding;
+      const right = rect.right + markerRadius + overlayPadding;
+      const top = rect.top - markerRadius - overlayPadding;
+      const bottom = rect.bottom + markerRadius + overlayPadding;
+
+      if (
+        markerPoint.x < left ||
+        markerPoint.x > right ||
+        markerPoint.y < top ||
+        markerPoint.y > bottom
+      ) {
+        return;
+      }
+
+      const pushLeft = markerPoint.x - left;
+      const pushRight = markerPoint.x - right;
+      const pushUp = markerPoint.y - top;
+      const pushDown = markerPoint.y - bottom;
+      const horizontalPush = Math.abs(pushLeft) < Math.abs(pushRight) ? pushLeft : pushRight;
+      const verticalPush = Math.abs(pushUp) < Math.abs(pushDown) ? pushUp : pushDown;
+
+      if (Math.abs(horizontalPush) <= Math.abs(verticalPush)) {
+        offsetX = Math.abs(horizontalPush) > Math.abs(offsetX) ? horizontalPush : offsetX;
+      } else {
+        offsetY = Math.abs(verticalPush) > Math.abs(offsetY) ? verticalPush : offsetY;
+      }
+    });
+
+    if (Math.abs(offsetX) < 1 && Math.abs(offsetY) < 1) {
+      return;
+    }
+
+    allowFollowViewportChange();
+    liveMap.panBy([offsetX, offsetY], {
+      animate: Boolean(options.animate),
+      duration: 0.2,
+      easeLinearity: 0.25
+    });
+  }
+
+  function recenterSelectedDeviceInSafeView(device, options = {}) {
+    if (!liveMap || !device) {
+      return;
+    }
+
+    const lat = Number(device.lat);
+    const lon = Number(device.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      return;
+    }
+
+    const latLng = window.L.latLng(lat, lon);
+    const currentZoom = Number(liveMap.getZoom?.());
+    const targetZoom = Math.max(SELECTED_DEVICE_MIN_ZOOM, currentZoom || SELECTED_DEVICE_MIN_ZOOM);
+
+    allowFollowViewportChange();
+    liveMap.setView(latLng, targetZoom, { animate: Boolean(options.animate) });
+    window.requestAnimationFrame(() => {
+      panLatLngToSafeCenter(latLng, options);
+      window.requestAnimationFrame(() => {
+        panLatLngAwayFromControlOverlays(latLng, options);
+      });
+    });
   }
 
   function distanceMeters(aLat, aLon, bLat, bLon) {
@@ -1929,7 +2106,7 @@ function angleDelta(from, to) {
       const lat = Number(device.lat);
       const lon = Number(device.lon);
       if (Number.isFinite(lat) && Number.isFinite(lon)) {
-        liveMap.setView([lat, lon], Math.max(16, liveMap.getZoom() || 16));
+        recenterSelectedDeviceInSafeView({ ...device, lat, lon }, { animate: true });
       }
     }
   }
@@ -2079,7 +2256,7 @@ function angleDelta(from, to) {
             apiClient?.storeSelectedDevice?.(selected);
             showDevicePanel(selected);
           }
-          liveMap.setView([lat, lon], 16);
+          recenterSelectedDeviceInSafeView(selected || { lat, lon }, { animate: true });
           setSheetOpen(false);
         }
       });
@@ -2510,22 +2687,14 @@ function getDeviceLiveLatLng(device) {
       ? normalizeAngle(computeBearing(prevLat, prevLon, lat, lon))
       : null;
 
-  for (const [source, value] of directCandidates) {
-  const parsed = parseRotationValue(value);
-
-    if (parsed !== null) {
-      // Igual que la plataforma: si el GPS/backend manda course/heading,
-      // se respeta ese rumbo y no se reemplaza por el bearing calculado.
-      return finish(parsed, source);
+    if (computedBearing !== null && movedMeters >= LIVE_MOVE_MIN_ANIM_M) {
+      return finish(computedBearing, 'computedBearing');
     }
-  }
 
-    if (
-      canComputeBearing
-    ) {
-      // Antes era muy exigente. Con 0.5 m ya puede calcular una pequena rotacion.
-      if (movedMeters >= 0.5) {
-        return finish(computeBearing(prevLat, prevLon, lat, lon), 'computedBearing');
+    for (const [source, value] of directCandidates) {
+      const parsed = parseRotationValue(value);
+      if (parsed !== null) {
+        return finish(parsed, source);
       }
     }
 
@@ -2680,10 +2849,9 @@ function getDeviceLiveLatLng(device) {
     }
 
     // Evita que la unidad quede detrás de botones flotantes y panel inferior.
-    liveMap.panInside(latLng, {
-      paddingTopLeft: [16, 88],
-      paddingBottomRight: [96, 230],
-      animate: false
+    panLatLngToSafeCenter(latLng, { animate: false });
+    window.requestAnimationFrame(() => {
+      panLatLngAwayFromControlOverlays(latLng, { animate: false });
     });
   }
 
@@ -2692,20 +2860,15 @@ function getDeviceLiveLatLng(device) {
       return;
     }
 
-    const zoom = Number(liveMap.getZoom?.());
-    if (!Number.isFinite(zoom) || zoom >= 12) {
-      return;
-    }
-
-    const selected = currentDevices.find((item) => String(item?.deviceId) === String(selectedDevice.deviceId));
-    const lat = Number(selected?.lat ?? selectedDevice?.lat);
-    const lon = Number(selected?.lon ?? selectedDevice?.lon);
+    const selected = currentDevices.find((item) => String(item?.deviceId) === String(selectedDevice.deviceId)) || selectedDevice;
+    const lat = Number(selected?.lat);
+    const lon = Number(selected?.lon);
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
       return;
     }
 
     // Evita zoom-out automático extremo cuando hay una unidad seleccionada.
-    liveMap.setView([lat, lon], 16, { animate: false });
+    recenterSelectedDeviceInSafeView({ ...selected, lat, lon }, { animate: false });
   }
 
   function renderDetailedMarkers(devices) {
@@ -3350,7 +3513,7 @@ function getDeviceLiveLatLng(device) {
       return;
     }
 
-    liveMap.setView([lat, lon], 16);
+    liveMap.setView([lat, lon], SELECTED_DEVICE_MIN_ZOOM);
   }
 
   function consumePendingDeviceAction() {
@@ -3465,10 +3628,8 @@ function animateMarkerMove(marker, fromLatLng, toLatLng, durationMs = LIVE_MARKE
         if (device) {
           apiClient?.storeSelectedDevice?.(device);
           showDevicePanel(device);
-          if (!preserveViewport && liveMap && Number.isFinite(Number(device.lat)) && Number.isFinite(Number(device.lon))) {
-            const currentZoom = Number(liveMap.getZoom?.());
-            const targetZoom = Math.max(16, currentZoom || 16);
-            liveMap.setView([Number(device.lat), Number(device.lon)], targetZoom);
+          if (liveMap && Number.isFinite(Number(device.lat)) && Number.isFinite(Number(device.lon))) {
+            recenterSelectedDeviceInSafeView(device, { animate: preserveViewport });
           }
           consumePendingDeviceAction();
         }
@@ -3498,6 +3659,7 @@ function animateMarkerMove(marker, fromLatLng, toLatLng, durationMs = LIVE_MARKE
     } finally {
       if (
         preserveViewport &&
+        !selectedDevice?.deviceId &&
         viewportSnapshot &&
         liveMap &&
         viewportSnapshot.center &&
@@ -3640,7 +3802,7 @@ function animateMarkerMove(marker, fromLatLng, toLatLng, durationMs = LIVE_MARKE
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
       return;
     }
-    liveMap.setView([lat, lon], Math.max(16, liveMap.getZoom() || 16));
+    recenterSelectedDeviceInSafeView({ ...selectedDevice, lat, lon }, { animate: true });
     if (deviceAddressText) {
       deviceAddressText.hidden = false;
     }

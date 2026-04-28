@@ -16,7 +16,10 @@
     'loadMapPage',
     'focusSelectedEvent',
     'enforceSelectedDeviceViewportSafety',
-    'keepDeviceMarkerInSafeView'
+    'keepDeviceMarkerInSafeView',
+    'recenterSelectedDeviceInSafeView',
+    'panLatLngToSafeCenter',
+    'panLatLngAwayFromControlOverlays'
   ];
 
   let programmaticUntil = 0;
