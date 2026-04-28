@@ -434,11 +434,11 @@
       }
     }
 
-    apiClient.getSessionInfo().then((session) => {
-      if (session && window.location.pathname.endsWith('/login.html')) {
-        window.location.href = new URL('./map.html', window.location.href).toString();
-      }
-    }).catch(() => {});
+    //apiClient.getSessionInfo().then((session) => {
+    //  if (session && window.location.pathname.endsWith('/login.html')) {
+    //    window.location.href = new URL('./map.html', window.location.href).toString();
+    //  }
+    //}).catch(() => {});
 
     loginForm.addEventListener('submit', (event) => {
       event.preventDefault();
@@ -555,6 +555,8 @@
   }
 
   attachRuntimeEventHandlers();
-  bootDashboard();
+  if (kpiGrid || liveMapElement || deviceList) {
+     bootDashboard();
+  }
 })();
 
