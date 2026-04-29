@@ -189,17 +189,43 @@
     return `${Math.round(Number(speed || 0))} km/h`;
   }
 
-  function formatDateTime(value) {
+  function parseApiDateTime(value) {
     if (!value) {
+      return null;
+    }
+
+    if (value instanceof Date) {
+      return Number.isNaN(value.getTime()) ? null : value;
+    }
+
+    let raw = String(value || '').trim();
+    if (!raw) {
+      return null;
+    }
+
+    if (/^\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(raw)) {
+      raw = `${raw.replace(' ', 'T')}Z`;
+    }
+
+    const parsed = new Date(raw);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  function formatDateTime(value) {
+    const parsed = parseApiDateTime(value);
+    if (!parsed) {
       return '--';
     }
 
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) {
-      return '--';
-    }
-
-    return parsed.toLocaleString();
+    return parsed.toLocaleString('es-EC', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
   }
 
   function updateMapLoadingOverlay(isVisible) {
@@ -214,8 +240,8 @@
     if (!value) {
       return '--';
     }
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) {
+    const parsed = parseApiDateTime(value);
+    if (!parsed) {
       return '--';
     }
     const diffMs = Math.max(0, Date.now() - parsed.getTime());
@@ -235,8 +261,7 @@
       return null;
     }
 
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
+    return parseApiDateTime(value);
   }
 
   function getDeviceLastReportTime(device) {
@@ -1500,11 +1525,29 @@ function angleDelta(from, to) {
     updateGeofencesStatus(`${currentGeofences.length} geocerca(s) visibles.`);
   }
 
+  function getDeviceDisplayName(device) {
+    return String(device?.vehicleName || device?.name || 'Unidad').trim() || 'Unidad';
+  }
+
+  function syncMapHeaderTitle() {
+    if (!headerTitle) {
+      return;
+    }
+
+    if (selectedEvent) {
+      headerTitle.textContent = selectedEvent.vehicleName || 'Evento';
+      return;
+    }
+
+    headerTitle.textContent = selectedDevice ? getDeviceDisplayName(selectedDevice) : 'Mapa';
+  }
+
   function showDevicePanel(device) {
     device = mergeCurrentDeviceAddress(device);
     hydrateDeviceAddress(device);
     selectedDevice = device || null;
     syncSelectionActionButtons(Boolean(selectedDevice));
+    syncMapHeaderTitle();
     if (!devicePanel) {
       return;
     }
@@ -1526,7 +1569,7 @@ function angleDelta(from, to) {
     const status = getStatusTone(device);
 
     if (deviceTitle) {
-      deviceTitle.textContent = device.vehicleName || device.name || 'Unidad';
+      deviceTitle.textContent = getDeviceDisplayName(device);
     }
     if (deviceCompany) {
       deviceCompany.textContent = getAddressLabel(pickDeviceAddressValue(device) || device.address, device);
@@ -3441,11 +3484,7 @@ function getDeviceLiveLatLng(device) {
       backButton.hidden = !hasEvent;
     }
 
-    if (headerTitle) {
-      headerTitle.textContent = hasEvent
-        ? (selectedEvent.vehicleName || 'Evento')
-        : 'Mapa';
-    }
+    syncMapHeaderTitle();
 
     if (eventPanel) {
       eventPanel.hidden = !hasEvent;
