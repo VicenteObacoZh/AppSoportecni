@@ -1011,6 +1011,10 @@ function getMarkerUrl(device) {
       });
 
       liveMap.on('zoomend moveend', () => {
+        if (Date.now() < Number(liveMap.__gpsRastreoAllowAutoViewportUntil || 0)) {
+          return;
+        }
+
         renderMap(filterDevices());
       });
 
@@ -3700,7 +3704,8 @@ function animateMarkerMove(marker, fromLatLng, toLatLng, durationMs = LIVE_MARKE
           hasInitializedViewport = true;
         }
       }
-    } catch (_error) {
+    } catch (error) {
+      console.error('[Map] loadMapPage failed', error);
       updateMapLoadingOverlay(false);
       currentDevices = [];
       currentCompanies = [];
@@ -3713,6 +3718,11 @@ function animateMarkerMove(marker, fromLatLng, toLatLng, durationMs = LIVE_MARKE
       renderGeofences();
       applyEventFocusState();
       showDevicePanel(null);
+
+      if (mapEmptyState) {
+        mapEmptyState.textContent = apiClient?.getUserMessageFromError?.(error) || 'No fue posible cargar el mapa.';
+        mapEmptyState.style.display = '';
+      }
     } finally {
       if (
         preserveViewport &&

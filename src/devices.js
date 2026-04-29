@@ -1242,8 +1242,10 @@ function resolveAddressesForVisibleDevices(devices) {
       renderCompanies();
       restoreRequestedDeviceSheet();
       scheduleGeocodeRefreshIfNeeded(currentDevices);
-    } catch (_error) {
-      companyList.innerHTML = '<div class="mobile-map-empty">No fue posible cargar los dispositivos.</div>';
+    } catch (error) {
+      console.error('[Devices] loadDevices failed', error);
+      const message = apiClient?.getUserMessageFromError?.(error) || 'No fue posible cargar los dispositivos.';
+      companyList.innerHTML = `<div class="mobile-map-empty">${escapeHtml(message)}</div>`;
       renderSummary([]);
     }
   }
