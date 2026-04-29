@@ -145,6 +145,9 @@
   const LIVE_MOVE_MIN_ANIM_M = 1.5;
   const LIVE_MOVE_MAX_SMOOTH_M = 180;
   const LIVE_ROTATE_MIN_DIFF_DEG = 3;
+  const LIVE_ROTATE_MIN_BEARING_M = 5;
+  const LIVE_ROTATE_SHARP_TURN_MIN_M = 18;
+  const LIVE_ROTATE_SHARP_TURN_MAX_DEG = 135;
   const DEVICE_ICON_ROTATION_OFFSET_DEG = 0;
   const SELECTED_DEVICE_MIN_ZOOM = 16;
   const FOLLOW_VIEWPORT_ALLOW_MS = 700;
@@ -2489,6 +2492,15 @@ function getDeviceLiveLatLng(device) {
     return ((numeric % 360) + 360) % 360;
   }
 
+  function smallestAngleDiff(from, to) {
+    const start = normalizeAngle(from);
+    const end = normalizeAngle(to);
+    let diff = end - start;
+    if (diff > 180) diff -= 360;
+    if (diff < -180) diff += 360;
+    return diff;
+  }
+
   function trimTrailToMaxKm(points, maxKm) {
     if (!Array.isArray(points) || points.length <= 1) {
       return Array.isArray(points) ? points : [];
@@ -2687,7 +2699,13 @@ function getDeviceLiveLatLng(device) {
       ? normalizeAngle(computeBearing(prevLat, prevLon, lat, lon))
       : null;
 
-    if (computedBearing !== null && movedMeters >= LIVE_MOVE_MIN_ANIM_M) {
+    const previousRotation = normalizeAngle(previousSnapshot?.rotation ?? markerRef?.__rotationAngle ?? 0);
+    if (computedBearing !== null && movedMeters >= LIVE_ROTATE_MIN_BEARING_M) {
+      const turnDiff = Math.abs(smallestAngleDiff(previousRotation, computedBearing));
+      if (movedMeters < LIVE_ROTATE_SHARP_TURN_MIN_M && turnDiff > LIVE_ROTATE_SHARP_TURN_MAX_DEG) {
+        return finish(previousRotation, 'previousSnapshot.rotation');
+      }
+
       return finish(computedBearing, 'computedBearing');
     }
 
@@ -2698,7 +2716,7 @@ function getDeviceLiveLatLng(device) {
       }
     }
 
-    return finish(previousSnapshot?.rotation ?? 0, 'previousSnapshot.rotation');
+    return finish(previousRotation, 'previousSnapshot.rotation');
   }
 
   function bindDevicePopup(marker, device) {
@@ -3769,7 +3787,7 @@ function animateMarkerMove(marker, fromLatLng, toLatLng, durationMs = LIVE_MARKE
   });
 
   routesButton?.addEventListener('click', () => {
-    openHistoryPlayback();
+    openCommandModal();
   });
 
   backButton?.addEventListener('click', () => {
@@ -3937,10 +3955,6 @@ function animateMarkerMove(marker, fromLatLng, toLatLng, durationMs = LIVE_MARKE
   });
 
   deviceCommandButton?.addEventListener('click', () => {
-    openCommandModal();
-  });
-
-  deviceHistoryButton?.addEventListener('click', () => {
     openCommandModal();
   });
 
