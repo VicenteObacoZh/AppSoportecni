@@ -1,4 +1,4 @@
-ï»¿:root {
+:root {
   --bg: #06111f;
   --bg-soft: #0b1e36;
   --panel: rgba(9, 23, 43, 0.72);
@@ -6173,7 +6173,7 @@ img {
   accent-color: #4d4a53;
 }
 
-/* RotaciÃ³n real de vehÃ­culos en mapa en vivo */
+/* Rotación real de vehículos en mapa en vivo */
 .vehicle-marker-leaflet {
   background: transparent;
   border: 0;
@@ -6216,3 +6216,59 @@ img {
   }
 }
 
+
+/* Selected device speed gauge on live map */
+.mobile-map-speed-gauge {
+  position: fixed;
+  left: 10px;
+  bottom: calc(178px + env(safe-area-inset-bottom, 0px));
+  z-index: 594;
+  width: 76px;
+  height: 76px;
+  border: 6px solid #3d3d3d;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #111111;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+}
+
+.mobile-map-speed-gauge[hidden] {
+  display: none !important;
+}
+
+.mobile-map-speed-gauge strong {
+  display: block;
+  font-size: 1.25rem;
+  line-height: 1;
+  font-weight: 800;
+}
+
+.mobile-map-speed-gauge span {
+  display: block;
+  margin-top: 3px;
+  font-size: 0.92rem;
+  line-height: 1;
+  font-weight: 500;
+}
+
+@media (max-width: 480px) {
+  .mobile-map-speed-gauge {
+    left: 8px;
+    bottom: calc(166px + env(safe-area-inset-bottom, 0px));
+    width: 68px;
+    height: 68px;
+    border-width: 5px;
+  }
+
+  .mobile-map-speed-gauge strong {
+    font-size: 1.08rem;
+  }
+
+  .mobile-map-speed-gauge span {
+    font-size: 0.78rem;
+  }
+}

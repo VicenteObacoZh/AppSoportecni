@@ -1,4 +1,4 @@
-ï»¿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
@@ -30,6 +30,10 @@
 
     <main class="mobile-map-stage">
       <div id="pageLiveMap" class="mobile-map-canvas"></div>
+      <div class="mobile-map-speed-gauge" id="mapSelectedSpeedGauge" hidden aria-live="polite">
+        <strong id="mapSelectedSpeedValue">0</strong>
+        <span>Km/hr</span>
+      </div>
         <div class="map-empty-state map-empty-state--overlay" id="pageMapEmptyState">
           <div class="loading-indicator loading-indicator--overlay" aria-label="Procesando">
             <div class="loading-indicator__spinner" aria-hidden="true"></div>
@@ -172,9 +176,9 @@
         <img src="./assets/icons/panel/icon_share_bold_white.png?v=1" alt="Compartir" onerror="this.style.display='none';this.previousElementSibling.style.display='grid'" />
       </button>
 
-      <button class="mobile-map-device-panel__action" type="button" id="mapDeviceHistoryButton" title="HistÃ³rico">
+      <button class="mobile-map-device-panel__action" type="button" id="mapDeviceHistoryButton" title="Histórico">
         <span class="mobile-map-device-panel__action-fallback">&#9654;</span>
-        <img src="./assets/icons/panel/icon_play_bold_white.png?v=1" alt="HistÃ³rico" onerror="this.style.display='none';this.previousElementSibling.style.display='grid'" />
+        <img src="./assets/icons/panel/icon_play_bold_white.png?v=1" alt="Histórico" onerror="this.style.display='none';this.previousElementSibling.style.display='grid'" />
       </button>
     </div>
   </div>

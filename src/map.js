@@ -5,6 +5,8 @@
   const companyList = document.getElementById('mapCompanyList');
   const mapElement = document.getElementById('pageLiveMap');
   const mapEmptyState = document.getElementById('pageMapEmptyState');
+  const selectedSpeedGauge = document.getElementById('mapSelectedSpeedGauge');
+  const selectedSpeedValue = document.getElementById('mapSelectedSpeedValue');
   const menuButton = document.getElementById('mobileMapMenuButton');
   const sheet = document.getElementById('mobileMapSheet');
   const tabButtons = Array.from(document.querySelectorAll('[data-sheet-tab]'));
@@ -136,6 +138,7 @@
   let shareSending = false;
   let historyOpening = false;
   let pendingDeviceAction = '';
+  let pendingMapRenderTimer = null;
   const LIVE_MARKER_ANIM_MS = 1000;
   const LIVE_ROTATE_ANIM_MS = 260;
   const LIVE_STALE_MINUTES = 30;
@@ -146,8 +149,12 @@
   const LIVE_MOVE_MAX_SMOOTH_M = 180;
   const LIVE_ROTATE_MIN_DIFF_DEG = 3;
   const LIVE_ROTATE_MIN_BEARING_M = 5;
+  const LIVE_ROTATE_ROUTE_MIN_SPEED_KMH = 3;
+  const LIVE_ROTATE_ROUTE_MIN_MOVE_M = 7;
+  const LIVE_ROTATE_DIRECT_MIN_SPEED_KMH = 2;
   const LIVE_ROTATE_SHARP_TURN_MIN_M = 18;
   const LIVE_ROTATE_SHARP_TURN_MAX_DEG = 135;
+  const LIVE_ROTATE_REVERSE_GUARD_DEG = 150;
   const DEVICE_ICON_ROTATION_OFFSET_DEG = 0;
   const SELECTED_DEVICE_MIN_ZOOM = 16;
   const FOLLOW_VIEWPORT_ALLOW_MS = 700;
@@ -185,8 +192,26 @@
       .replaceAll("'", '&#39;');
   }
 
+  function getDeviceSpeedKmh(device) {
+    const speed = Number(device?.speedKmh ?? device?.speed ?? 0);
+    return Number.isFinite(speed) ? Math.max(0, speed) : 0;
+  }
+
   function formatSpeed(speed) {
     return `${Math.round(Number(speed || 0))} km/h`;
+  }
+
+  function syncSelectedSpeedGauge(device) {
+    if (!selectedSpeedGauge || !selectedSpeedValue) {
+      return;
+    }
+
+    const hasDevice = Boolean(device);
+    selectedSpeedGauge.hidden = !hasDevice;
+    selectedSpeedGauge.setAttribute('aria-hidden', hasDevice ? 'false' : 'true');
+    if (hasDevice) {
+      selectedSpeedValue.textContent = String(Math.round(getDeviceSpeedKmh(device)));
+    }
   }
 
   function parseApiDateTime(value) {
@@ -926,6 +951,42 @@ function getMarkerUrl(device) {
     menuButton.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
   }
 
+  function isSheetOpen() {
+    return Boolean(sheet?.classList.contains('mobile-map-sheet--open'));
+  }
+
+  function closeSheetIfOutsideEvent(event) {
+    if (!isSheetOpen()) {
+      return;
+    }
+
+    const path = typeof event?.composedPath === 'function' ? event.composedPath() : [];
+    const target = event?.target;
+    const touchedSheet = path.includes(sheet) || sheet?.contains(target);
+    const touchedMenuButton = menuButton && (path.includes(menuButton) || menuButton.contains(target));
+
+    if (!touchedSheet && !touchedMenuButton) {
+      setSheetOpen(false);
+    }
+  }
+
+  function bindSheetOutsideClose() {
+    if (!sheet || sheet.__outsideCloseBound) {
+      return;
+    }
+
+    sheet.__outsideCloseBound = true;
+    ['pointerdown', 'mousedown', 'touchstart', 'click'].forEach((eventName) => {
+      document.addEventListener(eventName, closeSheetIfOutsideEvent, true);
+    });
+
+    if (mapElement) {
+      ['pointerdown', 'mousedown', 'touchstart', 'click'].forEach((eventName) => {
+        mapElement.addEventListener(eventName, () => setSheetOpen(false), true);
+      });
+    }
+  }
+
   function switchTab(nextTab) {
     currentTab = nextTab;
     tabButtons.forEach((button) => {
@@ -1008,6 +1069,10 @@ function getMarkerUrl(device) {
             trafficLayerFallback2.addTo(liveMap);
           }
         }
+      });
+
+      liveMap.on('mousedown touchstart dragstart zoomstart click', () => {
+        setSheetOpen(false);
       });
 
       liveMap.on('zoomend moveend', () => {
@@ -1379,6 +1444,7 @@ function angleDelta(from, to) {
       if (selectedEvent) {
         return;
       }
+      setSheetOpen(false);
       const nearest = findNearestDeviceAtLatLng(event?.latlng, 34);
       if (nearest) {
         selectDeviceFromMap(nearest);
@@ -1550,6 +1616,7 @@ function angleDelta(from, to) {
     device = mergeCurrentDeviceAddress(device);
     hydrateDeviceAddress(device);
     selectedDevice = device || null;
+    syncSelectedSpeedGauge(selectedDevice);
     syncSelectionActionButtons(Boolean(selectedDevice));
     syncMapHeaderTitle();
     if (!devicePanel) {
@@ -2157,6 +2224,7 @@ function angleDelta(from, to) {
       const lon = Number(device.lon);
       if (Number.isFinite(lat) && Number.isFinite(lon)) {
         recenterSelectedDeviceInSafeView({ ...device, lat, lon }, { animate: true });
+        scheduleSelectedDeviceMapRender();
       }
     }
   }
@@ -2307,6 +2375,7 @@ function angleDelta(from, to) {
             showDevicePanel(selected);
           }
           recenterSelectedDeviceInSafeView(selected || { lat, lon }, { animate: true });
+          scheduleSelectedDeviceMapRender();
           setSheetOpen(false);
         }
       });
@@ -2731,11 +2800,16 @@ function getDeviceLiveLatLng(device) {
       ['lastPosition.heading', device?.lastPosition?.heading]
     ];
 
+    const speed = Number(device?.speedKmh ?? device?.speed ?? 0);
+    const previousRotation = normalizeAngle(previousSnapshot?.rotation ?? markerRef?.__rotationAngle ?? 0);
+    const explicitCandidate = directCandidates
+      .map(([source, value]) => ({ source, rotation: parseRotationValue(value) }))
+      .find((candidate) => candidate.rotation !== null);
+
     const lat = Number(device?.lat);
     const lon = Number(device?.lon);
-    const markerLatLng = markerRef?.getLatLng?.();
-    const prevLat = Number(markerLatLng?.lat ?? previousSnapshot?.lat);
-    const prevLon = Number(markerLatLng?.lng ?? previousSnapshot?.lon);
+    const prevLat = Number(previousSnapshot?.lat);
+    const prevLon = Number(previousSnapshot?.lon);
     const canComputeBearing =
       Number.isFinite(lat) &&
       Number.isFinite(lon) &&
@@ -2746,21 +2820,34 @@ function getDeviceLiveLatLng(device) {
       ? normalizeAngle(computeBearing(prevLat, prevLon, lat, lon))
       : null;
 
-    const previousRotation = normalizeAngle(previousSnapshot?.rotation ?? markerRef?.__rotationAngle ?? 0);
     if (computedBearing !== null && movedMeters >= LIVE_ROTATE_MIN_BEARING_M) {
       const turnDiff = Math.abs(smallestAngleDiff(previousRotation, computedBearing));
-      if (movedMeters < LIVE_ROTATE_SHARP_TURN_MIN_M && turnDiff > LIVE_ROTATE_SHARP_TURN_MAX_DEG) {
+      const explicitVsMovementDiff = explicitCandidate
+        ? Math.abs(smallestAngleDiff(explicitCandidate.rotation, computedBearing))
+        : 0;
+      const hasRouteMovement = speed >= LIVE_ROTATE_ROUTE_MIN_SPEED_KMH && movedMeters >= LIVE_ROTATE_ROUTE_MIN_MOVE_M;
+
+      if (movedMeters < LIVE_ROTATE_SHARP_TURN_MIN_M && turnDiff > LIVE_ROTATE_SHARP_TURN_MAX_DEG && !hasRouteMovement) {
         return finish(previousRotation, 'previousSnapshot.rotation');
       }
 
-      return finish(computedBearing, 'computedBearing');
+      if (hasRouteMovement) {
+        return finish(computedBearing, explicitVsMovementDiff > LIVE_ROTATE_REVERSE_GUARD_DEG ? 'computedBearing.reverseGuard' : 'computedBearing.route');
+      }
+
+      if (explicitCandidate && speed >= LIVE_ROTATE_DIRECT_MIN_SPEED_KMH && explicitVsMovementDiff <= LIVE_ROTATE_REVERSE_GUARD_DEG) {
+        return finish(explicitCandidate.rotation, explicitCandidate.source);
+      }
+
+      return finish(computedBearing, explicitVsMovementDiff > LIVE_ROTATE_REVERSE_GUARD_DEG ? 'computedBearing.reverseGuard' : 'computedBearing');
     }
 
-    for (const [source, value] of directCandidates) {
-      const parsed = parseRotationValue(value);
-      if (parsed !== null) {
-        return finish(parsed, source);
-      }
+    if (explicitCandidate && speed >= LIVE_ROTATE_DIRECT_MIN_SPEED_KMH) {
+      return finish(explicitCandidate.rotation, explicitCandidate.source);
+    }
+
+    if (explicitCandidate) {
+      return finish(explicitCandidate.rotation, explicitCandidate.source);
     }
 
     return finish(previousRotation, 'previousSnapshot.rotation');
@@ -2796,7 +2883,7 @@ function getDeviceLiveLatLng(device) {
     const markerPosition = marker?.getLatLng?.();
     const lat = Number(markerPosition?.lat ?? device?.lat);
     const lon = Number(markerPosition?.lng ?? device?.lon);
-    const speed = Number(device?.speedKmh || 0);
+    const speed = getDeviceSpeedKmh(device);
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
       return;
     }
@@ -2951,19 +3038,17 @@ function getDeviceLiveLatLng(device) {
 
       const previousSnapshot = detailedSnapshots.get(markerId) || null;
       const marker = detailedMarkers.get(markerId);
-      const markerLatLng = marker?.getLatLng?.();
-      const previousForRotation = markerLatLng
+      const previousForRotation = previousSnapshot
         ? {
-            lat: Number(markerLatLng.lat),
-            lon: Number(markerLatLng.lng),
+            ...previousSnapshot,
             rotation: Number(marker?.__rotationAngle ?? previousSnapshot?.rotation ?? 0)
           }
-        : previousSnapshot;
+        : null;
       const rotationMeta = resolveDeviceRotation(device, previousForRotation, true, marker);
       const rotation = rotationMeta.rotation;
       const visualState = getLiveVisualState(device);
       
-      const speed = Number(device?.speedKmh || 0);
+      const speed = getDeviceSpeedKmh(device);
 
       if (!marker) {
         const created = window.L.marker([lat, lon], {
@@ -3145,6 +3230,34 @@ function getDeviceLiveLatLng(device) {
     }
 
     renderFocusedEventMarker();
+  }
+  function scheduleSelectedDeviceMapRender(delayMs = 260) {
+    if (!liveMap) {
+      return;
+    }
+
+    if (pendingMapRenderTimer) {
+      window.clearTimeout(pendingMapRenderTimer);
+      pendingMapRenderTimer = null;
+    }
+
+    const renderSelectedViewport = () => {
+      if (!liveMap) {
+        return;
+      }
+
+      liveMap.invalidateSize?.({ pan: false });
+      renderMap(filterDevices());
+    };
+
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(renderSelectedViewport);
+    });
+
+    pendingMapRenderTimer = window.setTimeout(() => {
+      pendingMapRenderTimer = null;
+      renderSelectedViewport();
+    }, delayMs);
   }
 
   function fitAllDevicesOnMap() {
@@ -3691,6 +3804,7 @@ function animateMarkerMove(marker, fromLatLng, toLatLng, durationMs = LIVE_MARKE
           showDevicePanel(device);
           if (liveMap && Number.isFinite(Number(device.lat)) && Number.isFinite(Number(device.lon))) {
             recenterSelectedDeviceInSafeView(device, { animate: preserveViewport });
+            scheduleSelectedDeviceMapRender();
           }
           consumePendingDeviceAction();
         }
@@ -3741,6 +3855,7 @@ function animateMarkerMove(marker, fromLatLng, toLatLng, durationMs = LIVE_MARKE
   selectedEvent = resolveSelectedEvent();
   selectedDevice = resolveSelectedDevice();
   syncSelectionActionButtons(Boolean(selectedDevice && selectedDevice.deviceId));
+  bindSheetOutsideClose();
 
   menuButton?.addEventListener('click', () => {
     const isOpen = sheet?.classList.contains('mobile-map-sheet--open');
