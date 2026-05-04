@@ -134,6 +134,9 @@
   let resolvedAddressByDevice = new Map();
   let trailPolylineById = new Map();
   let movementHistoryById = new Map();
+  let directionTrackById = new Map();
+  let roadRouteCacheByKey = new Map();
+  let pendingRoadRouteByKey = new Map();
   let fuelReportByDeviceId = new Map();
   let shareSending = false;
   let historyOpening = false;
@@ -146,15 +149,27 @@
   const LIVE_TAIL_MIN_STEP_M = 8;
   const LIVE_TAIL_RESET_JUMP_M = 120;
   const LIVE_MOVE_MIN_ANIM_M = 1.5;
-  const LIVE_MOVE_MAX_SMOOTH_M = 180;
+  const LIVE_MOVE_MAX_SMOOTH_M = 600;
   const LIVE_ROTATE_MIN_DIFF_DEG = 3;
   const LIVE_ROTATE_MIN_BEARING_M = 5;
   const LIVE_ROTATE_ROUTE_MIN_SPEED_KMH = 3;
-  const LIVE_ROTATE_ROUTE_MIN_MOVE_M = 7;
+  const LIVE_ROTATE_ROUTE_MIN_MOVE_M = 2.5;
   const LIVE_ROTATE_DIRECT_MIN_SPEED_KMH = 2;
   const LIVE_ROTATE_SHARP_TURN_MIN_M = 18;
   const LIVE_ROTATE_SHARP_TURN_MAX_DEG = 135;
   const LIVE_ROTATE_REVERSE_GUARD_DEG = 150;
+  const LIVE_DIRECTION_HISTORY_MAX_POINTS = 7;
+  const LIVE_DIRECTION_MIN_STEP_M = 3;
+  const LIVE_DIRECTION_MIN_BEARING_M = 8;
+  const LIVE_DIRECTION_OUT_OF_ORDER_GRACE_MS = 2000;
+  const LIVE_DIRECTION_RESET_JUMP_M = 900;
+  const LIVE_ROAD_ROUTE_ENABLED = true;
+  const LIVE_ROAD_ROUTE_MIN_M = 25;
+  const LIVE_ROAD_ROUTE_MAX_M = 1200;
+  const LIVE_ROAD_ROUTE_CACHE_MS = 30000;
+  const LIVE_ROAD_ROUTE_TIMEOUT_MS = 900;
+  const LIVE_ROAD_ROUTE_MAX_FACTOR = 4.5;
+  const LIVE_ROAD_ROUTE_SERVICE_URL = 'https://router.project-osrm.org/route/v1/driving';
   const DEVICE_ICON_ROTATION_OFFSET_DEG = 0;
   const SELECTED_DEVICE_MIN_ZOOM = 16;
   const FOLLOW_VIEWPORT_ALLOW_MS = 700;
@@ -2233,7 +2248,7 @@ function angleDelta(from, to) {
     const markerUrl = getMarkerUrl(device);
     const fallbackUrl = `../assets/markers/flecha_${getStatusColor(device)}.png`;
     const safeRotation = Number.isFinite(Number(rotationDeg)) ? Number(rotationDeg) : 0;
-    const visualRotation = normalizeAngle(safeRotation + DEVICE_ICON_ROTATION_OFFSET_DEG);
+    const visualRotation = safeRotation + DEVICE_ICON_ROTATION_OFFSET_DEG;
     const statusColor = getStatusColor(device);
 
     return window.L.divIcon({
@@ -2242,7 +2257,7 @@ function angleDelta(from, to) {
         <div class="gps-marker-real__shell gps-marker-real__shell--${statusColor}">
           <span class="gps-marker-real__wave"></span>
           <span class="gps-marker-real__glow"></span>
-          <img class="gps-marker-real__img" style="transform: rotate(${visualRotation}deg); transition: transform 380ms linear;" src="${markerUrl}" alt="vehiculo" onerror="this.onerror=null;this.src='${fallbackUrl}'" />
+          <img class="gps-marker-real__img" style="transform: rotate(${visualRotation}deg); transition: none;" src="${markerUrl}" alt="vehiculo" onerror="this.onerror=null;this.src='${fallbackUrl}'" />
         </div>
       `,
       iconSize: [42, 42],
@@ -2617,6 +2632,94 @@ function getDeviceLiveLatLng(device) {
     return diff;
   }
 
+  function parseDeviceFixTimeMs(device) {
+    const value = device?.fixTime ?? device?.FixTime ?? device?.deviceTime ?? device?.DeviceTime ?? device?.lastUpdate ?? device?.LastUpdate ?? device?.serverTime ?? device?.ServerTime;
+    if (value === null || value === undefined || value === '') {
+      return null;
+    }
+
+    if (typeof value === 'number') {
+      if (!Number.isFinite(value)) return null;
+      return value < 1000000000000 ? value * 1000 : value;
+    }
+
+    const parsed = Date.parse(String(value));
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  function rememberDirectionPoint(markerId, device, previousRotation = 0) {
+    const lat = Number(device?.lat);
+    const lon = Number(device?.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      return { bearing: null, ignored: true, reason: 'invalid-position' };
+    }
+
+    const speed = getDeviceSpeedKmh(device);
+    const fixTimeMs = parseDeviceFixTimeMs(device);
+    const point = { lat, lon, fixTimeMs, speed, seenAt: Date.now() };
+    let history = directionTrackById.get(markerId) || [];
+    const last = history[history.length - 1] || null;
+
+    if (last) {
+      const hasComparableTime = fixTimeMs !== null && last.fixTimeMs !== null;
+      if (hasComparableTime && fixTimeMs < (last.fixTimeMs - LIVE_DIRECTION_OUT_OF_ORDER_GRACE_MS)) {
+        return { bearing: normalizeAngle(previousRotation), ignored: true, reason: 'out-of-order' };
+      }
+
+      const movedFromLast = distanceMeters(last.lat, last.lon, lat, lon);
+      const maxReasonableJump = Math.max(LIVE_DIRECTION_RESET_JUMP_M, LIVE_MOVE_MAX_SMOOTH_M, speed * 4);
+      if (Number.isFinite(movedFromLast) && movedFromLast > maxReasonableJump) {
+        history = [point];
+        directionTrackById.set(markerId, history);
+        return { bearing: normalizeAngle(previousRotation), ignored: false, reason: 'jump-reset' };
+      }
+
+      if (!Number.isFinite(movedFromLast) || movedFromLast < LIVE_DIRECTION_MIN_STEP_M) {
+        history[history.length - 1] = { ...last, ...point, lat: last.lat, lon: last.lon };
+      } else {
+        history.push(point);
+      }
+    } else {
+      history.push(point);
+    }
+
+    if (history.length > LIVE_DIRECTION_HISTORY_MAX_POINTS) {
+      history = history.slice(-LIVE_DIRECTION_HISTORY_MAX_POINTS);
+    }
+    directionTrackById.set(markerId, history);
+
+    if (history.length < 2) {
+      return { bearing: null, ignored: false, reason: 'warming-up' };
+    }
+
+    const current = history[history.length - 1];
+    const minBearingMeters = Math.min(30, Math.max(LIVE_DIRECTION_MIN_BEARING_M, speed * 0.22));
+    let anchor = null;
+    let anchorDistance = 0;
+
+    for (let index = history.length - 2; index >= 0; index -= 1) {
+      const candidate = history[index];
+      const distance = distanceMeters(candidate.lat, candidate.lon, current.lat, current.lon);
+      if (Number.isFinite(distance) && distance >= minBearingMeters) {
+        anchor = candidate;
+        anchorDistance = distance;
+        break;
+      }
+    }
+
+    if (!anchor) {
+      return { bearing: normalizeAngle(previousRotation), ignored: false, reason: 'not-enough-distance' };
+    }
+
+    const bearing = normalizeAngle(computeBearing(anchor.lat, anchor.lon, current.lat, current.lon));
+    const turnDiff = Math.abs(smallestAngleDiff(previousRotation, bearing));
+    if (anchorDistance < LIVE_ROTATE_SHARP_TURN_MIN_M && turnDiff > LIVE_ROTATE_SHARP_TURN_MAX_DEG) {
+      return { bearing: normalizeAngle(previousRotation), ignored: false, reason: 'sharp-jitter-guard' };
+    }
+
+    return { bearing, ignored: false, reason: 'hidden-track' };
+  }
+
   function trimTrailToMaxKm(points, maxKm) {
     if (!Array.isArray(points) || points.length <= 1) {
       return Array.isArray(points) ? points : [];
@@ -2647,13 +2750,17 @@ function getDeviceLiveLatLng(device) {
       return;
     }
 
-    const safeAngle = normalizeAngle(angle);
-    const visualAngle = normalizeAngle(safeAngle + DEVICE_ICON_ROTATION_OFFSET_DEG);
+    const numericAngle = Number(angle);
+    const rawAngle = Number.isFinite(numericAngle) ? numericAngle : 0;
+    const safeAngle = normalizeAngle(rawAngle);
+    const visualAngle = rawAngle + DEVICE_ICON_ROTATION_OFFSET_DEG;
     marker.__rotationAngle = safeAngle;
+    marker.__displayRotationAngle = visualAngle;
 
     const markerElement = marker.getElement?.();
     const image = markerElement?.querySelector?.('.gps-marker-real__img');
     if (image) {
+      image.style.transition = 'none';
       image.style.transform = `rotate(${visualAngle}deg)`;
     }
   }
@@ -2668,23 +2775,31 @@ function getDeviceLiveLatLng(device) {
       marker.__rotateCancel = null;
     }
 
-    const startAngle = normalizeAngle(marker.__rotationAngle ?? marker.options?.rotationAngle ?? 0);
+    const displayStart = Number.isFinite(Number(marker.__displayRotationAngle))
+      ? Number(marker.__displayRotationAngle)
+      : Number(marker.__rotationAngle ?? marker.options?.rotationAngle ?? 0);
+    const startAngle = normalizeAngle(displayStart);
     const endAngle = normalizeAngle(targetAngle);
     let diff = endAngle - startAngle;
     if (diff > 180) diff -= 360;
     if (diff < -180) diff += 360;
+    const displayEnd = displayStart + diff;
 
     if (Math.abs(diff) < LIVE_ROTATE_MIN_DIFF_DEG) {
-      updateMarkerRotationVisual(marker, endAngle);
+      marker.__disableRotationTransition = false;
+      updateMarkerRotationVisual(marker, displayEnd);
+      marker.__rotationAngle = endAngle;
       marker.__rotateCancel = null;
       return;
     }
 
     const startTime = performance.now();
     let cancelled = false;
+    marker.__disableRotationTransition = true;
 
     marker.__rotateCancel = () => {
       cancelled = true;
+      marker.__disableRotationTransition = false;
     };
 
     function tick(now) {
@@ -2693,11 +2808,15 @@ function getDeviceLiveLatLng(device) {
       }
 
       const progress = Math.min((now - startTime) / durationMs, 1);
-      updateMarkerRotationVisual(marker, startAngle + (diff * progress));
+      const frameAngle = displayStart + (diff * progress);
+      updateMarkerRotationVisual(marker, frameAngle);
 
       if (progress < 1) {
         window.requestAnimationFrame(tick);
       } else {
+        marker.__disableRotationTransition = false;
+        marker.__displayRotationAngle = displayEnd;
+        marker.__rotationAngle = endAngle;
         marker.__rotateCancel = null;
       }
     }
@@ -2718,9 +2837,13 @@ function getDeviceLiveLatLng(device) {
   const safeRotation = normalizeAngle(rotation);
 
   if (forceRefresh || !markerElement || !image || marker.__visualKey !== visualKey) {
-    marker.setIcon(buildDeviceIcon(device, safeRotation));
+    const currentDisplayRotation = Number.isFinite(Number(marker.__displayRotationAngle))
+      ? Number(marker.__displayRotationAngle)
+      : Number(marker.__rotationAngle ?? safeRotation);
+    marker.setIcon(buildDeviceIcon(device, currentDisplayRotation));
     marker.__visualKey = visualKey;
-    marker.__rotationAngle = safeRotation;
+    marker.__rotationAngle = normalizeAngle(currentDisplayRotation);
+    marker.__displayRotationAngle = currentDisplayRotation;
 
     window.requestAnimationFrame(() => {
       const refreshedElement = marker.getElement?.();
@@ -2734,7 +2857,7 @@ function getDeviceLiveLatLng(device) {
         };
       }
 
-      updateMarkerRotationVisual(marker, safeRotation);
+      updateMarkerRotationVisual(marker, currentDisplayRotation);
     });
 
     return;
@@ -2802,6 +2925,7 @@ function getDeviceLiveLatLng(device) {
 
     const speed = Number(device?.speedKmh ?? device?.speed ?? 0);
     const previousRotation = normalizeAngle(previousSnapshot?.rotation ?? markerRef?.__rotationAngle ?? 0);
+    const hiddenTrackBearing = parseRotationValue(previousSnapshot?.hiddenTrackBearing);
     const explicitCandidate = directCandidates
       .map(([source, value]) => ({ source, rotation: parseRotationValue(value) }))
       .find((candidate) => candidate.rotation !== null);
@@ -2820,30 +2944,21 @@ function getDeviceLiveLatLng(device) {
       ? normalizeAngle(computeBearing(prevLat, prevLon, lat, lon))
       : null;
 
+    if (hiddenTrackBearing !== null && speed >= LIVE_ROTATE_ROUTE_MIN_SPEED_KMH) {
+      return finish(hiddenTrackBearing, 'hiddenTrack.bearing');
+    }
+
+    if (computedBearing !== null && movedMeters >= LIVE_ROTATE_ROUTE_MIN_MOVE_M && speed >= LIVE_ROTATE_ROUTE_MIN_SPEED_KMH) {
+      return finish(computedBearing, 'computedBearing.route');
+    }
+
     if (computedBearing !== null && movedMeters >= LIVE_ROTATE_MIN_BEARING_M) {
       const turnDiff = Math.abs(smallestAngleDiff(previousRotation, computedBearing));
-      const explicitVsMovementDiff = explicitCandidate
-        ? Math.abs(smallestAngleDiff(explicitCandidate.rotation, computedBearing))
-        : 0;
-      const hasRouteMovement = speed >= LIVE_ROTATE_ROUTE_MIN_SPEED_KMH && movedMeters >= LIVE_ROTATE_ROUTE_MIN_MOVE_M;
-
-      if (movedMeters < LIVE_ROTATE_SHARP_TURN_MIN_M && turnDiff > LIVE_ROTATE_SHARP_TURN_MAX_DEG && !hasRouteMovement) {
+      if (movedMeters < LIVE_ROTATE_SHARP_TURN_MIN_M && turnDiff > LIVE_ROTATE_SHARP_TURN_MAX_DEG) {
         return finish(previousRotation, 'previousSnapshot.rotation');
       }
 
-      if (hasRouteMovement) {
-        return finish(computedBearing, explicitVsMovementDiff > LIVE_ROTATE_REVERSE_GUARD_DEG ? 'computedBearing.reverseGuard' : 'computedBearing.route');
-      }
-
-      if (explicitCandidate && speed >= LIVE_ROTATE_DIRECT_MIN_SPEED_KMH && explicitVsMovementDiff <= LIVE_ROTATE_REVERSE_GUARD_DEG) {
-        return finish(explicitCandidate.rotation, explicitCandidate.source);
-      }
-
-      return finish(computedBearing, explicitVsMovementDiff > LIVE_ROTATE_REVERSE_GUARD_DEG ? 'computedBearing.reverseGuard' : 'computedBearing');
-    }
-
-    if (explicitCandidate && speed >= LIVE_ROTATE_DIRECT_MIN_SPEED_KMH) {
-      return finish(explicitCandidate.rotation, explicitCandidate.source);
+      return finish(computedBearing, 'computedBearing');
     }
 
     if (explicitCandidate) {
@@ -2930,6 +3045,174 @@ function getDeviceLiveLatLng(device) {
     trailPolylineById.set(markerId, polyline);
   }
 
+  function isDeviceSelectedForRoadRoute(markerId, device) {
+    if (!selectedDevice?.deviceId) {
+      return false;
+    }
+
+    const selectedId = String(selectedDevice.deviceId || '');
+    return selectedId === String(device?.deviceId || '') || selectedId === String(markerId || '');
+  }
+
+  function makeRoadRouteCacheKey(fromLat, fromLon, toLat, toLon) {
+    const round = (value) => Number(value).toFixed(5);
+    return `${round(fromLat)},${round(fromLon)}>${round(toLat)},${round(toLon)}`;
+  }
+
+  function validateRoadRoutePath(path, straightMeters) {
+    if (!Array.isArray(path) || path.length < 2 || !Number.isFinite(straightMeters)) {
+      return null;
+    }
+
+    let totalMeters = 0;
+    const cleanPath = [];
+    path.forEach((point) => {
+      const lat = Number(point?.[0]);
+      const lon = Number(point?.[1]);
+      if (Number.isFinite(lat) && Number.isFinite(lon)) {
+        const last = cleanPath[cleanPath.length - 1];
+        if (!last || distanceMeters(last[0], last[1], lat, lon) >= 1) {
+          cleanPath.push([lat, lon]);
+        }
+      }
+    });
+
+    for (let index = 1; index < cleanPath.length; index += 1) {
+      totalMeters += distanceMeters(cleanPath[index - 1][0], cleanPath[index - 1][1], cleanPath[index][0], cleanPath[index][1]);
+    }
+
+    const maxExpectedMeters = Math.max(80, straightMeters * LIVE_ROAD_ROUTE_MAX_FACTOR);
+    if (cleanPath.length < 2 || !Number.isFinite(totalMeters) || totalMeters > maxExpectedMeters) {
+      return null;
+    }
+
+    return cleanPath;
+  }
+
+  async function fetchRoadRoutePath(fromLat, fromLon, toLat, toLon, straightMeters) {
+    if (!LIVE_ROAD_ROUTE_ENABLED || straightMeters < LIVE_ROAD_ROUTE_MIN_M || straightMeters > LIVE_ROAD_ROUTE_MAX_M) {
+      return null;
+    }
+
+    const cacheKey = makeRoadRouteCacheKey(fromLat, fromLon, toLat, toLon);
+    const cached = roadRouteCacheByKey.get(cacheKey);
+    if (cached && (Date.now() - cached.createdAt) < LIVE_ROAD_ROUTE_CACHE_MS) {
+      return cached.path;
+    }
+
+    if (pendingRoadRouteByKey.has(cacheKey)) {
+      return pendingRoadRouteByKey.get(cacheKey);
+    }
+
+    const url = `${LIVE_ROAD_ROUTE_SERVICE_URL}/${fromLon},${fromLat};${toLon},${toLat}?overview=full&geometries=geojson&steps=false&alternatives=false`;
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timeoutId = controller
+      ? window.setTimeout(() => controller.abort(), LIVE_ROAD_ROUTE_TIMEOUT_MS)
+      : null;
+    const request = fetch(url, { cache: 'no-store', signal: controller?.signal })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload) => {
+        const coordinates = payload?.routes?.[0]?.geometry?.coordinates;
+        const path = Array.isArray(coordinates)
+          ? coordinates.map((coord) => [Number(coord?.[1]), Number(coord?.[0])])
+          : null;
+        const validPath = validateRoadRoutePath(path, straightMeters);
+        roadRouteCacheByKey.set(cacheKey, { path: validPath, createdAt: Date.now() });
+        return validPath;
+      })
+      .catch(() => null)
+      .finally(() => {
+        if (timeoutId !== null) {
+          window.clearTimeout(timeoutId);
+        }
+        pendingRoadRouteByKey.delete(cacheKey);
+      });
+
+    pendingRoadRouteByKey.set(cacheKey, request);
+    return request;
+  }
+
+  function animateMarkerAlongPath(marker, path, durationMs = LIVE_MARKER_ANIM_MS, onUpdate = null, onDone = null) {
+    const points = validateRoadRoutePath(path, LIVE_ROAD_ROUTE_MAX_M);
+    if (!points) {
+      const target = Array.isArray(path) ? path[path.length - 1] : null;
+      animateMarkerTo(marker, target?.[0], target?.[1], durationMs, onUpdate, onDone);
+      return;
+    }
+
+    if (typeof marker.__animCancel === 'function') {
+      marker.__animCancel();
+      marker.__animCancel = null;
+    }
+
+    const segments = [];
+    let totalMeters = 0;
+    for (let index = 1; index < points.length; index += 1) {
+      const from = points[index - 1];
+      const to = points[index];
+      const meters = distanceMeters(from[0], from[1], to[0], to[1]);
+      if (Number.isFinite(meters) && meters > 0) {
+        totalMeters += meters;
+        segments.push({ from, to, meters, endMeters: totalMeters, bearing: normalizeAngle(computeBearing(from[0], from[1], to[0], to[1])) });
+      }
+    }
+
+    if (!segments.length || !Number.isFinite(totalMeters) || totalMeters <= 0) {
+      const last = points[points.length - 1];
+      animateMarkerTo(marker, last[0], last[1], durationMs, onUpdate, onDone);
+      return;
+    }
+
+    const startTime = performance.now();
+    let cancelled = false;
+    let currentSegmentIndex = -1;
+    marker.__animCancel = () => {
+      cancelled = true;
+    };
+
+    function tick(now) {
+      if (cancelled) {
+        return;
+      }
+
+      const t = Math.min(1, (now - startTime) / durationMs);
+      const eased = 1 - Math.pow(1 - t, 2);
+      const traveled = totalMeters * eased;
+      let segmentIndex = segments.findIndex((segment) => traveled <= segment.endMeters);
+      if (segmentIndex < 0) {
+        segmentIndex = segments.length - 1;
+      }
+
+      const segment = segments[segmentIndex];
+      const previousEnd = segmentIndex > 0 ? segments[segmentIndex - 1].endMeters : 0;
+      const localT = segment.meters > 0 ? Math.min(1, Math.max(0, (traveled - previousEnd) / segment.meters)) : 1;
+      const nextLatLng = [
+        segment.from[0] + ((segment.to[0] - segment.from[0]) * localT),
+        segment.from[1] + ((segment.to[1] - segment.from[1]) * localT)
+      ];
+
+      if (segmentIndex !== currentSegmentIndex) {
+        currentSegmentIndex = segmentIndex;
+        smoothRotateMarker(marker, segment.bearing, Math.min(LIVE_ROTATE_ANIM_MS, 180));
+      }
+
+      marker.setLatLng(nextLatLng);
+      if (typeof onUpdate === 'function') {
+        onUpdate(marker.getLatLng());
+      }
+
+      if (t < 1) {
+        window.requestAnimationFrame(tick);
+      } else {
+        marker.__animCancel = null;
+        if (typeof onDone === 'function') {
+          onDone(marker.getLatLng());
+        }
+      }
+    }
+
+    window.requestAnimationFrame(tick);
+  }
   function animateMarkerTo(marker, toLat, toLon, durationMs = LIVE_MARKER_ANIM_MS, onUpdate = null, onDone = null) {
     const from = marker.getLatLng();
     const startLat = Number(from.lat);
@@ -3038,14 +3321,23 @@ function getDeviceLiveLatLng(device) {
 
       const previousSnapshot = detailedSnapshots.get(markerId) || null;
       const marker = detailedMarkers.get(markerId);
+      const previousRotation = Number(marker?.__rotationAngle ?? previousSnapshot?.rotation ?? 0);
+      const hiddenTrack = rememberDirectionPoint(markerId, device, previousRotation);
       const previousForRotation = previousSnapshot
         ? {
             ...previousSnapshot,
-            rotation: Number(marker?.__rotationAngle ?? previousSnapshot?.rotation ?? 0)
+            rotation: previousRotation,
+            hiddenTrackBearing: hiddenTrack.bearing
           }
-        : null;
+        : {
+            rotation: previousRotation,
+            hiddenTrackBearing: hiddenTrack.bearing
+          };
+      if (hiddenTrack.ignored && hiddenTrack.reason === 'out-of-order') {
+        return;
+      }
       const rotationMeta = resolveDeviceRotation(device, previousForRotation, true, marker);
-      const rotation = rotationMeta.rotation;
+      let rotation = rotationMeta.rotation;
       const visualState = getLiveVisualState(device);
       
       const speed = getDeviceSpeedKmh(device);
@@ -3071,19 +3363,24 @@ function getDeviceLiveLatLng(device) {
         detailedMarkers.set(markerId, created);
         keepDeviceMarkerInSafeView(created, device);
       } else {
-        syncDeviceMarkerVisual(marker, device, rotation);
         const currentLatLng = marker.getLatLng?.();
         const movedMeters = currentLatLng
           ? distanceMeters(currentLatLng.lat, currentLatLng.lng, lat, lon)
           : Number.POSITIVE_INFINITY;
+        const hasHiddenTarget = currentLatLng && Number.isFinite(movedMeters) && movedMeters >= LIVE_DIRECTION_MIN_BEARING_M;
 
+        if (hasHiddenTarget) {
+          rotation = normalizeAngle(computeBearing(currentLatLng.lat, currentLatLng.lng, lat, lon));
+        }
+
+        syncDeviceMarkerVisual(marker, device, rotation);
         smoothRotateMarker(marker, rotation);
 
         if (!Number.isFinite(movedMeters) || movedMeters <= LIVE_MOVE_MIN_ANIM_M) {
           marker.setLatLng([lat, lon]);
           updateTrailForDevice(markerId, marker, device);
           keepDeviceMarkerInSafeView(marker, device);
-        } else if (movedMeters > LIVE_MOVE_MAX_SMOOTH_M) {
+        } else if (movedMeters > Math.max(LIVE_MOVE_MAX_SMOOTH_M, getDeviceSpeedKmh(device) * 3)) {
           if (typeof marker.__animCancel === 'function') {
             marker.__animCancel();
             marker.__animCancel = null;
@@ -3092,28 +3389,51 @@ function getDeviceLiveLatLng(device) {
           updateTrailForDevice(markerId, marker, device);
           keepDeviceMarkerInSafeView(marker, device);
         } else {
-          animateMarkerTo(
-            marker,
-            lat,
-            lon,
-            LIVE_MARKER_ANIM_MS,
-            null,
-            (finalLatLng) => {
-              updateTrailForDevice(markerId, marker, {
-                ...device,
-                lat: finalLatLng?.lat ?? lat,
-                lon: finalLatLng?.lng ?? lon
-              });
-              keepDeviceMarkerInSafeView(marker, device);
-            }
-          );
+          const moveDurationMs = Math.min(2600, Math.max(LIVE_MARKER_ANIM_MS, movedMeters * 7));
+          const finishMove = (finalLatLng) => {
+            updateTrailForDevice(markerId, marker, {
+              ...device,
+              lat: finalLatLng?.lat ?? lat,
+              lon: finalLatLng?.lng ?? lon
+            });
+            keepDeviceMarkerInSafeView(marker, device);
+          };
+          const runStraightMove = () => {
+            animateMarkerTo(marker, lat, lon, moveDurationMs, null, finishMove);
+          };
+
+          if (isDeviceSelectedForRoadRoute(markerId, device) && hasHiddenTarget) {
+            const routeKey = makeRoadRouteCacheKey(currentLatLng.lat, currentLatLng.lng, lat, lon);
+            marker.__roadTargetKey = routeKey;
+
+            fetchRoadRoutePath(currentLatLng.lat, currentLatLng.lng, lat, lon, movedMeters).then((roadPath) => {
+              if (marker.__roadTargetKey !== routeKey || !detailedMarkers.has(markerId)) {
+                return;
+              }
+
+              if (roadPath && roadPath.length >= 2) {
+                const path = [[currentLatLng.lat, currentLatLng.lng], ...roadPath.slice(1)];
+                const firstTurn = path[1]
+                  ? normalizeAngle(computeBearing(path[0][0], path[0][1], path[1][0], path[1][1]))
+                  : rotation;
+                smoothRotateMarker(marker, firstTurn);
+                animateMarkerAlongPath(marker, path, moveDurationMs, null, finishMove);
+              } else {
+                runStraightMove();
+              }
+            });
+          } else {
+            runStraightMove();
+          }
         }
       }
 
       detailedSnapshots.set(markerId, {
         lat,
         lon,
-        rotation
+        rotation,
+        hiddenTrackBearing: hiddenTrack.bearing,
+        fixTimeMs: parseDeviceFixTimeMs(device)
       });
 
       const markerRef = detailedMarkers.get(markerId);
@@ -3131,6 +3451,7 @@ function getDeviceLiveLatLng(device) {
         detailedMarkers.delete(markerId);
         detailedSnapshots.delete(markerId);
         movementHistoryById.delete(markerId);
+        directionTrackById.delete(markerId);
         const trail = trailPolylineById.get(markerId);
         if (trail) {
           trail.remove();
@@ -4265,3 +4586,4 @@ function animateMarkerMove(marker, fromLatLng, toLatLng, durationMs = LIVE_MARKE
   loadMapPage();
   startAutoRefresh();
 })();
+
