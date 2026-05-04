@@ -6173,7 +6173,7 @@ img {
   accent-color: #4d4a53;
 }
 
-/* Rotación real de vehículos en mapa en vivo */
+/* Rotaciï¿½n real de vehï¿½culos en mapa en vivo */
 .vehicle-marker-leaflet {
   background: transparent;
   border: 0;
@@ -6271,4 +6271,19 @@ img {
   .mobile-map-speed-gauge span {
     font-size: 0.78rem;
   }
+}
+
+/* FIX: selector de fecha Android/WebView visible en historial */
+.dashboard-body--history-player {
+  color-scheme: light;
+}
+
+.dashboard-body--history-player input[type="datetime-local"],
+.dashboard-body--history-player input[type="date"],
+.dashboard-body--history-player input[type="time"] {
+  color-scheme: light;
+  background: #ffffff !important;
+  color: #111827 !important;
+  -webkit-text-fill-color: #111827 !important;
+  border-color: rgba(17, 24, 39, 0.22) !important;
 }
