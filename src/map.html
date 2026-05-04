@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ï»¿<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
@@ -176,9 +176,9 @@
         <img src="./assets/icons/panel/icon_share_bold_white.png?v=1" alt="Compartir" onerror="this.style.display='none';this.previousElementSibling.style.display='grid'" />
       </button>
 
-      <button class="mobile-map-device-panel__action" type="button" id="mapDeviceHistoryButton" title="Histórico">
+      <button class="mobile-map-device-panel__action" type="button" id="mapDeviceHistoryButton" title="HistÃ³rico">
         <span class="mobile-map-device-panel__action-fallback">&#9654;</span>
-        <img src="./assets/icons/panel/icon_play_bold_white.png?v=1" alt="Histórico" onerror="this.style.display='none';this.previousElementSibling.style.display='grid'" />
+        <img src="./assets/icons/panel/icon_play_bold_white.png?v=1" alt="HistÃ³rico" onerror="this.style.display='none';this.previousElementSibling.style.display='grid'" />
       </button>
     </div>
   </div>
@@ -310,10 +310,10 @@
 
             <div class="mobile-history-modal__custom" id="mapHistoryCustomFields" hidden>
               <div class="mobile-history-modal__grid">
-                <input type="date" id="mapHistoryFromDate" />
-                <input type="time" id="mapHistoryFromTime" />
-                <input type="date" id="mapHistoryToDate" />
-                <input type="time" id="mapHistoryToTime" />
+                <input type="text" id="mapHistoryFromDate" inputmode="numeric" placeholder="2026-05-04" autocomplete="off" />
+                <input type="text" id="mapHistoryFromTime" inputmode="numeric" placeholder="00:00" autocomplete="off" />
+                <input type="text" id="mapHistoryToDate" inputmode="numeric" placeholder="2026-05-04" autocomplete="off" />
+                <input type="text" id="mapHistoryToTime" inputmode="numeric" placeholder="23:59" autocomplete="off" />
               </div>
             </div>
 
@@ -385,9 +385,10 @@
   <script src="./app-shell.js?v=1"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="./map-viewport-guard.js?v=3"></script>
-  <script src="./map.js?v=47"></script>
+  <script src="./map.js?v=48"></script>
 </body>
 </html>
+
 
 
 
