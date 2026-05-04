@@ -10,6 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="./styles.css?v=29" />
+  <link rel="stylesheet" href="./routes-datepicker-fix.css?v=1" />
 </head>
 <body class="dashboard-body dashboard-body--routes-mobile dashboard-body--history-player">
   <div class="mobile-routes-player">
@@ -114,12 +115,12 @@
         <div class="mobile-routes-player__date-grid">
           <label class="field">
             <span>Desde</span>
-            <input type="datetime-local" id="routeFrom" />
+            <input type="text" id="routeFrom" readonly inputmode="none" autocomplete="off" />
           </label>
 
           <label class="field">
             <span>Hasta</span>
-            <input type="datetime-local" id="routeTo" />
+            <input type="text" id="routeTo" readonly inputmode="none" autocomplete="off" />
           </label>
         </div>
       </div>
@@ -135,6 +136,7 @@
   <script src="./api.js?v=3"></script>
   <script src="./app-shell.js?v=1"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="./routes.js?v=4"></script>
+  <script src="./routes-datepicker-fix.js?v=1"></script>
+  <script src="./routes.js?v=5"></script>
 </body>
 </html>
