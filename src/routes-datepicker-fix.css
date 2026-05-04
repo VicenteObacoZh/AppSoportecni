@@ -1,0 +1,50 @@
+/* Evita el calendario nativo oscuro de Android y usa controles visibles propios. */
+.dashboard-body--history-player .route-datetime-text {
+  cursor: default;
+  user-select: none;
+  caret-color: transparent;
+  background: #ffffff !important;
+  color: #111827 !important;
+  -webkit-text-fill-color: #111827 !important;
+  border: 1px solid rgba(17, 24, 39, 0.22) !important;
+}
+
+.route-datetime-native-free {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.route-datetime-native-free__title {
+  color: #263241;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.route-datetime-native-free__grid {
+  display: grid;
+  grid-template-columns: 1fr 1.15fr 1fr;
+  gap: 8px;
+}
+
+.route-datetime-native-free__grid--time {
+  grid-template-columns: 1fr 1fr;
+}
+
+.route-datetime-native-free select {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(17, 24, 39, 0.18);
+  background: #ffffff;
+  color: #111827;
+  -webkit-text-fill-color: #111827;
+  font-weight: 800;
+  outline: none;
+}
+
+.route-datetime-native-free select:focus {
+  border-color: #009688;
+  box-shadow: 0 0 0 3px rgba(0, 150, 136, 0.16);
+}
