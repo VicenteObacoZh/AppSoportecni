@@ -60,7 +60,7 @@
       window.location.protocol === 'file:';
 
     if (isCapacitorApp) {
-      return productionFallback;
+      return localFallback;
     }
 
     const currentHost = String(window.location.hostname || '').toLowerCase();
@@ -70,6 +70,7 @@
 
   function resolveBackendBaseUrlCandidates() {
     const primary = resolveBackendBaseUrl();
+    const productionFallback = 'https://rastreo.soportecni.com/api';
     const configuredBaseUrl = readConfiguredBaseUrl();
     const candidates = [];
 
@@ -83,6 +84,7 @@
         candidates.push('http://localhost:4100');
       }
       candidates.push(primary || 'https://rastreo.soportecni.com');
+      candidates.push(productionFallback);
     } else {
       candidates.push(primary);
     }

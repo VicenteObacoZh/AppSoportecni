@@ -6222,7 +6222,7 @@ img {
   position: fixed;
   left: 10px;
   bottom: calc(178px + env(safe-area-inset-bottom, 0px));
-  z-index: 594;
+  z-index: 530;
   width: 76px;
   height: 76px;
   border: 6px solid #3d3d3d;
