@@ -172,6 +172,33 @@ async function fillMissingAddresses(items = []) {
   });
 }
 
+async function resolvePlatformAddressAsync(lat, lon, session) {
+  if (!session || !hasLiveCookies(session)) {
+    return null;
+  }
+
+  try {
+    const query = new URLSearchParams({
+      cachedOnly: 'false',
+      lat: String(lat),
+      lon: String(lon)
+    });
+
+    const result = await fetchPlatform(`/api/geocode/reverse?${query.toString()}`, {
+      headers: {
+        Cookie: session.cookies.join('; ')
+      }
+    });
+
+    const address = String(result?.text || '').trim();
+    return address && !isCoordinateAddressText(address) && !isAddressPlaceholderText(address)
+      ? address
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 function respondMissingSessionId(res) {
   return res.status(400).json({
     ok: false,
@@ -3095,9 +3122,10 @@ router.post('/monitor/device-meta', async (req, res) => {
   }
 });
 
-router.get('/geocode/reverse', async (req, res) => {
+async function reverseGeocodeHandler(req, res) {
   const lat = Number(req.query.lat);
   const lon = Number(req.query.lon);
+  const sessionId = String(req.query.sessionId || '').trim();
 
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
     return res.status(400).json({
@@ -3116,13 +3144,17 @@ router.get('/geocode/reverse', async (req, res) => {
   }
 
   try {
-    const address = await geocodeCacheService.getAddressAsync(lat, lon);
+    const session = sessionId ? getSession(sessionId) : null;
+    const platformAddress = await resolvePlatformAddressAsync(lat, lon, session);
+    const address = platformAddress || await geocodeCacheService.getAddressAsync(lat, lon);
+
     return res.json({
       ok: true,
       data: {
         lat,
         lon,
-        address: address || null
+        address: address || null,
+        source: platformAddress ? 'platform' : 'backend'
       }
     });
   } catch (error) {
@@ -3132,6 +3164,9 @@ router.get('/geocode/reverse', async (req, res) => {
       message: error?.message || 'No fue posible resolver direccion.'
     });
   }
-});
+}
+
+router.get('/geocode/reverse', reverseGeocodeHandler);
+router.get('/reverse', reverseGeocodeHandler);
 
 module.exports = router;

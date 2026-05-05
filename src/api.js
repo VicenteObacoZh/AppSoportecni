@@ -635,8 +635,8 @@
     }
   }
 
-  return await tryResolve('/geocode/reverse')
-    || await tryResolve('/live/geocode/reverse')
+  return await tryResolve('/live/geocode/reverse')
+    || await tryResolve('/geocode/reverse')
     || null;
 }
  

@@ -26,6 +26,7 @@ function createApp() {
   app.use('/api/health', healthRoutes);
   app.use('/api/auth', authRoutes);
   app.use('/api/dashboard', dashboardRoutes);
+  app.use('/api/geocode', liveRoutes);
   app.use('/api/live', liveRoutes);
   app.use('/api/public', publicRoutes);
   app.use('/share', publicRoutes);

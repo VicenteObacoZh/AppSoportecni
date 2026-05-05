@@ -222,8 +222,9 @@
     }
 
     const hasDevice = Boolean(device);
-    selectedSpeedGauge.hidden = !hasDevice;
-    selectedSpeedGauge.setAttribute('aria-hidden', hasDevice ? 'false' : 'true');
+    const shouldShow = hasDevice && !isSheetOpen();
+    selectedSpeedGauge.hidden = !shouldShow;
+    selectedSpeedGauge.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
     if (hasDevice) {
       selectedSpeedValue.textContent = String(Math.round(getDeviceSpeedKmh(device)));
     }
@@ -963,7 +964,9 @@ function getMarkerUrl(device) {
       return;
     }
     sheet.classList.toggle('mobile-map-sheet--open', isOpen);
+    document.body.classList.toggle('dashboard-body--map-sheet-open', isOpen);
     menuButton.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    syncSelectedSpeedGauge(selectedDevice);
   }
 
   function isSheetOpen() {

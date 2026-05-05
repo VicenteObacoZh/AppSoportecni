@@ -6240,6 +6240,10 @@ img {
   display: none !important;
 }
 
+.dashboard-body--map-sheet-open .mobile-map-speed-gauge {
+  display: none !important;
+}
+
 .mobile-map-speed-gauge strong {
   display: block;
   font-size: 1.25rem;
