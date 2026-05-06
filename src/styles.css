@@ -1380,6 +1380,7 @@ img {
 }
 
 .mobile-map-sheet__tab {
+  position: relative;
   padding: 20px 12px;
   border: 0;
   color: #777;
@@ -1391,7 +1392,20 @@ img {
 
 .mobile-map-sheet__tab--active {
   color: #252525;
-  box-shadow: inset 0 -4px 0 #3a3a3a;
+  box-shadow: none;
+}
+
+.mobile-map-sheet__tab--active::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 7.2ch;
+  max-width: calc(100% - 28px);
+  height: 4px;
+  border-radius: 999px 999px 0 0;
+  background: #3a3a3a;
+  transform: translateX(-50%);
 }
 
 .mobile-map-sheet__search {
@@ -2588,7 +2602,7 @@ img {
 }
 
 .mobile-devices-topbar {
-  padding: 22px 24px;
+  padding: 14px 20px;
   color: #fff;
   background: #4a4546;
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.12);
@@ -2596,7 +2610,8 @@ img {
 
 .mobile-devices-topbar h1 {
   margin: 0;
-  font-size: 2rem;
+  font-size: 1.35rem;
+  line-height: 1.18;
   font-weight: 700;
 }
 
@@ -3733,20 +3748,45 @@ img {
 }
 
 .mobile-devices-kpi {
-  padding: 10px 12px;
-  min-height: 46px;
-  border-radius: 14px;
-  display: flex;
+  display: grid;
+  justify-items: center;
   align-items: center;
+  gap: 3px;
+  min-height: 58px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  text-align: center;
+  box-shadow: 0 5px 14px rgba(19, 23, 31, 0.07);
 }
 
 .mobile-devices-kpi span {
-  display: none;
+  display: block;
+  color: #4f5661;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.15;
 }
 
 .mobile-devices-kpi strong {
-  font-size: 0.84rem;
-  line-height: 1.2;
+  color: #1f232b;
+  font-size: 1.14rem;
+  line-height: 1;
+}
+
+.mobile-devices-kpi--total {
+  background: #fff;
+}
+
+.mobile-devices-kpi--moving {
+  background: #e5f6eb;
+}
+
+.mobile-devices-kpi--idle {
+  background: #edf0f3;
+}
+
+.mobile-devices-kpi--stopped {
+  background: #ffe4df;
 }
 
 /* Mobile settings screen */
@@ -4909,6 +4949,28 @@ img {
   font-size: 0.8rem;
   font-weight: 500;
   line-height: 1.35;
+}
+
+.mobile-map-device-panel--v2 .mobile-map-device-panel__fact-button {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  color: #2a2f37;
+  background: transparent;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1.35;
+  text-align: left;
+}
+
+.mobile-map-device-panel--v2 .mobile-map-device-panel__fact-button:not(:disabled) {
+  cursor: pointer;
+}
+
+.mobile-map-device-panel--v2 .mobile-map-device-panel__fact-button:disabled {
+  color: #6c7480;
 }
 
 .mobile-map-device-panel--v2 .mobile-map-device-panel__buttons {

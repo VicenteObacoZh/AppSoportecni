@@ -32,6 +32,46 @@
     });
   }
 
+  function parseDeviceDateTime(value) {
+    if (!value) {
+      return null;
+    }
+
+    if (value instanceof Date) {
+      return Number.isNaN(value.getTime()) ? null : value;
+    }
+
+    let raw = String(value || '').trim();
+    if (!raw) {
+      return null;
+    }
+
+    if (/^\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(raw)) {
+      raw = `${raw.replace(' ', 'T')}Z`;
+    }
+
+    const parsed = new Date(raw);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  function formatDeviceDateTime(value) {
+    const parsed = parseDeviceDateTime(value);
+    if (!parsed) {
+      return '--';
+    }
+
+    return new Intl.DateTimeFormat('es-EC', {
+      timeZone: 'America/Guayaquil',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    }).format(parsed);
+  }
+
   function syncRuntimeMode(payload) {
     const mode = String(payload?.mode || '').trim().toLowerCase();
     if (!mode) {
@@ -1220,6 +1260,7 @@ async function sendCommandBySession(sessionId, { deviceId, command, authorizatio
     clearManualLogout,
     isSessionError,
     isNetworkError,
-    getUserMessageFromError
+    getUserMessageFromError,
+    formatDeviceDateTime
   };
 })();

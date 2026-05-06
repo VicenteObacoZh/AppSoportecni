@@ -43,7 +43,6 @@
   const deviceCompany = document.getElementById('mapDeviceCompany');
   const deviceSpeed = document.getElementById('mapDeviceSpeed');
   const deviceTime = document.getElementById('mapDeviceTime');
-  const deviceUniqueId = document.getElementById('mapDeviceUniqueId');
   const deviceStatus = document.getElementById('mapDeviceStatus');
   const deviceAddressButton = document.getElementById('mapDeviceAddressButton');
   const deviceCommandButton = document.getElementById('mapDeviceCommandButton');
@@ -285,20 +284,7 @@
   }
 
   function formatDateTime(value) {
-    const parsed = parseApiDateTime(value);
-    if (!parsed) {
-      return '--';
-    }
-
-    return parsed.toLocaleString('es-EC', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false
-    });
+    return apiClient?.formatDeviceDateTime?.(value) || '--';
   }
 
   function updateMapLoadingOverlay(isVisible) {
@@ -761,14 +747,6 @@
     };
   }
 
-  function formatCourse(device) {
-    const course = Number(device?.course ?? device?.heading ?? device?.direction);
-    if (!Number.isFinite(course)) {
-      return 'Curso --';
-    }
-    return `Curso ${Math.round(course)}`;
-  }
-
   function sensorValue(device, keys, fallback = '-') {
     for (const key of keys) {
       const value = device?.[key];
@@ -1020,6 +998,10 @@
 
     if (deviceCompany) {
       deviceCompany.textContent = getAddressLabel(address, selectedDevice);
+    }
+    if (deviceAddressButton) {
+      deviceAddressButton.textContent = address ? getAddressLabel(address, selectedDevice) : 'Obtener direccion';
+      deviceAddressButton.disabled = false;
     }
     if (deviceAddressText && !deviceAddressText.hidden) {
       deviceAddressText.textContent = getAddressLabel(address, selectedDevice);
@@ -1847,15 +1829,17 @@ function angleDelta(from, to) {
     if (deviceCompany) {
       deviceCompany.textContent = getAddressLabel(pickDeviceAddressValue(device) || device.address, device);
     }
+    if (deviceAddressButton) {
+      const address = pickDeviceAddressValue(device) || device.address;
+      deviceAddressButton.textContent = address ? getAddressLabel(address, device) : 'Obtener direccion';
+      deviceAddressButton.disabled = false;
+    }
     setHeaderLocation(pickDeviceAddressValue(device) || device.address);
     if (deviceSpeed) {
       deviceSpeed.textContent = formatSpeed(device.speedKmh);
     }
     if (deviceTime) {
       deviceTime.textContent = formatDateTime(device.fixTime);
-    }
-    if (deviceUniqueId) {
-      deviceUniqueId.textContent = formatCourse(device);
     }
     if (deviceStatus) {
       deviceStatus.textContent = status.label;
@@ -4520,7 +4504,7 @@ function animateMarkerMove(marker, fromLatLng, toLatLng, durationMs = LIVE_MARKE
   });
 
   deviceAddressButton?.addEventListener('click', async () => {
-    if (!selectedDevice || !liveMap) {
+    if (!selectedDevice) {
       return;
     }
     const lat = Number(selectedDevice.lat);
@@ -4528,21 +4512,32 @@ function animateMarkerMove(marker, fromLatLng, toLatLng, durationMs = LIVE_MARKE
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
       return;
     }
-    recenterSelectedDeviceInSafeView({ ...selectedDevice, lat, lon }, { animate: true });
-    if (deviceAddressText) {
-      deviceAddressText.hidden = false;
-      if (!pickDeviceAddressValue(selectedDevice)) {
-        deviceAddressText.textContent = 'Consultando direccion...';
-        const resolved = await resolveAddressNowIfNeeded(selectedDevice);
-        deviceAddressText.textContent = resolved || getAddressLabel('', selectedDevice);
-        if (resolved) {
-          if (deviceCompany) {
-            deviceCompany.textContent = resolved;
-          }
-          setHeaderLocation(resolved);
-        }
-      }
+    if (liveMap) {
+      recenterSelectedDeviceInSafeView({ ...selectedDevice, lat, lon }, { animate: true });
     }
+    const currentAddress = pickDeviceAddressValue(selectedDevice);
+    if (currentAddress) {
+      updateSelectedDeviceAddressView();
+      return;
+    }
+    deviceAddressButton.disabled = true;
+    deviceAddressButton.textContent = 'Consultando direccion...';
+    if (deviceAddressText) {
+      deviceAddressText.hidden = true;
+    }
+    const resolved = await resolveAddressNowIfNeeded(selectedDevice);
+    if (deviceAddressText) {
+      deviceAddressText.hidden = true;
+      deviceAddressText.textContent = '';
+    }
+    if (resolved) {
+      if (deviceCompany) {
+        deviceCompany.textContent = resolved;
+      }
+      setHeaderLocation(resolved);
+    }
+    deviceAddressButton.textContent = resolved || 'Obtener direccion';
+    deviceAddressButton.disabled = false;
   });
 
   deviceInfoButton?.addEventListener('click', () => {

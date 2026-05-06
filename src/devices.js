@@ -641,17 +641,21 @@ function resolveAddressesForVisibleDevices(devices) {
     const offline = devices.filter((item) => getStatusTone(item).key === 'offline').length;
 
     summary.innerHTML = `
-      <article class="mobile-devices-kpi">
-        <strong>Total: ${devices.length}</strong>
+      <article class="mobile-devices-kpi mobile-devices-kpi--total">
+        <span>Total</span>
+        <strong>${devices.length}</strong>
       </article>
-      <article class="mobile-devices-kpi">
-        <strong>Movimiento: ${moving}</strong>
+      <article class="mobile-devices-kpi mobile-devices-kpi--moving">
+        <span>Movimiento</span>
+        <strong>${moving}</strong>
       </article>
-      <article class="mobile-devices-kpi">
-        <strong>Reposo: ${idle}</strong>
+      <article class="mobile-devices-kpi mobile-devices-kpi--idle">
+        <span>Reposo</span>
+        <strong>${idle}</strong>
       </article>
-      <article class="mobile-devices-kpi">
-        <strong>Detenido / sin señal: ${stopped + offline}</strong>
+      <article class="mobile-devices-kpi mobile-devices-kpi--stopped">
+        <span>Detenido / sin señal</span>
+        <strong>${stopped + offline}</strong>
       </article>
     `;
   }
@@ -681,7 +685,7 @@ function resolveAddressesForVisibleDevices(devices) {
     const arrowUrl = `../assets/markers/flecha_${markerColor}.png`;
     const iconUrl = getMarkerUrl(device, markerColor);
     const title = escapeHtml(device.vehicleName || device.name || 'Unidad');
-    const ts = escapeHtml(device.fixTime ? new Date(device.fixTime).toLocaleString() : 'Sin fecha visible');
+    const ts = escapeHtml(apiClient?.formatDeviceDateTime?.(device.fixTime) || 'Sin fecha visible');
     const address = getAddressLabel(device);
     const addressKey = escapeHtml(getAddressKey(device) || '');
     const addressMarkup = address
