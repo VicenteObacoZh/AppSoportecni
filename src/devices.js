@@ -565,31 +565,13 @@ function resolveAddressesForVisibleDevices(devices) {
     });
   }
 
-  function scheduleGeocodeRefreshIfNeeded(devices) {
+  function scheduleGeocodeRefreshIfNeeded(_devices) {
     if (geocodeRefreshTimer) {
       window.clearTimeout(geocodeRefreshTimer);
       geocodeRefreshTimer = null;
     }
 
-    if (geocodeRefreshAttempts >= MAX_GEOCODE_REFRESH_ATTEMPTS) {
-      return;
-    }
-
-    const unresolved = devices.some((device) => {
-      const lat = Number(device?.lat ?? device?.latitude ?? device?.Lat ?? device?.Latitude);
-      const lon = Number(device?.lon ?? device?.longitude ?? device?.Lon ?? device?.Longitude);
-      return Number.isFinite(lat) && Number.isFinite(lon) && !hasAddressText(device);
-    });
-
-    if (!unresolved) {
-      geocodeRefreshAttempts = 0;
-      return;
-    }
-
-    geocodeRefreshAttempts += 1;
-    geocodeRefreshTimer = window.setTimeout(() => {
-      loadDevices();
-    }, 5500);
+    geocodeRefreshAttempts = 0;
   }
 
   function getDeviceSearchText(device) {

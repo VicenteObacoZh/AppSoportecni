@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css?v=34" />
+  <link rel="stylesheet" href="./styles.css?v=36" />
 </head>
 <body class="dashboard-body dashboard-body--map">
   <div class="mobile-map-app">
@@ -17,6 +17,7 @@
       <button class="mobile-map-topbar__back" type="button" id="mapBackButton" aria-label="Volver">&#8592;</button>
       <div class="mobile-map-topbar__title">
         <h1 id="mapHeaderTitle">Mapa</h1>
+        <p id="mapHeaderLocation" hidden></p>
       </div>
       <div class="mobile-map-topbar__status" aria-hidden="true">
         <img src="./assets/device-actions/DeviceInf.png" alt="" />
@@ -379,13 +380,13 @@
     </nav>
   </div>
 
-  <script src="./config.js?v=6"></script>
+  <script src="./config.js?v=7"></script>
   <script src="./mock-data.js?v=3"></script>
-  <script src="./api.js?v=6"></script>
+  <script src="./api.js?v=10"></script>
   <script src="./app-shell.js?v=1"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="./map-viewport-guard.js?v=3"></script>
-  <script src="./map.js?v=49"></script>
+  <script src="./map.js?v=53"></script>
 </body>
 </html>
 

@@ -1181,7 +1181,8 @@ img {
   align-items: center;
   justify-content: flex-start;
   gap: 5px;
-  padding: 10px 12px;
+  min-height: 54px;
+  padding: 5px 12px 4px;
   color: #fff;
   background: #4b4547;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.16);
@@ -1201,14 +1202,38 @@ img {
   display: none;
 }
 
+.mobile-map-topbar__title {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: grid;
+  align-content: center;
+  gap: 1px;
+  padding-top: 1px;
+}
+
 .mobile-map-topbar__title h1 {
   margin: 0;
-  max-width: 190px;
+  max-width: 166px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.82rem;
-  font-weight: 400;
+  font-size: 0.78rem;
+  line-height: 1.05;
+  font-weight: 500;
+}
+
+.mobile-map-topbar__title p {
+  margin: 0;
+  max-width: 190px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  color: #ffd447;
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: 0;
 }
 
 .mobile-map-topbar__status {

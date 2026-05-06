@@ -28,6 +28,7 @@
   const routesButton = document.getElementById('mapRoutesButton');
   const geofenceFabButton = document.getElementById('mapGeofenceFabButton');
   const headerTitle = document.getElementById('mapHeaderTitle');
+  const headerLocation = document.getElementById('mapHeaderLocation');
   const backButton = document.getElementById('mapBackButton');
   const eventPanel = document.getElementById('mapEventPanel');
   const eventPanelGrabber = document.getElementById('mapEventPanelGrabber');
@@ -529,9 +530,14 @@
       return primary;
     }
 
-    const deviceKey = getDeviceAddressKey(fallback);
-    if (deviceKey && resolvedAddressByDevice.has(deviceKey)) {
-      return resolvedAddressByDevice.get(deviceKey);
+    const coordinateKey = getAddressKey(fallback);
+    if (coordinateKey && resolvedAddressByKey.has(coordinateKey)) {
+      return resolvedAddressByKey.get(coordinateKey);
+    }
+
+    const cachedByDevice = getCachedAddressForDevicePosition(fallback);
+    if (cachedByDevice) {
+      return cachedByDevice;
     }
 
     const lat = Number(fallback?.lat ?? fallback?.latitude ?? fallback?.Lat ?? fallback?.Latitude);
@@ -541,6 +547,74 @@
     }
 
     return 'Obteniendo direccion...';
+  }
+
+  function normalizeLocationPart(value) {
+    return String(value || '')
+      .trim()
+      .replace(/^(parroquia|canton|cant[oó]n|provincia(?:\s+de)?)\s+/i, '')
+      .trim();
+  }
+
+  function isLikelyStreetOrVenuePart(value) {
+    const text = normalizeLocationPart(value).toLowerCase();
+    return Boolean(
+      !text ||
+      /^(avenida|av\.?|calle|v[ií]a|e\d+|troncal|ciclov[ií]a|puente|estacionamiento|sal[oó]n|supermercado|hospital|canch[oó]n|uef|upc)\b/.test(text)
+    );
+  }
+
+  function chooseHeaderCityPart(parts, fallbackIndex) {
+    const fallback = parts[fallbackIndex] || '';
+    const fallbackLower = fallback.toLowerCase();
+    const detailCandidates = parts
+      .slice(0, Math.max(0, fallbackIndex))
+      .filter((part) => !isLikelyStreetOrVenuePart(part));
+
+    if (fallbackLower === 'santa elena' && detailCandidates.length) {
+      return detailCandidates[0];
+    }
+
+    return fallback;
+  }
+
+  function formatHeaderLocation(address) {
+    const parts = String(address || '')
+      .split(',')
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .filter((part) => {
+        const normalized = part.toLowerCase();
+        return normalized !== 'ecuador' && !/^\d{5,6}$/.test(part);
+      })
+      .map(normalizeLocationPart)
+      .filter(Boolean);
+
+    if (parts.length < 2) {
+      return '';
+    }
+
+    const province = parts[parts.length - 1];
+    const canton = parts[parts.length - 2];
+    const city = chooseHeaderCityPart(parts, parts.length - 3);
+    const uniqueParts = [province, canton, city].filter((part, index, items) => {
+      if (!part) {
+        return false;
+      }
+      return items.findIndex((item) => item.toLowerCase() === part.toLowerCase()) === index;
+    });
+
+    return uniqueParts.length >= 2 ? `En: ${uniqueParts.join(' - ')}` : '';
+  }
+
+  function setHeaderLocation(address) {
+    if (!headerLocation) {
+      return;
+    }
+
+    const text = formatHeaderLocation(address);
+    headerLocation.textContent = text;
+    headerLocation.hidden = !text;
   }
 
   function isUsableAddressText(value) {
@@ -583,7 +657,10 @@
       resolvedAddressByKey.set(coordinateKey, text);
     }
     if (deviceKey) {
-      resolvedAddressByDevice.set(deviceKey, text);
+      resolvedAddressByDevice.set(deviceKey, {
+        address: text,
+        coordinateKey
+      });
     }
 
     device.address = text;
@@ -602,15 +679,15 @@
       return;
     }
 
-    const deviceKey = getDeviceAddressKey(device);
-    if (deviceKey && resolvedAddressByDevice.has(deviceKey)) {
-      rememberDeviceAddress(device, resolvedAddressByDevice.get(deviceKey));
-      return;
-    }
-
     const coordinateKey = getAddressKey(device);
     if (coordinateKey && resolvedAddressByKey.has(coordinateKey)) {
       rememberDeviceAddress(device, resolvedAddressByKey.get(coordinateKey));
+      return;
+    }
+
+    const cachedByDevice = getCachedAddressForDevicePosition(device);
+    if (cachedByDevice) {
+      rememberDeviceAddress(device, cachedByDevice);
     }
   }
 
@@ -633,7 +710,10 @@
     hydrateDeviceAddress(device);
 
     const currentAddress = pickDeviceAddressValue(current);
-    const selectedAddress = pickDeviceAddressValue(device);
+    const canReuseSelectedAddress = hasSameAddressCoordinate(current, device);
+    const selectedAddress = canReuseSelectedAddress
+      ? pickDeviceAddressValue(device)
+      : '';
     const address = currentAddress || selectedAddress;
 
     if (address) {
@@ -644,9 +724,9 @@
     return {
       ...device,
       ...current,
-      address: address || current.address || device.address,
-      direccion: address || current.direccion || device.direccion,
-      formattedAddress: address || current.formattedAddress || device.formattedAddress
+      address: address || current.address || (canReuseSelectedAddress ? device.address : ''),
+      direccion: address || current.direccion || (canReuseSelectedAddress ? device.direccion : ''),
+      formattedAddress: address || current.formattedAddress || (canReuseSelectedAddress ? device.formattedAddress : '')
     };
   }
 
@@ -816,6 +896,37 @@
     return null;
   }
 
+  function getCachedAddressForDevicePosition(deviceLike) {
+    const deviceKey = getDeviceAddressKey(deviceLike);
+    if (!deviceKey || !resolvedAddressByDevice.has(deviceKey)) {
+      return null;
+    }
+
+    const cached = resolvedAddressByDevice.get(deviceKey);
+    const coordinateKey = getAddressKey(deviceLike);
+    if (typeof cached === 'string') {
+      return coordinateKey ? null : cached;
+    }
+
+    const address = String(cached?.address || '').trim();
+    if (!isUsableAddressText(address)) {
+      return null;
+    }
+
+    const cachedCoordinateKey = String(cached?.coordinateKey || '').trim();
+    if (coordinateKey && cachedCoordinateKey && coordinateKey !== cachedCoordinateKey) {
+      return null;
+    }
+
+    return address;
+  }
+
+  function hasSameAddressCoordinate(first, second) {
+    const firstKey = getAddressKey(first);
+    const secondKey = getAddressKey(second);
+    return Boolean(firstKey && secondKey && firstKey === secondKey);
+  }
+
   function isSameAddressTarget(first, second) {
     const firstDeviceKey = getDeviceAddressKey(first);
     const secondDeviceKey = getDeviceAddressKey(second);
@@ -842,12 +953,15 @@
     }
     const deviceKey = getDeviceAddressKey(targetLike);
     if (deviceKey) {
-      resolvedAddressByDevice.set(deviceKey, address);
+      resolvedAddressByDevice.set(deviceKey, {
+        address,
+        coordinateKey: key
+      });
     }
 
     currentDevices.forEach((item) => {
       const itemKey = getAddressKey(item);
-      if ((itemKey && itemKey === key) || isSameAddressTarget(item, targetLike)) {
+      if (itemKey && itemKey === key) {
         item.address = address;
         item.direccion = address;
         item.formattedAddress = address;
@@ -855,7 +969,7 @@
     });
 
     if (selectedDevice) {
-      if (isSameAddressTarget(selectedDevice, targetLike)) {
+      if (isSameAddressTarget(selectedDevice, targetLike) && hasSameAddressCoordinate(selectedDevice, targetLike)) {
         selectedDevice.address = address;
         selectedDevice.direccion = address;
         selectedDevice.formattedAddress = address;
@@ -865,11 +979,13 @@
 
   function updateSelectedDeviceAddressView() {
     if (!selectedDevice) {
+      setHeaderLocation('');
       return;
     }
 
     hydrateDeviceAddress(selectedDevice);
     const address = pickDeviceAddressValue(selectedDevice) || selectedDevice.address;
+    setHeaderLocation(address);
 
     if (deviceCompany) {
       deviceCompany.textContent = getAddressLabel(address, selectedDevice);
@@ -885,10 +1001,7 @@
       return null;
     }
 
-    const directAddress = getAddressLabel(
-      deviceLike?.address || deviceLike?.direccion || deviceLike?.formattedAddress,
-      null
-    );
+    const directAddress = pickDeviceAddressValue(deviceLike);
     if (directAddress && directAddress !== 'Obteniendo direccion...') {
       applyResolvedAddressToState(deviceLike, directAddress);
       return directAddress;
@@ -898,9 +1011,9 @@
       return resolvedAddressByKey.get(key);
     }
 
-    const deviceKey = getDeviceAddressKey(deviceLike);
-    if (deviceKey && resolvedAddressByDevice.has(deviceKey)) {
-      return resolvedAddressByDevice.get(deviceKey);
+    const cachedByDevice = getCachedAddressForDevicePosition(deviceLike);
+    if (cachedByDevice) {
+      return cachedByDevice;
     }
 
     if (pendingAddressByKey.has(key)) {
@@ -1624,10 +1737,12 @@ function angleDelta(from, to) {
 
     if (selectedEvent) {
       headerTitle.textContent = selectedEvent.vehicleName || 'Evento';
+      setHeaderLocation(selectedEvent.address || '');
       return;
     }
 
     headerTitle.textContent = selectedDevice ? getDeviceDisplayName(selectedDevice) : 'Mapa';
+    setHeaderLocation(selectedDevice ? pickDeviceAddressValue(selectedDevice) || selectedDevice.address : '');
   }
 
   function showDevicePanel(device) {
@@ -1646,6 +1761,7 @@ function angleDelta(from, to) {
     devicePanel.hidden = !hasDevice;
 
     if (!hasDevice) {
+      setHeaderLocation('');
       if (deviceAddressText) {
         deviceAddressText.hidden = true;
       }
@@ -1663,6 +1779,7 @@ function angleDelta(from, to) {
     if (deviceCompany) {
       deviceCompany.textContent = getAddressLabel(pickDeviceAddressValue(device) || device.address, device);
     }
+    setHeaderLocation(pickDeviceAddressValue(device) || device.address);
     if (deviceSpeed) {
       deviceSpeed.textContent = formatSpeed(device.speedKmh);
     }
@@ -1687,6 +1804,7 @@ function angleDelta(from, to) {
         if (deviceCompany) {
           deviceCompany.textContent = resolved;
         }
+        setHeaderLocation(resolved);
         if (deviceAddressText) {
           deviceAddressText.textContent = resolved;
         }
