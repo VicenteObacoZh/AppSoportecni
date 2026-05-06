@@ -3090,25 +3090,16 @@ function getDeviceLiveLatLng(device) {
   }
 
   function bindDevicePopup(marker, device) {
+    const cachedAddress = pickDeviceAddressValue(device) || getCachedAddressForDevicePosition(device) || '';
+    const addressText = cachedAddress || 'Obtener dirección';
+
     marker.bindPopup(`
       <div class="gps-popup">
         <strong>${escapeHtml(device.vehicleName || device.name || 'Unidad')}</strong>
-        <span>Direccion: ${escapeHtml(getAddressLabel(device.address, device))}</span>
+        <span>Direccion: ${escapeHtml(addressText)}</span>
         <span>Velocidad: ${formatSpeed(device.speedKmh)}</span>
       </div>
     `);
-
-    resolveAddressNowIfNeeded(device).then((resolved) => {
-      if (resolved) {
-        marker.setPopupContent(`
-          <div class="gps-popup">
-            <strong>${escapeHtml(device.vehicleName || device.name || 'Unidad')}</strong>
-            <span>Direccion: ${escapeHtml(resolved)}</span>
-            <span>Velocidad: ${formatSpeed(device.speedKmh)}</span>
-          </div>
-        `);
-      }
-    });
   }
 
   function updateTrailForDevice(markerId, marker, device) {

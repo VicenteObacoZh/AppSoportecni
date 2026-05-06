@@ -120,6 +120,7 @@ function updateRenderedAddressByKey(key, address) {
   document.querySelectorAll('[data-device-address-key]').forEach((element) => {
     if (element.dataset.deviceAddressKey === key) {
       element.textContent = `Dirección: ${address}`;
+      element.classList.remove('fleet-device-card__address--loading');
     }
   });
 }
@@ -205,10 +206,7 @@ function resolveAddressesForVisibleDevices(devices) {
       if (deviceKey) {
         resolvedAddressByDevice.set(deviceKey, existingAddress);
       }
-      return;
     }
-
-    resolveAddressNowIfNeeded(device);
   });
 }
 
@@ -540,11 +538,7 @@ function resolveAddressesForVisibleDevices(devices) {
     return resolvedAddressByDevice.get(deviceKey);
   }
 
-  if (key) {
-    return 'Obteniendo dirección...';
-  }
-
-  return 'Obteniendo dirección...';
+  return '';
 }
 
   function hasAddressText(device) {
@@ -659,8 +653,11 @@ function resolveAddressesForVisibleDevices(devices) {
     const iconUrl = getMarkerUrl(device, markerColor);
     const title = escapeHtml(device.vehicleName || device.name || 'Unidad');
     const ts = escapeHtml(device.fixTime ? new Date(device.fixTime).toLocaleString() : 'Sin fecha visible');
-    const address = escapeHtml(getAddressLabel(device));
+    const address = getAddressLabel(device);
     const addressKey = escapeHtml(getAddressKey(device) || '');
+    const addressMarkup = address
+      ? `Dirección: ${escapeHtml(address)}`
+      : `Dirección: <button class="fleet-device-card__address-button" type="button" data-device-address-action-key="${addressKey}">Obtener dirección</button>`;
 
     return `
       <article class="fleet-device-card fleet-device-card--${status.color}" data-device-sheet-id="${escapeHtml(device.deviceId)}" tabindex="0" role="button" aria-label="Abrir acciones de ${title}">
@@ -673,7 +670,7 @@ function resolveAddressesForVisibleDevices(devices) {
             <div class="fleet-device-card__title">${title}</div>
           </div>
           <div class="fleet-device-card__meta">${status.label} | ${ts}</div>
-          <div class="fleet-device-card__meta" data-device-address-key="${addressKey}">Dirección: ${address}</div>
+          <div class="fleet-device-card__meta fleet-device-card__address" data-device-address-key="${addressKey}">${addressMarkup}</div>
         </div>
         <div class="fleet-device-card__speed">${formatSpeed(device.speedKmh)}</div>
       </article>
@@ -1138,6 +1135,37 @@ function resolveAddressesForVisibleDevices(devices) {
     .reduce((items, company) => items.concat(company.items || []), []);
 
   resolveAddressesForVisibleDevices(visibleDevices);
+
+  companyList.querySelectorAll('[data-device-address-action-key]').forEach((button) => {
+    button.addEventListener('click', async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const key = button.getAttribute('data-device-address-action-key') || '';
+      const device = visibleDevices.find((item) => getAddressKey(item) === key);
+      const addressRow = button.closest('[data-device-address-key]');
+      if (!device || !addressRow) {
+        return;
+      }
+
+      button.disabled = true;
+      addressRow.classList.add('fleet-device-card__address--loading');
+      button.textContent = 'Consultando...';
+
+      try {
+        const resolved = await resolveAddressNowIfNeeded(device);
+        if (!resolved) {
+          button.disabled = false;
+          button.textContent = 'Obtener dirección';
+          addressRow.classList.remove('fleet-device-card__address--loading');
+        }
+      } catch {
+        button.disabled = false;
+        button.textContent = 'Obtener dirección';
+        addressRow.classList.remove('fleet-device-card__address--loading');
+      }
+    });
+  });
 
   companyList.querySelectorAll('[data-company-name]').forEach((button) => {
     button.addEventListener('click', () => {

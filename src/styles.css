@@ -3005,6 +3005,25 @@ img {
   line-height: 1.35;
 }
 
+.fleet-device-card__address-button {
+  border: 0;
+  background: transparent;
+  color: #0b76d1;
+  font: inherit;
+  font-weight: 800;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.fleet-device-card__address-button:disabled {
+  color: #777;
+  text-decoration: none;
+}
+
+.fleet-device-card__address--loading {
+  color: #777;
+}
+
 .fleet-device-card__link {
   margin-top: 6px;
   color: #5fa8df;
