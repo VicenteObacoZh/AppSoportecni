@@ -2552,6 +2552,7 @@ function normalizeCommand(commandRaw) {
 
 router.get('/monitor/data', async (req, res) => {
   const sessionId = String(req.query.sessionId || '').trim();
+  const resolveAddresses = String(req.query.resolveAddresses || 'false').trim().toLowerCase() === 'true';
   if (!sessionId) {
     return respondMissingSessionId(res);
   }
@@ -2599,7 +2600,9 @@ router.get('/monitor/data', async (req, res) => {
     }
 
     const data = buildMonitorSummary(payload);
-    await fillMissingAddresses(data.devices);
+    if (resolveAddresses) {
+      await fillMissingAddresses(data.devices);
+    }
 
     return res.json({
       ok: true,

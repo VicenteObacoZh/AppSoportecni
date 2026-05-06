@@ -1,5 +1,36 @@
 (function () {
   const config = window.GpsRastreoConfig || {};
+  const DEBUG_PERFORMANCE = Boolean(config.debugPerformance || window.DEBUG_PERFORMANCE === true);
+  const MONITOR_CACHE_TTL_MS = Number(config.monitorCacheTtlMs || 12000);
+  const monitorCache = {
+    sessionId: '',
+    timestamp: 0,
+    payload: null,
+    promise: null
+  };
+  const reverseGeocodeCacheByKey = new Map();
+  const reverseGeocodePendingByKey = new Map();
+
+  function perfLog(label, detail = {}) {
+    if (!DEBUG_PERFORMANCE) {
+      return;
+    }
+
+    console.debug(`[Perf] ${label}`, detail);
+  }
+
+  function perfNow() {
+    return typeof performance !== 'undefined' && typeof performance.now === 'function'
+      ? performance.now()
+      : Date.now();
+  }
+
+  function perfMeasure(label, start, detail = {}) {
+    perfLog(label, {
+      ...detail,
+      ms: Math.round(perfNow() - start)
+    });
+  }
 
   function syncRuntimeMode(payload) {
     const mode = String(payload?.mode || '').trim().toLowerCase();
@@ -565,12 +596,146 @@
     return payload?.data || null;
   }
 
+  async function getMonitorPayloadBySession(sessionId, options = {}) {
+    const force = Boolean(options.force);
+    const now = Date.now();
+
+    if (
+      !force &&
+      monitorCache.sessionId === sessionId &&
+      monitorCache.payload &&
+      now - monitorCache.timestamp < MONITOR_CACHE_TTL_MS
+    ) {
+      perfLog('monitor/data cache hit', {
+        ageMs: now - monitorCache.timestamp
+      });
+      return monitorCache.payload;
+    }
+
+    if (!force && monitorCache.sessionId === sessionId && monitorCache.promise) {
+      perfLog('monitor/data pending reuse');
+      return monitorCache.promise;
+    }
+
+    const query = new URLSearchParams({
+      sessionId,
+      resolveAddresses: 'false',
+      mobile: 'true'
+    });
+    const started = perfNow();
+
+    monitorCache.sessionId = sessionId;
+    monitorCache.promise = request(`${config.endpoints.liveMonitorData || '/live/monitor/data'}?${query.toString()}`)
+      .then((payload) => {
+        monitorCache.payload = payload;
+        monitorCache.timestamp = Date.now();
+        syncRuntimeMode(payload);
+        perfMeasure('monitor/data request', started, {
+          devices: payload?.data?.devices?.length || 0
+        });
+        return payload;
+      })
+      .finally(() => {
+        monitorCache.promise = null;
+      });
+
+    return monitorCache.promise;
+  }
+
+  function buildDashboardFromMonitor(live, sessionId, liveAlerts = null) {
+    const alertItems = Array.isArray(liveAlerts?.items) ? liveAlerts.items : [];
+    const activeAlerts = alertItems.filter((item) => item?.activo);
+    const topAlert = activeAlerts[0] || alertItems[0] || null;
+
+    return {
+      kpis: [
+        { label: 'Unidades visibles', value: String(live.summary.total), detail: 'Dispositivos cargados desde Monitor?handler=Data.' },
+        { label: 'En movimiento', value: String(live.summary.moving), detail: 'Velocidad mayor a 3 km/h en la ultima lectura.' },
+        { label: 'Con ubicacion', value: String(live.summary.withLocation), detail: 'Unidades con latitud y longitud disponibles.' },
+        { label: 'Empresas', value: String(live.summary.companies), detail: 'Empresas visibles dentro del alcance del usuario.' },
+        { label: 'Alertas activas', value: String(liveAlerts?.summary?.active ?? 0), detail: 'Configuraciones activas detectadas en el modulo Alertas.' },
+        { label: 'Tipos de alerta', value: String(liveAlerts?.summary?.types ?? 0), detail: 'Variedad de reglas activas disponibles para la operacion.' }
+      ],
+      alerts: (alertItems.length > 0
+        ? alertItems.slice(0, 6).map((item) => ({
+            time: item.activo ? 'activa' : 'inactiva',
+            title: item.nombre || 'Alerta',
+            detail: `${item.tipo || 'Sin tipo'} | ${item.dispositivos || 0} dispositivos vinculados`,
+            badge: item.activo ? 'Activa' : 'Inactiva',
+            tone: item.activo ? 'success' : 'muted'
+          }))
+        : [
+            { time: 'live', title: `Usuario autenticado: ${live.userName || 'sin nombre visible'}` },
+            { time: 'live', title: `Empresa activa: ${live.empresaNombre || 'sin empresa'}` },
+            { time: 'live', title: `Cliente portal: ${live.clienteId || 'sin cliente'}` },
+            { time: 'live', title: `Dispositivos procesados: ${live.afterCount || live.summary.total}` }
+          ]),
+      roadmap: [
+        { area: 'Monitor', detail: 'Sesion real conectada al handler Data del monitor.' },
+        { area: 'Alertas', detail: liveAlerts ? 'Modulo Alertas conectado con handler List.' : 'Alertas diferidas para no bloquear dispositivos/mapa.' },
+        { area: 'Mapa', detail: 'Pintando dispositivos reales sobre Leaflet en la nueva interfaz.' },
+        { area: 'Siguiente paso', detail: 'Consumir rutas, eventos detallados y geocercas reales con la misma sessionId.' }
+      ],
+      devices: live.devices || [],
+      highlightedUnit: live.devices?.[0]
+        ? {
+            name: live.devices[0].vehicleName || live.devices[0].name || 'Primera unidad visible',
+            detail: `IMEI ${live.devices[0].uniqueId || '-'} | ${live.devices[0].groupName || 'Sin empresa'}`
+          }
+        : {
+            name: 'Sin unidades',
+            detail: 'La sesion esta activa pero no devolvio dispositivos.'
+          },
+      latestAlert: {
+        title: topAlert
+          ? `${topAlert.nombre || 'Alerta'}`
+          : 'Monitor real conectado',
+        detail: topAlert
+          ? `${topAlert.tipo || 'Sin tipo'} | ${topAlert.dispositivos || 0} dispositivos | ${topAlert.activo ? 'Activa' : 'Inactiva'}`
+          : `La sesion ${sessionId.slice(0, 8)}... ya puede consultar datos autenticados del portal.`
+      },
+      alertSummary: liveAlerts?.summary || null
+    };
+  }
+
+  async function getMonitorDashboard(options = {}) {
+    const sessionId = ensureSessionId();
+    let payload;
+
+    try {
+      payload = await getMonitorPayloadBySession(sessionId, options);
+    } catch (error) {
+      throw handleClientError(error, {
+        context: 'dashboard-monitor-data',
+        emit: true,
+        clearOnSession: true
+      });
+    }
+
+    if (payload?.ok && payload?.data) {
+      return buildDashboardFromMonitor(payload.data, sessionId, null);
+    }
+
+    const fallback = await request(config.endpoints.dashboard || '/dashboard');
+    return fallback.data || fallback;
+  }
+
   async function reverseGeocode(lat, lon) {
   const latitude = Number(lat);
   const longitude = Number(lon);
 
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
     return null;
+  }
+
+  const cacheKey = `${latitude.toFixed(5)},${longitude.toFixed(5)}`;
+  if (reverseGeocodeCacheByKey.has(cacheKey)) {
+    perfLog('reverse geocode cache hit', { key: cacheKey });
+    return reverseGeocodeCacheByKey.get(cacheKey);
+  }
+  if (reverseGeocodePendingByKey.has(cacheKey)) {
+    perfLog('reverse geocode pending reuse', { key: cacheKey });
+    return reverseGeocodePendingByKey.get(cacheKey);
   }
 
   const query = new URLSearchParams({
@@ -635,9 +800,27 @@
     }
   }
 
-  return await tryResolve('/live/geocode/reverse')
-    || await tryResolve('/geocode/reverse')
-    || null;
+  const started = perfNow();
+  const pending = (async () => {
+    const resolved = await tryResolve('/live/geocode/reverse')
+      || await tryResolve('/geocode/reverse')
+      || null;
+    if (resolved) {
+      reverseGeocodeCacheByKey.set(cacheKey, resolved);
+    }
+    perfMeasure('reverse geocode', started, {
+      key: cacheKey,
+      hit: Boolean(resolved)
+    });
+    return resolved;
+  })();
+
+  reverseGeocodePendingByKey.set(cacheKey, pending);
+  try {
+    return await pending;
+  } finally {
+    reverseGeocodePendingByKey.delete(cacheKey);
+  }
 }
  
 async function sendCommandBySession(sessionId, { deviceId, command, authorizationKey }) {
@@ -759,13 +942,17 @@ async function sendCommandBySession(sessionId, { deviceId, command, authorizatio
       }
     },
 
+    async getMonitorDashboard(options = {}) {
+      return getMonitorDashboard(options);
+    },
+
     async getDashboard() {
       const sessionId = ensureSessionId();
 
       if (sessionId) {
         let payload;
         try {
-          payload = await request(`${config.endpoints.liveMonitorData || '/live/monitor/data'}?sessionId=${encodeURIComponent(sessionId)}`);
+          payload = await getMonitorPayloadBySession(sessionId);
         } catch (error) {
           throw handleClientError(error, {
             context: 'dashboard-monitor-data',
@@ -775,7 +962,6 @@ async function sendCommandBySession(sessionId, { deviceId, command, authorizatio
         }
 
         if (payload?.ok && payload?.data) {
-          syncRuntimeMode(payload);
           const live = payload.data;
           let liveAlerts = null;
           try {
@@ -783,59 +969,7 @@ async function sendCommandBySession(sessionId, { deviceId, command, authorizatio
           } catch {
             liveAlerts = null;
           }
-          const alertItems = Array.isArray(liveAlerts?.items) ? liveAlerts.items : [];
-          const activeAlerts = alertItems.filter((item) => item?.activo);
-          const topAlert = activeAlerts[0] || alertItems[0] || null;
-
-          return {
-            kpis: [
-              { label: 'Unidades visibles', value: String(live.summary.total), detail: 'Dispositivos cargados desde Monitor?handler=Data.' },
-              { label: 'En movimiento', value: String(live.summary.moving), detail: 'Velocidad mayor a 3 km/h en la ultima lectura.' },
-              { label: 'Con ubicacion', value: String(live.summary.withLocation), detail: 'Unidades con latitud y longitud disponibles.' },
-              { label: 'Empresas', value: String(live.summary.companies), detail: 'Empresas visibles dentro del alcance del usuario.' },
-              { label: 'Alertas activas', value: String(liveAlerts?.summary?.active ?? 0), detail: 'Configuraciones activas detectadas en el modulo Alertas.' },
-              { label: 'Tipos de alerta', value: String(liveAlerts?.summary?.types ?? 0), detail: 'Variedad de reglas activas disponibles para la operacion.' }
-            ],
-            alerts: (alertItems.length > 0
-              ? alertItems.slice(0, 6).map((item) => ({
-                  time: item.activo ? 'activa' : 'inactiva',
-                  title: item.nombre || 'Alerta',
-                  detail: `${item.tipo || 'Sin tipo'} | ${item.dispositivos || 0} dispositivos vinculados`,
-                  badge: item.activo ? 'Activa' : 'Inactiva',
-                  tone: item.activo ? 'success' : 'muted'
-                }))
-              : [
-                  { time: 'live', title: `Usuario autenticado: ${live.userName || 'sin nombre visible'}` },
-                  { time: 'live', title: `Empresa activa: ${live.empresaNombre || 'sin empresa'}` },
-                  { time: 'live', title: `Cliente portal: ${live.clienteId || 'sin cliente'}` },
-                  { time: 'live', title: `Dispositivos procesados: ${live.afterCount || live.summary.total}` }
-                ]),
-            roadmap: [
-              { area: 'Monitor', detail: 'Sesion real conectada al handler Data del monitor.' },
-              { area: 'Alertas', detail: liveAlerts ? 'Modulo Alertas conectado con handler List.' : 'Pendiente validar handler List del modulo Alertas.' },
-              { area: 'Mapa', detail: 'Pintando dispositivos reales sobre Leaflet en la nueva interfaz.' },
-              { area: 'Siguiente paso', detail: 'Consumir rutas, eventos detallados y geocercas reales con la misma sessionId.' }
-            ],
-            devices: live.devices || [],
-            highlightedUnit: live.devices?.[0]
-              ? {
-                  name: live.devices[0].vehicleName || live.devices[0].name || 'Primera unidad visible',
-                  detail: `IMEI ${live.devices[0].uniqueId || '-'} | ${live.devices[0].groupName || 'Sin empresa'}`
-                }
-              : {
-                  name: 'Sin unidades',
-                  detail: 'La sesion esta activa pero no devolvio dispositivos.'
-                },
-            latestAlert: {
-              title: topAlert
-                ? `${topAlert.nombre || 'Alerta'}`
-                : 'Monitor real conectado',
-              detail: topAlert
-                ? `${topAlert.tipo || 'Sin tipo'} | ${topAlert.dispositivos || 0} dispositivos | ${topAlert.activo ? 'Activa' : 'Inactiva'}`
-                : `La sesion ${sessionId.slice(0, 8)}... ya puede consultar datos autenticados del portal.`
-            },
-            alertSummary: liveAlerts?.summary || null
-          };
+          return buildDashboardFromMonitor(live, sessionId, liveAlerts);
         }
       }
 
@@ -1019,6 +1153,7 @@ async function sendCommandBySession(sessionId, { deviceId, command, authorizatio
     },
 
     async getSessionInfo() {
+      const started = perfNow();
       const sessionId = getStoredSessionId();
       if (!sessionId) {
       if (hasManualLogout()) {
@@ -1029,6 +1164,7 @@ async function sendCommandBySession(sessionId, { deviceId, command, authorizatio
         if (latest?.id) {
           syncRuntimeMode(latest);
           storeSessionId(latest.id);
+          perfMeasure('session load', started, { source: 'latest-session' });
           return latest;
           }
         } catch (error) {
@@ -1050,6 +1186,7 @@ async function sendCommandBySession(sessionId, { deviceId, command, authorizatio
       try {
         const payload = await request(`${config.endpoints.authSession || '/auth/session'}/${encodeURIComponent(sessionId)}`);
         syncRuntimeMode(payload);
+        perfMeasure('session load', started, { source: 'stored-session' });
         return payload;
       } catch (error) {
         const handled = handleClientError(error, {

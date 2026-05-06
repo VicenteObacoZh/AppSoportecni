@@ -40,9 +40,38 @@
   let activeSheetDeviceId = '';
   let deviceRenameAbortController = null;
   let activeReportRequest = null;
+  let loadDevicesPromise = null;
+  let lastCompaniesRenderKey = '';
+  const DEBUG_PERFORMANCE = Boolean(window.GpsRastreoConfig?.debugPerformance || window.DEBUG_PERFORMANCE === true);
 let resolvedAddressByKey = new Map();
 let pendingAddressByKey = new Map();
 let resolvedAddressByDevice = new Map();
+
+function perfLog(label, detail = {}) {
+  if (!DEBUG_PERFORMANCE) {
+    return;
+  }
+  console.debug(`[Perf][Devices] ${label}`, detail);
+}
+
+function perfNow() {
+  return typeof performance !== 'undefined' && typeof performance.now === 'function'
+    ? performance.now()
+    : Date.now();
+}
+
+function debounce(fn, waitMs = 160) {
+  let timer = null;
+  return (...args) => {
+    if (timer) {
+      window.clearTimeout(timer);
+    }
+    timer = window.setTimeout(() => {
+      timer = null;
+      fn(...args);
+    }, waitMs);
+  };
+}
 
 function getAddressKey(device) {
   const lat = Number(device?.lat ?? device?.latitude ?? device?.Lat ?? device?.Latitude);
@@ -1104,7 +1133,21 @@ function resolveAddressesForVisibleDevices(devices) {
   function renderCompanies() {
   if (!companyList) return;
 
+  const started = perfNow();
   const companies = getFilteredCompanies();
+  const renderKey = JSON.stringify({
+    query: String(searchInput?.value || '').trim().toLowerCase(),
+    filter: currentFilter,
+    expanded: expandedCompany,
+    counts: companies.map((company) => `${company.name}:${company.items.length}`).join('|')
+  });
+
+  if (renderKey === lastCompaniesRenderKey) {
+    perfLog('render cards skipped', { reason: 'same-filter-state' });
+    return;
+  }
+  lastCompaniesRenderKey = renderKey;
+
   if (!companies.length) {
     companyList.innerHTML = '<div class="mobile-map-empty">No hay dispositivos para el filtro actual.</div>';
     return;
@@ -1225,16 +1268,30 @@ function resolveAddressesForVisibleDevices(devices) {
       appShell?.navigate?.('./routes.html', { deviceId, from: 'devices' });
     });
   });
+
+  perfLog('render cards', {
+    ms: Math.round(perfNow() - started),
+    companies: companies.length,
+    expandedDevices: visibleDevices.length
+  });
 }
 
   async function loadDevices() {
     if (!apiClient) return;
+    if (loadDevicesPromise) {
+      return loadDevicesPromise;
+    }
+
+    loadDevicesPromise = (async () => {
+    const started = perfNow();
     companyList.innerHTML = createLoadingMarkup();
 
     try {
+      const sessionStarted = perfNow();
       const session = await appShell?.requireSession?.({
         redirectOnMissing: true
       });
+      perfLog('session load', { ms: Math.round(perfNow() - sessionStarted) });
 
       if (!session) {
         companyList.innerHTML = '<div class="mobile-map-empty">Inicia sesión para ver la flota.</div>';
@@ -1242,7 +1299,14 @@ function resolveAddressesForVisibleDevices(devices) {
         return;
       }
 
-      const dashboard = await apiClient.getDashboard();
+      const monitorStarted = perfNow();
+      const dashboard = await (apiClient.getMonitorDashboard
+        ? apiClient.getMonitorDashboard()
+        : apiClient.getDashboard());
+      perfLog('monitor/dashboard', {
+        ms: Math.round(perfNow() - monitorStarted),
+        devices: dashboard?.devices?.length || 0
+      });
       currentDevices = Array.isArray(dashboard.devices) ? dashboard.devices : [];
       buildGroups(currentDevices);
       renderSummary(currentDevices);
@@ -1252,12 +1316,25 @@ function resolveAddressesForVisibleDevices(devices) {
       renderCompanies();
       restoreRequestedDeviceSheet();
       scheduleGeocodeRefreshIfNeeded(currentDevices);
+      perfLog('load total', {
+        ms: Math.round(perfNow() - started),
+        devices: currentDevices.length
+      });
     } catch (error) {
-      console.error('[Devices] loadDevices failed', error);
+      if (DEBUG_PERFORMANCE) {
+        console.error('[Devices] loadDevices failed', error);
+      }
       const message = apiClient?.getUserMessageFromError?.(error) || 'No fue posible cargar los dispositivos.';
-      companyList.innerHTML = `<div class="mobile-map-empty">${escapeHtml(message)}</div>`;
-      renderSummary([]);
+      if (!currentDevices.length) {
+        companyList.innerHTML = `<div class="mobile-map-empty">${escapeHtml(message)}</div>`;
+        renderSummary([]);
+      }
+    } finally {
+      loadDevicesPromise = null;
     }
+    })();
+
+    return loadDevicesPromise;
   }
 
   filterButtons.forEach((button) => {
@@ -1268,7 +1345,7 @@ function resolveAddressesForVisibleDevices(devices) {
     });
   });
 
-  searchInput?.addEventListener('input', renderCompanies);
+  searchInput?.addEventListener('input', debounce(renderCompanies, 180));
   deviceActionsSheetBackdrop?.addEventListener('click', closeDeviceActionsSheet);
   deviceActionsSheetClose?.addEventListener('click', closeDeviceActionsSheet);
   deviceActionsSheet?.querySelectorAll('[data-device-sheet-action]').forEach((button) => {
