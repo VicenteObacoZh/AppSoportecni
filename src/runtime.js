@@ -431,11 +431,13 @@
       }
     }
 
-    apiClient.getSessionInfo().then((session) => {
-      if (session && window.location.pathname.endsWith('/login.html')) {
-        window.location.href = new URL('./map.html', window.location.href).toString();
-      }
-    }).catch(() => {});
+    if (apiClient.getStoredSessionId?.()) {
+      apiClient.getSessionInfo().then((session) => {
+        if (session && window.location.pathname.endsWith('/login.html')) {
+          window.location.href = new URL('./map.html', window.location.href).toString();
+        }
+      }).catch(() => {});
+    }
 
     loginForm.addEventListener('submit', (event) => {
       event.preventDefault();
@@ -454,13 +456,11 @@
 
         setLoginUiState('success', 'Ingreso correcto. Abriendo el mapa...');
 
-        window.setTimeout(() => {
-          const nextUrl = new URL('./map.html', window.location.href);
-          if (result?.sessionId) {
-            nextUrl.searchParams.set('sessionId', result.sessionId);
-          }
-          window.location.href = nextUrl.toString();
-        }, 700);
+        const nextUrl = new URL('./map.html', window.location.href);
+        if (result?.sessionId) {
+          nextUrl.searchParams.set('sessionId', result.sessionId);
+        }
+        window.location.href = nextUrl.toString();
       }).catch((error) => {
         const validationMessages = Array.isArray(error?.payload?.validationMessages)
           ? error.payload.validationMessages.filter(Boolean)

@@ -560,10 +560,10 @@
     const lat = Number(fallback?.lat ?? fallback?.latitude ?? fallback?.Lat ?? fallback?.Latitude);
     const lon = Number(fallback?.lon ?? fallback?.longitude ?? fallback?.Lon ?? fallback?.Longitude);
     if (Number.isFinite(lat) && Number.isFinite(lon)) {
-      return 'Obteniendo direccion...';
+      return 'Obteniendo dirección...';
     }
 
-    return 'Obteniendo direccion...';
+    return 'Obteniendo dirección...';
   }
 
   function normalizeLocationPart(value) {
@@ -1000,7 +1000,7 @@
       deviceCompany.textContent = getAddressLabel(address, selectedDevice);
     }
     if (deviceAddressButton) {
-      deviceAddressButton.textContent = address ? getAddressLabel(address, selectedDevice) : 'Obtener direccion';
+      deviceAddressButton.textContent = address ? getAddressLabel(address, selectedDevice) : 'Obtener dirección';
       deviceAddressButton.disabled = false;
     }
     if (deviceAddressText && !deviceAddressText.hidden) {
@@ -1015,7 +1015,7 @@
     }
 
     const directAddress = pickDeviceAddressValue(deviceLike);
-    if (directAddress && directAddress !== 'Obteniendo direccion...') {
+    if (directAddress && directAddress !== 'Obteniendo dirección...') {
       applyResolvedAddressToState(deviceLike, directAddress);
       return directAddress;
     }
@@ -1831,7 +1831,7 @@ function angleDelta(from, to) {
     }
     if (deviceAddressButton) {
       const address = pickDeviceAddressValue(device) || device.address;
-      deviceAddressButton.textContent = address ? getAddressLabel(address, device) : 'Obtener direccion';
+      deviceAddressButton.textContent = address ? getAddressLabel(address, device) : 'Obtener dirección';
       deviceAddressButton.disabled = false;
     }
     setHeaderLocation(pickDeviceAddressValue(device) || device.address);
@@ -3135,7 +3135,7 @@ function getDeviceLiveLatLng(device) {
     marker.bindPopup(`
       <div class="gps-popup">
         <strong>${escapeHtml(device.vehicleName || device.name || 'Unidad')}</strong>
-        <span>Direccion: ${escapeHtml(addressText)}</span>
+        <span>Dirección: ${escapeHtml(addressText)}</span>
         <span>Velocidad: ${formatSpeed(device.speedKmh)}</span>
       </div>
     `);
@@ -4214,6 +4214,28 @@ function getDeviceLiveLatLng(device) {
     }
   }
 
+  function primeSelectedDeviceView() {
+    if (selectedEvent || !selectedDevice?.deviceId) {
+      return;
+    }
+
+    showDevicePanel(selectedDevice);
+
+    const lat = Number(selectedDevice.lat);
+    const lon = Number(selectedDevice.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      updateMapLoadingOverlay(false);
+      return;
+    }
+
+    currentDevices = [selectedDevice];
+    renderMap(currentDevices);
+    if (liveMap) {
+      recenterSelectedDeviceInSafeView(selectedDevice, { animate: false });
+    }
+    updateMapLoadingOverlay(false);
+  }
+
 function getDeviceHeading(device, fallback = 0) {
   const value = Number(device?.course ?? device?.heading ?? device?.direction);
   return Number.isFinite(value) ? value : fallback;
@@ -4521,7 +4543,7 @@ function animateMarkerMove(marker, fromLatLng, toLatLng, durationMs = LIVE_MARKE
       return;
     }
     deviceAddressButton.disabled = true;
-    deviceAddressButton.textContent = 'Consultando direccion...';
+    deviceAddressButton.textContent = 'Consultando dirección...';
     if (deviceAddressText) {
       deviceAddressText.hidden = true;
     }
@@ -4536,7 +4558,7 @@ function animateMarkerMove(marker, fromLatLng, toLatLng, durationMs = LIVE_MARKE
       }
       setHeaderLocation(resolved);
     }
-    deviceAddressButton.textContent = resolved || 'Obtener direccion';
+    deviceAddressButton.textContent = resolved || 'Obtener dirección';
     deviceAddressButton.disabled = false;
   });
 
@@ -4684,7 +4706,7 @@ function animateMarkerMove(marker, fromLatLng, toLatLng, durationMs = LIVE_MARKE
     }
     infoAddress.hidden = !infoAddress.hidden;
     if (!infoAddress.hidden && selectedDevice && !pickDeviceAddressValue(selectedDevice)) {
-      infoAddress.textContent = 'Consultando direccion...';
+      infoAddress.textContent = 'Consultando dirección...';
       const resolved = await resolveAddressNowIfNeeded(selectedDevice);
       infoAddress.textContent = resolved || getAddressLabel('', selectedDevice);
     }
@@ -4817,6 +4839,7 @@ function animateMarkerMove(marker, fromLatLng, toLatLng, durationMs = LIVE_MARKE
   syncGeofencesControls();
   setTrafficVisible(false);
   applyEventFocusState();
+  primeSelectedDeviceView();
   loadMapPage();
   startAutoRefresh();
 })();
