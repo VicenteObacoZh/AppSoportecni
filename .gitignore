@@ -6,8 +6,17 @@ node_modules/
 dist/
 build/
 www/
-android/
 ios/
+
+# Android source is versioned; keep local/build/signing artifacts out of Git.
+*.apk
+*.aab
+*.jks
+*.keystore
+*.p12
+android/.gradle/
+android/**/build/
+android/local.properties
 
 # Environment
 .env

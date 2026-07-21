@@ -37,7 +37,6 @@
 
   function resolveBackendBaseUrl() {
     const productionFallback = 'https://rastreo.soportecni.com/api';
-    const localFallback = 'http://10.0.2.2:4100/api';
 
     if (typeof window === 'undefined' || !window.location) {
       return productionFallback;
@@ -63,40 +62,20 @@
       return productionFallback;
     }
 
-    const currentHost = String(window.location.hostname || '').toLowerCase();
-    const isLocalHost = currentHost === 'localhost' || currentHost === '127.0.0.1' || currentHost === '10.0.2.2';
-    return isLocalHost ? localFallback : productionFallback;
+    return productionFallback;
   }
 
   function resolveBackendBaseUrlCandidates() {
     const primary = resolveBackendBaseUrl();
     const productionFallback = 'https://rastreo.soportecni.com/api';
-    const localFallback = 'http://10.0.2.2:4100/api';
     const configuredBaseUrl = readConfiguredBaseUrl();
     const candidates = [];
 
     if (configuredBaseUrl) {
       candidates.push(primary);
     } else if (typeof window !== 'undefined') {
-      const isNativeCapacitor = Boolean(
-        window.Capacitor?.isNativePlatform?.() ||
-        window.CapacitorAndroid ||
-        window.webkit?.messageHandlers?.bridge
-      );
-      const isCapacitorApp =
-        isNativeCapacitor ||
-        window.location.protocol === 'capacitor:' ||
-        window.location.protocol === 'file:';
-      const currentHost = String(window.location.hostname || '').toLowerCase();
-      const isLocalHost = currentHost === 'localhost' || currentHost === '127.0.0.1' || currentHost === '10.0.2.2';
       candidates.push(primary || 'https://rastreo.soportecni.com');
       candidates.push(productionFallback);
-      if (isLocalHost) {
-        candidates.push('http://10.0.2.2:4100');
-        candidates.push('http://localhost:4100');
-      } else if (isCapacitorApp) {
-        candidates.push(localFallback);
-      }
     } else {
       candidates.push(primary);
     }

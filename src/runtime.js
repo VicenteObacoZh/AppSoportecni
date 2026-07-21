@@ -120,17 +120,21 @@
         return null;
       }
 
-      return {
+      const saved = {
         email: String(parsed.email || ''),
-        password: String(parsed.password || ''),
         remember: Boolean(parsed.remember)
       };
+      // Migrate legacy entries that included a plaintext password.
+      if (Object.prototype.hasOwnProperty.call(parsed, 'password')) {
+        window.localStorage.setItem('gpsrastreo.savedCredentials', JSON.stringify(saved));
+      }
+      return saved;
     } catch {
       return null;
     }
   }
 
-  function saveCredentials(email, password, remember) {
+  function saveCredentials(email, remember) {
     if (typeof window === 'undefined') {
       return;
     }
@@ -143,7 +147,6 @@
 
       window.localStorage.setItem('gpsrastreo.savedCredentials', JSON.stringify({
         email: String(email || ''),
-        password: String(password || ''),
         remember: true
       }));
     } catch {
@@ -423,9 +426,6 @@
       if (loginForm.elements.email) {
         loginForm.elements.email.value = savedCredentials.email;
       }
-      if (loginForm.elements.password) {
-        loginForm.elements.password.value = savedCredentials.password;
-      }
       if (rememberCredentials) {
         rememberCredentials.checked = savedCredentials.remember;
       }
@@ -450,7 +450,6 @@
       }).then((result) => {
         saveCredentials(
           loginForm.elements.email.value,
-          loginForm.elements.password.value,
           Boolean(rememberCredentials?.checked)
         );
 

@@ -94,21 +94,6 @@
     return String(value || '').trim().replace(/\/$/, '');
   }
 
-  function isLoopbackBaseUrl(value) {
-    const normalized = normalizeBaseUrl(value);
-    if (!normalized) {
-      return false;
-    }
-
-    try {
-      const parsed = new URL(normalized);
-      const host = String(parsed.hostname || '').toLowerCase();
-      return host === 'localhost' || host === '127.0.0.1';
-    } catch {
-      return false;
-    }
-  }
-
   function getBackendBaseUrls() {
     const candidates = [];
     const configuredCandidates = Array.isArray(config.backendBaseUrlCandidates)
@@ -143,8 +128,7 @@
       return primary;
     }
 
-    const preferred = candidates.find((item) => !isLoopbackBaseUrl(item));
-    return preferred || primary;
+    return primary;
   }
 
   function buildUrl(path, baseUrl) {

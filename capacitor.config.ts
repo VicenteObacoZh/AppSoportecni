@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'Soportecni GPS',
   webDir: 'www',
   server: {
-    androidScheme: 'http'
+    androidScheme: 'https'
   },
   bundledWebRuntime: false
 };
